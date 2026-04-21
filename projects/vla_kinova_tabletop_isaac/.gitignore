@@ -1,0 +1,30 @@
+# Project-local secrets and generated files
+.env
+.snapshot.env
+
+# ROS 2 workspace build artifacts
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# ROS 2 workspace kortex packages (these will be imported automatically using vcs)
+ros2_ws/src/control_msgs
+ros2_ws/src/picknik_controllers
+ros2_ws/src/realtime_tools
+ros2_ws/src/ros2_control
+ros2_ws/src/ros2_controllers
+ros2_ws/src/ros2_kortex
+ros2_ws/src/ros2_robotiq_gripper
+ros2_ws/src/serial
+
+# Training output
+artifacts/
+runs/
+wandb/
+checkpoints/
+*.pt
+*.pth
+
+# Python
+__pycache__/
+*.pyc
