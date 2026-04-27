@@ -7,8 +7,8 @@
                 double radius = 2.6735292434692384
             }
             dictionary Perspective = {
-                double3 position = (-0.10548516016732669, -1.103739067982215, 1.9298968933949108)
-                double3 target = (5.5621985898581165, 22.55617576198107, -15.99779466700096)
+                double3 position = (1.6585910519019815, -1.074754688494898, 1.4684416410707717)
+                double3 target = (-16.551985439120074, 20.59420220870971, -15.239980328640588)
             }
             dictionary Right = {
                 double3 position = (-0.0025831043571606276, -5, 1.2875876568113325)
@@ -508,38 +508,40 @@ def Xform "World"
                 prepend token[] inputs:jointNames.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/SubscriberJointState.outputs:jointNames>
                 custom double[] inputs:positionCommand
                 prepend double[] inputs:positionCommand.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/SubscriberJointState.outputs:positionCommand>
-                custom string inputs:script = '''def compute(db):
-\t# Retrieve inputs from the ros subscriber
-\tnames = list(db.inputs.jointNames)
-\tpos = list(db.inputs.positionCommand)
-\tvel = list(db.inputs.velocityCommand)
-\teff = list(db.inputs.effortCommand)
+                custom string inputs:script = '''import omni.graph.core as og
 
-\t# Only command the joints which exists in the articulation 
-\t# We want to keep only the joints which actually have a joint drive
-\t# For the gripper these are just the left and right knuckle joints, the other ones are now all passive
-\tvalid_joints = [
-\t\t"joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6",
-\t\t"robotiq_85_left_knuckle_joint", "robotiq_85_right_knuckle_joint"
-\t]
+def compute(db):
+    # Retrieve inputs from the ros subscriber
+    names = list(db.inputs.jointNames)
+    pos = list(db.inputs.positionCommand)
+    vel = list(db.inputs.velocityCommand)
+    eff = list(db.inputs.effortCommand)
 
-\tout_names, out_pos, out_vel, out_eff = [], [], [], []
+    # Only command the joints which exists in the articulation 
+    # We want to keep only the joints which actually have a joint drive
+    # For the gripper these are just the left and right knuckle joints, the other ones are now all passive
+    valid_joints = [
+        "joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6",
+        "robotiq_85_left_knuckle_joint", "robotiq_85_right_knuckle_joint"
+    ]
 
-\t# Keep only the valid joints
-\tfor i, name in enumerate(names):
-\tif name in valid_joints:
-\t\t\tout_names.append(name)
-\t\t\tif len(pos) > i: out_pos.append(pos[i])
-\t\t\tif len(vel) > i: out_vel.append(vel[i])
-\t\t\tif len(eff) > i: out_eff.append(eff[i])
+    out_names, out_pos, out_vel, out_eff = [], [], [], []
 
-\tdb.outputs.jointNames = out_names
-\tdb.outputs.positionCommand = out_pos
-\tdb.outputs.velocityCommand = out_vel
-\tdb.outputs.effortCommand = out_eff
-\tdb.outputs.execOut = db.inputs.execIn
+    # Keep only the valid joints
+    for i, name in enumerate(names):
+        if name in valid_joints:
+            out_names.append(name)
+            if len(pos) > i: out_pos.append(pos[i])
+            if len(vel) > i: out_vel.append(vel[i])
+            if len(eff) > i: out_eff.append(eff[i])
 
-\treturn True'''
+    db.outputs.jointNames = out_names
+    db.outputs.positionCommand = out_pos
+    db.outputs.velocityCommand = out_vel
+    db.outputs.effortCommand = out_eff
+    db.outputs.execOut = db.inputs.execIn
+
+    return True'''
                 custom token inputs:scriptPath
                 custom bool inputs:usePath
                 custom double[] inputs:velocityCommand
@@ -556,7 +558,7 @@ def Xform "World"
                 custom double[] outputs:positionCommand
                 custom double[] outputs:velocityCommand
                 custom bool state:omni_initialized
-                uniform float2 ui:nodegraph:node:pos = (-100.88615, 195.3756)
+                uniform float2 ui:nodegraph:node:pos = (-89.572815, 201.03227)
             }
 
             def OmniGraphNode "ros2_publish_clock" (
@@ -586,7 +588,7 @@ def Xform "World"
     }
 
     def Cube "Cube" (
-        active = true
+        active = false
         prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysxRigidBodyAPI", "PhysicsCollisionAPI", "PhysxCollisionAPI"]
     )
     {

@@ -21,7 +21,7 @@ def launch_setup(context, *args, **kwargs):
         "sim_isaac": "true",
         "use_fake_hardware": "false",
         "gripper_joint_name": "robotiq_85_left_knuckle_joint",
-        "use_external_cable": "true",
+        "use_external_cable": "false",
     }
 
     # 1. URDF Generation
@@ -29,7 +29,7 @@ def launch_setup(context, *args, **kwargs):
         [
             FindExecutable(name="xacro"), " ",
             os.path.join(get_package_share_directory("kortex_description"), "robots", "gen3.xacro"), " ",
-            "arm:=gen3 dof:=6 gripper:=robotiq_2f_85 vision:=true sim_isaac:=true use_fake_hardware:=false use_external_cable:=true",
+            "arm:=gen3 dof:=6 gripper:=robotiq_2f_85 vision:=true sim_isaac:=true use_fake_hardware:=false use_external_cable:=false",
         ]
     )
     robot_description = {"robot_description": robot_description_content}
