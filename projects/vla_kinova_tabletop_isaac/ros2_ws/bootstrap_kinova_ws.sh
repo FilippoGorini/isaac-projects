@@ -33,7 +33,7 @@ echo ""
 # Build workspace
 echo ""
 echo "==> Building workspace..."
-colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release --parallel-workers 3
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release --parallel-workers 3
 echo ""
 
 echo ""

@@ -7,8 +7,8 @@
                 double radius = 5
             }
             dictionary Perspective = {
-                double3 position = (1.0202017227736457, 1.3331761608639603, 2.0111892552743043)
-                double3 target = (-0.434653997345704, -0.12167955925538876, 0.556333569879786)
+                double3 position = (-0.12974101421765416, -1.9235175264810458, 1.474480733933716)
+                double3 target = (1.5751062002553788, 5.724340285058802, -0.7171113314379889)
             }
             dictionary Right = {
                 double3 position = (0, -5, 0)
@@ -27,7 +27,9 @@
             dictionary muteness = {
             }
         }
+        int refinementOverrideImplVersion = 0
         dictionary renderSettings = {
+            bool "rtx:useViewLightingMode" = 1
         }
     }
     defaultPrim = "kinova_gen3_6dof_2f85"
@@ -61,6 +63,7 @@ def "Render" (
                 token omni:rtx:background:source:type = "domeLight"
                 bool omni:rtx:dlss:frameGeneration = 1
                 bool omni:rtx:material:db:nonVisualMaterialCSV:enabled = 0
+                bool omni:rtx:material:db:syncLoads = 1
                 token omni:rtx:post:dlss:execMode = "performance"
                 bool omni:rtx:post:registeredCompositing:invertColorCorrection = 1
                 bool omni:rtx:post:registeredCompositing:invertToneMap = 1
@@ -71,7 +74,9 @@ def "Render" (
                 bool omni:rtx:rt:demoire = 0
                 bool omni:rtx:rt:ecoMode:enabled
                 bool omni:rtx:rt:lightcache:spatialCache:dontResolveConflicts = 1
-                bool omni:rtx:scene:useViewLightingMode
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                bool omni:rtx:scene:hydra:mdlMaterialWarmup = 1
+                bool omni:rtx:scene:useViewLightingMode = 1
                 uint omni:rtx:viewTile:limit = 4294967295
                 rel orderedVars = </Render/Vars/LdrColor>
                 custom bool overrideClipRange = 0
@@ -100,7 +105,7 @@ def "Render" (
     }
 }
 
-def Xform "kinova_gen3_6dof_2f85" (
+over "kinova_gen3_6dof_2f85" (
     prepend references = @./kinova_gen3_6dof_2f85/kinova_gen3_6dof_2f85.usd@
 )
 {
@@ -135,6 +140,10 @@ def Xform "kinova_gen3_6dof_2f85" (
 
     over "spherical_wrist_1_link"
     {
+        string isaac:nameOverride (
+            displayName = "Name Override"
+            doc = "Name override for prim lookup in base name search"
+        )
     }
 
     over "spherical_wrist_2_link"
@@ -183,58 +192,155 @@ def Xform "kinova_gen3_6dof_2f85" (
 
     over "joints"
     {
-        over "joint_2"
+        over "joint_2" (
+            prepend apiSchemas = ["PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
         {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 80.00209
             float state:angular:physics:position = 0
             float state:angular:physics:velocity = 0
         }
 
-        over "joint_3"
+        over "joint_3" (
+            prepend apiSchemas = ["PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
         {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 80.00209
             float state:angular:physics:position = 0
             float state:angular:physics:velocity = 0
         }
 
-        over "joint_5"
+        over "joint_5" (
+            prepend apiSchemas = ["PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
         {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 70.00397
             float state:angular:physics:position = 0
             float state:angular:physics:velocity = 0
         }
 
-        over "robotiq_85_left_inner_knuckle_joint"
+        over "robotiq_85_left_knuckle_joint" (
+            prepend apiSchemas = ["PhysxLimitAPI:angular", "PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
         {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 28.64789
+            float physxLimit:angular:damping = 0
             float state:angular:physics:position = 0
             float state:angular:physics:velocity = 0
         }
 
-        over "robotiq_85_left_knuckle_joint"
+        over "robotiq_85_right_knuckle_joint" (
+            prepend apiSchemas = ["PhysxLimitAPI:angular", "PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
         {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 28.64789
+            float physxLimit:angular:damping = 0
             float state:angular:physics:position = 0
             float state:angular:physics:velocity = 0
         }
 
-        over "robotiq_85_right_inner_knuckle_joint"
+        over "robotiq_85_base_joint"
         {
-            float state:angular:physics:position = 0
-            float state:angular:physics:velocity = 0
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
         }
 
-        over "robotiq_85_right_knuckle_joint"
+        over "robotiq_85_left_inner_knuckle_joint" (
+            prepend apiSchemas = ["PhysxLimitAPI:angular", "PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
         {
-            float state:angular:physics:position = 0
-            float state:angular:physics:velocity = 0
+            float drive:angular:physics:maxForce = 50
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 28.64789
+            float physxJoint:jointFriction = 1
+            float physxJoint:maxJointVelocity = 28.64789
+            float physxLimit:angular:damping = 0
         }
 
-        over "robotiq_85_left_finger_tip_joint"
+        over "robotiq_85_left_finger_joint"
         {
-            float state:angular:physics:position = 0
-            float state:angular:physics:velocity = 0
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
         }
 
-        over "robotiq_85_right_finger_tip_joint"
+        over "robotiq_85_left_finger_tip_joint" (
+            prepend apiSchemas = ["PhysxLimitAPI:angular", "PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
         {
-            float state:angular:physics:position = 0
-            float state:angular:physics:velocity = 0
+            float drive:angular:physics:maxForce = 50
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 28.64789
+            float physxJoint:jointFriction = 1
+            float physxJoint:maxJointVelocity = 28.64789
+            float physxLimit:angular:damping = 0
+        }
+
+        over "robotiq_85_right_inner_knuckle_joint" (
+            prepend apiSchemas = ["PhysxLimitAPI:angular", "PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
+        {
+            float drive:angular:physics:maxForce = 50
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 28.64789
+            float physxJoint:jointFriction = 1
+            float physxJoint:maxJointVelocity = 28.64789
+            float physxLimit:angular:damping = 0
+        }
+
+        over "robotiq_85_right_finger_joint"
+        {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+        }
+
+        over "robotiq_85_right_finger_tip_joint" (
+            prepend apiSchemas = ["PhysxLimitAPI:angular", "PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
+        {
+            float drive:angular:physics:maxForce = 50
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 28.64789
+            float physxJoint:jointFriction = 1
+            float physxJoint:maxJointVelocity = 28.64789
+            float physxLimit:angular:damping = 0
         }
 
         over "base_joint"
@@ -243,6 +349,39 @@ def Xform "kinova_gen3_6dof_2f85" (
                 displayName = "Name Override"
                 doc = "Name override for prim lookup in base name search"
             )
+        }
+
+        over "joint_1" (
+            prepend apiSchemas = ["PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
+        {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 80.00209
+        }
+
+        over "joint_4" (
+            prepend apiSchemas = ["PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
+        {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 70.00397
+        }
+
+        over "joint_6" (
+            prepend apiSchemas = ["PhysxDrivePerformanceEnvelopeAPI:angular"]
+        )
+        {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 70.00397
         }
     }
 }
