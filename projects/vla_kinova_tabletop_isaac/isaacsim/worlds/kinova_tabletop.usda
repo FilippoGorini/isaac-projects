@@ -7,8 +7,8 @@
                 double radius = 2.6735292434692384
             }
             dictionary Perspective = {
-                double3 position = (1.6585910519019815, -1.074754688494898, 1.4684416410707717)
-                double3 target = (-16.551985439120074, 20.59420220870971, -15.239980328640588)
+                double3 position = (0.06307087315966901, -1.0993582456940536, 1.6240613490764686)
+                double3 target = (1.323617676759688, 28.730513837156657, -16.313255010062186)
             }
             dictionary Right = {
                 double3 position = (-0.0025831043571606276, -5, 1.2875876568113325)
@@ -84,6 +84,10 @@ def Xform "World"
 
         over "bracelet_link"
         {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
         }
 
         over "robotiq_85_base_link"
@@ -366,7 +370,7 @@ def Xform "World"
                     }
                 )
                 custom double outputs:time
-                uniform float2 ui:nodegraph:node:pos = (-964.54626, 107.53413)
+                uniform float2 ui:nodegraph:node:pos = (-747.60785, 107.534134)
             }
 
             def OmniGraphNode "Context" (
@@ -378,7 +382,7 @@ def Xform "World"
                 token node:type = "isaacsim.ros2.bridge.ROS2Context"
                 int node:typeVersion = 2
                 custom uint64 outputs:context
-                uniform float2 ui:nodegraph:node:pos = (-959.7894, -74.83928)
+                uniform float2 ui:nodegraph:node:pos = (-742.851, -74.83927)
             }
 
             def OmniGraphNode "ReadSimTime" (
@@ -391,7 +395,7 @@ def Xform "World"
                 token node:type = "isaacsim.core.nodes.IsaacReadSimulationTime"
                 int node:typeVersion = 1
                 custom double outputs:simulationTime
-                uniform float2 ui:nodegraph:node:pos = (-974.96765, -282.76154)
+                uniform float2 ui:nodegraph:node:pos = (-758.02924, -282.76154)
             }
 
             def OmniGraphNode "PublisherJointState" (
@@ -440,6 +444,7 @@ def Xform "World"
                 prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/OnPlaybackTick.outputs:tick>
                 custom string inputs:nodeNamespace = ""
                 custom string inputs:qosProfile
+                prepend string inputs:qosProfile.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/ros2_qos_profile.outputs:qosProfile>
                 custom uint64 inputs:queueSize
                 custom string inputs:topicName = "/isaac_joint_commands"
                 token node:type = "isaacsim.ros2.bridge.ROS2SubscribeJointState"
@@ -454,7 +459,8 @@ def Xform "World"
                 custom double[] outputs:positionCommand
                 custom double outputs:timeStamp
                 custom double[] outputs:velocityCommand
-                uniform float2 ui:nodegraph:node:pos = (-454.17578, 165.82352)
+                uniform token ui:nodegraph:node:expansionState = "open"
+                uniform float2 ui:nodegraph:node:pos = (-456.23267, 168.5147)
             }
 
             def OmniGraphNode "ArticulationController" (
@@ -489,7 +495,7 @@ def Xform "World"
                 prepend double[] inputs:velocityCommand.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/og_bridge_mapper.outputs:velocityCommand>
                 token node:type = "isaacsim.core.nodes.IsaacArticulationController"
                 int node:typeVersion = 1
-                uniform float2 ui:nodegraph:node:pos = (243.8477, 238.01862)
+                uniform float2 ui:nodegraph:node:pos = (199.1806, 227.42729)
             }
 
             def OmniGraphNode "og_bridge_mapper" (
@@ -558,7 +564,7 @@ def compute(db):
                 custom double[] outputs:positionCommand
                 custom double[] outputs:velocityCommand
                 custom bool state:omni_initialized
-                uniform float2 ui:nodegraph:node:pos = (-89.572815, 201.03227)
+                uniform float2 ui:nodegraph:node:pos = (-110.237434, 208.22125)
             }
 
             def OmniGraphNode "ros2_publish_clock" (
