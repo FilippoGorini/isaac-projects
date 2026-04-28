@@ -80,7 +80,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     # RViz
-    rviz_config_file = os.path.join(get_package_share_directory(kortex_moveit_package), "config", "moveit.rviz")
+    rviz_config_file = os.path.join(get_package_share_directory(my_package), "config", "moveit.rviz")
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
