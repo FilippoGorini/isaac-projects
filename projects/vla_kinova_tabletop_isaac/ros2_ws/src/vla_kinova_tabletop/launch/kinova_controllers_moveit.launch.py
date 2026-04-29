@@ -22,14 +22,18 @@ def launch_setup(context, *args, **kwargs):
         "use_fake_hardware": "false",
         "gripper_joint_name": "robotiq_85_left_knuckle_joint",
         "use_external_cable": "false",
+        "isaac_arm_joint_commands": "/isaac_arm_commands",
+        "isaac_gripper_joint_commands": "/isaac_gripper_commands",
     }
 
     # 1. URDF Generation
     robot_description_content = Command(
         [
             FindExecutable(name="xacro"), " ",
-            os.path.join(get_package_share_directory("kortex_description"), "robots", "gen3.xacro"), " ",
-            "arm:=gen3 dof:=6 gripper:=robotiq_2f_85 vision:=true sim_isaac:=true use_fake_hardware:=false use_external_cable:=false",
+            os.path.join(get_package_share_directory(my_package), "urdf", "gen3.xacro"), " ",
+            "arm:=gen3 dof:=6 gripper:=robotiq_2f_85 vision:=true sim_isaac:=true use_fake_hardware:=false use_external_cable:=false ",
+            "isaac_arm_joint_commands:=/isaac_arm_commands ",
+            "isaac_gripper_joint_commands:=/isaac_gripper_commands",
         ]
     )
     robot_description = {"robot_description": robot_description_content}
@@ -38,7 +42,10 @@ def launch_setup(context, *args, **kwargs):
     # Leverages Kortex package for SRDF, OMPL, and Kinematics, but overrides controllers
     moveit_config = (
         MoveItConfigsBuilder("gen3", package_name=kortex_moveit_package)
-        .robot_description(mappings=launch_arguments)
+        .robot_description(
+            file_path=os.path.join(get_package_share_directory(my_package), "urdf", "gen3.xacro"),
+            mappings=launch_arguments
+        )
         .trajectory_execution(file_path=os.path.join(get_package_share_directory(my_package), "config", "moveit_controllers.yaml"))
         .planning_scene_monitor(publish_robot_description=True, publish_robot_description_semantic=True)
         .planning_pipelines(pipelines=["ompl"])

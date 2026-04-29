@@ -7,8 +7,8 @@
                 double radius = 2.6735292434692384
             }
             dictionary Perspective = {
-                double3 position = (0.06307087315966901, -1.0993582456940536, 1.6240613490764686)
-                double3 target = (1.323617676759688, 28.730513837156657, -16.313255010062186)
+                double3 position = (0.14420685598675573, -0.6053080705069322, 1.4650543651744004)
+                double3 target = (0.03536063767328741, 0.5327524622572586, 1.0061264084623318)
             }
             dictionary Right = {
                 double3 position = (-0.0025831043571606276, -5, 1.2875876568113325)
@@ -288,7 +288,9 @@ def Xform "World"
                 )
             }
 
-            def PhysicsRevoluteJoint "robotiq_85_left_inner_knuckle_finger_tip_joint"
+            def PhysicsRevoluteJoint "robotiq_85_left_inner_knuckle_finger_tip_joint" (
+                prepend apiSchemas = ["PhysxJointAPI"]
+            )
             {
                 uniform token physics:axis = "Y"
                 rel physics:body0 = </World/kinova_gen3_6dof_2f85/robotiq_85_left_inner_knuckle_link>
@@ -300,6 +302,7 @@ def Xform "World"
                 point3f physics:localPos1 = (-0.017887656, -5.013192e-8, 0.006625226)
                 quatf physics:localRot0 = (1, 0, 7.058096e-26, 2.530672e-31)
                 quatf physics:localRot1 = (1, 0, 7.058096e-26, 2.530672e-31)
+                float physxJoint:maxJointVelocity = 28.64789
             }
 
             over "robotiq_85_right_finger_joint"
@@ -310,7 +313,9 @@ def Xform "World"
                 )
             }
 
-            def PhysicsRevoluteJoint "robotiq_85_right_inner_knuckle_finger_tip_joint"
+            def PhysicsRevoluteJoint "robotiq_85_right_inner_knuckle_finger_tip_joint" (
+                prepend apiSchemas = ["PhysxJointAPI"]
+            )
             {
                 uniform token physics:axis = "Y"
                 rel physics:body0 = </World/kinova_gen3_6dof_2f85/robotiq_85_right_inner_knuckle_link>
@@ -321,6 +326,7 @@ def Xform "World"
                 point3f physics:localPos1 = (0.01789, -3.595584e-8, 0.00663)
                 quatf physics:localRot0 = (1, 0, 0, 0)
                 quatf physics:localRot1 = (1, 0, 0, 0)
+                float physxJoint:maxJointVelocity = 28.64789
             }
 
             over "joint_4" (
@@ -348,7 +354,7 @@ def Xform "World"
             }
         }
 
-        def OmniGraph "ActionGraph"
+        def OmniGraph "ROS2_Bridge_Graph"
         {
             token evaluationMode = "Automatic"
             token evaluator:type = "execution"
@@ -382,7 +388,7 @@ def Xform "World"
                 token node:type = "isaacsim.ros2.bridge.ROS2Context"
                 int node:typeVersion = 2
                 custom uint64 outputs:context
-                uniform float2 ui:nodegraph:node:pos = (-742.851, -74.83927)
+                uniform float2 ui:nodegraph:node:pos = (-749.6705, -63.927998)
             }
 
             def OmniGraphNode "ReadSimTime" (
@@ -395,7 +401,7 @@ def Xform "World"
                 token node:type = "isaacsim.core.nodes.IsaacReadSimulationTime"
                 int node:typeVersion = 1
                 custom double outputs:simulationTime
-                uniform float2 ui:nodegraph:node:pos = (-758.02924, -282.76154)
+                uniform float2 ui:nodegraph:node:pos = (-760.757, -239.11633)
             }
 
             def OmniGraphNode "PublisherJointState" (
@@ -403,13 +409,13 @@ def Xform "World"
             )
             {
                 custom uint64 inputs:context
-                prepend uint64 inputs:context.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/Context.outputs:context>
+                prepend uint64 inputs:context.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/Context.outputs:context>
                 custom uint inputs:execIn (
                     customData = {
                         bool isExecution = 1
                     }
                 )
-                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/OnPlaybackTick.outputs:tick>
+                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
                 custom string inputs:nodeNamespace = ""
                 custom string inputs:qosProfile
                 custom uint64 inputs:queueSize
@@ -423,30 +429,80 @@ def Xform "World"
                     }
                 )
                 custom double inputs:timeStamp
-                prepend double inputs:timeStamp.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/ReadSimTime.outputs:simulationTime>
+                prepend double inputs:timeStamp.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/ReadSimTime.outputs:simulationTime>
                 custom string inputs:topicName = "/isaac_joint_states"
                 token node:type = "isaacsim.ros2.bridge.ROS2PublishJointState"
                 int node:typeVersion = 1
-                uniform float2 ui:nodegraph:node:pos = (-110.46274, -76.266304)
+                uniform float2 ui:nodegraph:node:pos = (-411.84613, -74.35293)
             }
 
-            def OmniGraphNode "SubscriberJointState" (
+            def OmniGraphNode "ArticulationController" (
                 prepend apiSchemas = ["NodeGraphNodeAPI"]
+                instanceable = false
             )
             {
-                custom uint64 inputs:context
-                prepend uint64 inputs:context.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/Context.outputs:context>
+                custom double[] inputs:effortCommand
+                prepend double[] inputs:effortCommand.connect = [
+                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/internal_sim_test.outputs:effortCommand>,
+                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/IsaacCommandsMerger.outputs:effortCommand>,
+                ]
                 custom uint inputs:execIn (
                     customData = {
                         bool isExecution = 1
                     }
                 )
-                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/OnPlaybackTick.outputs:tick>
+                prepend uint inputs:execIn.connect = [
+                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/internal_sim_test.outputs:execOut>,
+                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/IsaacCommandsMerger.outputs:execOut>,
+                ]
+                custom int[] inputs:jointIndices
+                custom token[] inputs:jointNames
+                prepend token[] inputs:jointNames.connect = [
+                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/internal_sim_test.outputs:jointNames>,
+                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/IsaacCommandsMerger.outputs:jointNames>,
+                ]
+                custom double[] inputs:positionCommand
+                prepend double[] inputs:positionCommand.connect = [
+                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/internal_sim_test.outputs:positionCommand>,
+                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/IsaacCommandsMerger.outputs:positionCommand>,
+                ]
+                custom string inputs:robotPath
+                custom rel inputs:targetPrim = </World/kinova_gen3_6dof_2f85/root_joint> (
+                    customData = {
+                        dictionary omni = {
+                            dictionary graph = {
+                                string relType = "target"
+                            }
+                        }
+                    }
+                )
+                custom double[] inputs:velocityCommand
+                prepend double[] inputs:velocityCommand.connect = [
+                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/internal_sim_test.outputs:velocityCommand>,
+                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/IsaacCommandsMerger.outputs:velocityCommand>,
+                ]
+                token node:type = "isaacsim.core.nodes.IsaacArticulationController"
+                int node:typeVersion = 1
+                uniform float2 ui:nodegraph:node:pos = (189.17099, 181.3087)
+            }
+
+            def OmniGraphNode "SubscriberArmState" (
+                prepend apiSchemas = ["NodeGraphNodeAPI"]
+            )
+            {
+                custom uint64 inputs:context
+                prepend uint64 inputs:context.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/Context.outputs:context>
+                custom uint inputs:execIn (
+                    customData = {
+                        bool isExecution = 1
+                    }
+                )
+                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
                 custom string inputs:nodeNamespace = ""
                 custom string inputs:qosProfile
-                prepend string inputs:qosProfile.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/ros2_qos_profile.outputs:qosProfile>
+                prepend string inputs:qosProfile.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/ros2_qos_profile.outputs:qosProfile>
                 custom uint64 inputs:queueSize
-                custom string inputs:topicName = "/isaac_joint_commands"
+                custom string inputs:topicName = "/isaac_arm_commands"
                 token node:type = "isaacsim.ros2.bridge.ROS2SubscribeJointState"
                 int node:typeVersion = 2
                 custom double[] outputs:effortCommand
@@ -460,98 +516,133 @@ def Xform "World"
                 custom double outputs:timeStamp
                 custom double[] outputs:velocityCommand
                 uniform token ui:nodegraph:node:expansionState = "open"
-                uniform float2 ui:nodegraph:node:pos = (-456.23267, 168.5147)
+                uniform float2 ui:nodegraph:node:pos = (-412.15726, 179.00317)
             }
 
-            def OmniGraphNode "ArticulationController" (
+            def OmniGraphNode "SubscriberGripperState" (
                 prepend apiSchemas = ["NodeGraphNodeAPI"]
-                instanceable = false
             )
             {
-                custom double[] inputs:effortCommand
-                prepend double[] inputs:effortCommand.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/og_bridge_mapper.outputs:effortCommand>
+                custom uint64 inputs:context
+                prepend uint64 inputs:context.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/Context.outputs:context>
                 custom uint inputs:execIn (
                     customData = {
                         bool isExecution = 1
                     }
                 )
-                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/og_bridge_mapper.outputs:execOut>
-                custom int[] inputs:jointIndices
-                custom token[] inputs:jointNames
-                prepend token[] inputs:jointNames.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/og_bridge_mapper.outputs:jointNames>
-                custom double[] inputs:positionCommand
-                prepend double[] inputs:positionCommand.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/og_bridge_mapper.outputs:positionCommand>
-                custom string inputs:robotPath
-                custom rel inputs:targetPrim = </World/kinova_gen3_6dof_2f85/root_joint> (
+                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
+                custom string inputs:nodeNamespace = ""
+                custom string inputs:qosProfile
+                prepend string inputs:qosProfile.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/ros2_qos_profile.outputs:qosProfile>
+                custom uint64 inputs:queueSize
+                custom string inputs:topicName = "/isaac_gripper_commands"
+                token node:type = "isaacsim.ros2.bridge.ROS2SubscribeJointState"
+                int node:typeVersion = 2
+                custom double[] outputs:effortCommand
+                custom uint outputs:execOut (
                     customData = {
-                        dictionary omni = {
-                            dictionary graph = {
-                                string relType = "target"
-                            }
-                        }
+                        bool isExecution = 1
                     }
                 )
-                custom double[] inputs:velocityCommand
-                prepend double[] inputs:velocityCommand.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/og_bridge_mapper.outputs:velocityCommand>
-                token node:type = "isaacsim.core.nodes.IsaacArticulationController"
-                int node:typeVersion = 1
-                uniform float2 ui:nodegraph:node:pos = (199.1806, 227.42729)
+                custom token[] outputs:jointNames
+                custom double[] outputs:positionCommand
+                custom double outputs:timeStamp
+                custom double[] outputs:velocityCommand
+                uniform token ui:nodegraph:node:expansionState = "open"
+                uniform float2 ui:nodegraph:node:pos = (-413.1818, 494.27203)
             }
 
-            def OmniGraphNode "og_bridge_mapper" (
+            def OmniGraphNode "IsaacCommandsMerger" (
                 prepend apiSchemas = ["NodeGraphNodeAPI"]
             )
             {
-                custom double[] inputs:effortCommand
-                prepend double[] inputs:effortCommand.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/SubscriberJointState.outputs:effortCommand>
+                custom double[] inputs:armEfforts
+                prepend double[] inputs:armEfforts.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberArmState.outputs:effortCommand>
+                custom token[] inputs:armNames
+                prepend token[] inputs:armNames.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberArmState.outputs:jointNames>
+                custom double[] inputs:armPositions
+                prepend double[] inputs:armPositions.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberArmState.outputs:positionCommand>
+                custom double[] inputs:armVelocities
+                prepend double[] inputs:armVelocities.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberArmState.outputs:velocityCommand>
                 custom uint inputs:execIn (
                     customData = {
                         bool isExecution = 1
                     }
                 )
-                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/SubscriberJointState.outputs:execOut>
-                custom token[] inputs:jointNames
-                prepend token[] inputs:jointNames.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/SubscriberJointState.outputs:jointNames>
-                custom double[] inputs:positionCommand
-                prepend double[] inputs:positionCommand.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/SubscriberJointState.outputs:positionCommand>
+                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
+                custom double[] inputs:gripperEfforts
+                prepend double[] inputs:gripperEfforts.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberGripperState.outputs:effortCommand>
+                custom token[] inputs:gripperNames
+                prepend token[] inputs:gripperNames.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberGripperState.outputs:jointNames>
+                custom double[] inputs:gripperPositions
+                prepend double[] inputs:gripperPositions.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberGripperState.outputs:positionCommand>
+                custom double[] inputs:gripperVelocities
+                prepend double[] inputs:gripperVelocities.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberGripperState.outputs:velocityCommand>
                 custom string inputs:script = '''import omni.graph.core as og
+import numpy as np
+
+def setup(db):
+    """Optional initialization logic."""
+    pass
 
 def compute(db):
-    # Retrieve inputs from the ros subscriber
-    names = list(db.inputs.jointNames)
-    pos = list(db.inputs.positionCommand)
-    vel = list(db.inputs.velocityCommand)
-    eff = list(db.inputs.effortCommand)
+    """
+    Inputs required on the node:
+    - armNames (string[]): Joint names from /isaac_arm_commands
+    - armPositions (double[]): Positions from /isaac_arm_commands
+    - armVelocities (double[]): Velocities from /isaac_arm_commands
+    - armEfforts (double[]): Efforts from /isaac_arm_commands
+    
+    - gripperNames (string[]): Joint names from /isaac_gripper_commands
+    - gripperPositions (double[]): Positions from /isaac_gripper_commands
+    - gripperVelocities (double[]): Velocities from /isaac_gripper_commands
+    - gripperEfforts (double[]): Efforts from /isaac_gripper_commands
 
-    # Only command the joints which exists in the articulation 
-    # We want to keep only the joints which actually have a joint drive
-    # For the gripper these are just the left and right knuckle joints, the other ones are now all passive
-    valid_joints = [
-        "joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6",
-        "robotiq_85_left_knuckle_joint", "robotiq_85_right_knuckle_joint"
+    Outputs:
+    - jointNames (string[])
+    - positionCommand (double[])
+    - velocityCommand (double[])
+    - effortCommand (double[])
+    """
+    
+    # 1. Start with Arm Data
+    # Convert to lists for easy manipulation
+    names = list(db.inputs.armNames)
+    pos = list(db.inputs.armPositions)
+    vel = list(db.inputs.armVelocities)
+    eff = list(db.inputs.armEfforts)
+
+    # 2. Define target gripper joints (Driven Joints only)
+    # These must match the names in your URDF/USD exactly
+    target_gripper_joints = [
+        "robotiq_85_left_knuckle_joint", 
+        "robotiq_85_right_knuckle_joint"
     ]
 
-    out_names, out_pos, out_vel, out_eff = [], [], [], []
+    # 3. Filter and append Gripper Data
+    g_names = db.inputs.gripperNames
+    g_pos = db.inputs.gripperPositions
+    g_vel = db.inputs.gripperVelocities
+    g_eff = db.inputs.gripperEfforts
 
-    # Keep only the valid joints
-    for i, name in enumerate(names):
-        if name in valid_joints:
-            out_names.append(name)
-            if len(pos) > i: out_pos.append(pos[i])
-            if len(vel) > i: out_vel.append(vel[i])
-            if len(eff) > i: out_eff.append(eff[i])
+    if len(g_names) > 0:
+        for i, name in enumerate(g_names):
+            if name in target_gripper_joints:
+                names.append(name)
+                # Safely append if data exists at this index
+                if i < len(g_pos): pos.append(g_pos[i])
+                if i < len(g_vel): vel.append(g_vel[i])
+                if i < len(g_eff): eff.append(g_eff[i])
 
-    db.outputs.jointNames = out_names
-    db.outputs.positionCommand = out_pos
-    db.outputs.velocityCommand = out_vel
-    db.outputs.effortCommand = out_eff
-    db.outputs.execOut = db.inputs.execIn
+    # 4. Output the merged set
+    db.outputs.jointNames = names
+    db.outputs.positionCommand = pos
+    db.outputs.velocityCommand = vel
+    db.outputs.effortCommand = eff
 
     return True'''
                 custom token inputs:scriptPath
                 custom bool inputs:usePath
-                custom double[] inputs:velocityCommand
-                prepend double[] inputs:velocityCommand.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/SubscriberJointState.outputs:velocityCommand>
                 token node:type = "omni.graph.scriptnode.ScriptNode"
                 int node:typeVersion = 2
                 custom double[] outputs:effortCommand
@@ -564,31 +655,32 @@ def compute(db):
                 custom double[] outputs:positionCommand
                 custom double[] outputs:velocityCommand
                 custom bool state:omni_initialized
-                uniform float2 ui:nodegraph:node:pos = (-110.237434, 208.22125)
+                uniform token ui:nodegraph:node:expansionState = "open"
+                uniform float2 ui:nodegraph:node:pos = (-105.23347, 179.81772)
             }
 
-            def OmniGraphNode "ros2_publish_clock" (
+            def OmniGraphNode "ROS2PublishClock" (
                 prepend apiSchemas = ["NodeGraphNodeAPI"]
             )
             {
                 custom uint64 inputs:context
-                prepend uint64 inputs:context.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/Context.outputs:context>
+                prepend uint64 inputs:context.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/Context.outputs:context>
                 custom uint inputs:execIn (
                     customData = {
                         bool isExecution = 1
                     }
                 )
-                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/OnPlaybackTick.outputs:tick>
+                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
                 custom string inputs:nodeNamespace
                 custom string inputs:qosProfile
                 custom uint64 inputs:queueSize
                 custom double inputs:timeStamp
-                prepend double inputs:timeStamp.connect = </World/kinova_gen3_6dof_2f85/ActionGraph/ReadSimTime.outputs:simulationTime>
+                prepend double inputs:timeStamp.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/ReadSimTime.outputs:simulationTime>
                 custom string inputs:topicName
                 token node:type = "isaacsim.ros2.bridge.ROS2PublishClock"
                 int node:typeVersion = 1
                 uniform token ui:nodegraph:node:expansionState = "open"
-                uniform float2 ui:nodegraph:node:pos = (-101.87909, -334.28607)
+                uniform float2 ui:nodegraph:node:pos = (-404.18683, -316.76633)
             }
         }
     }
@@ -662,7 +754,7 @@ def "Render" (
                 uint omni:rtx:viewTile:limit = 4294967295
                 rel orderedVars = </Render/Vars/LdrColor>
                 custom bool overrideClipRange = 0
-                uniform int2 resolution = (1280, 720)
+                uniform int2 resolution = (1920, 1080)
             }
         }
     }
