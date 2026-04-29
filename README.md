@@ -144,6 +144,13 @@ TigerVNC window as the UI; WebRTC is not part of this workflow.
 Run non-headless Isaac Lab commands from that same VNC terminal. If
 `run isaaclab` omits `--headless`, the viewport opens on that display.
 
+For standalone Isaac Sim `python.sh` examples, use:
+
+```bash
+./isaac_vmctl.sh run --py --gui \
+  'standalone_examples/api/isaacsim.robot.policy.examples/anymal_standalone.py'
+```
+
 The WebRTC-based workflows below use NVIDIA's WebRTC client instead of
 TigerVNC.
 
@@ -210,6 +217,48 @@ your terminal:
 ```bash
 ./isaac_vmctl.sh run -- bash -lc 'cd projects/my-project && python train.py'
 ```
+
+### Isaac Sim python.sh Commands
+
+Use `run --py` when you want to translate a normal Isaac Sim `./python.sh ...`
+command into this repo's Docker workflow.
+
+This:
+
+```bash
+./python.sh standalone_examples/api/isaacsim.robot.policy.examples/anymal_standalone.py
+```
+
+becomes:
+
+```bash
+./isaac_vmctl.sh run --py \
+  'standalone_examples/api/isaacsim.robot.policy.examples/anymal_standalone.py'
+```
+
+To open the app inside TigerVNC, run the same command from the TigerVNC
+terminal and add `--gui`:
+
+```bash
+./isaac_vmctl.sh run --py --gui \
+  'standalone_examples/api/isaacsim.robot.policy.examples/anymal_standalone.py'
+```
+
+To launch the same kind of standalone example through WebRTC, use
+`--livestream`:
+
+```bash
+./isaac_vmctl.sh run --py --livestream public \
+  'standalone_examples/api/isaacsim.robot.policy.examples/anymal_standalone.py'
+```
+
+`run --py` wraps `/isaac-sim/python.sh` directly. `--gui` adds X/VNC wiring.
+`--livestream` wraps a standalone script entrypoint with Isaac Sim's streaming
+configuration, so it is meant for normal script-path examples such as
+`standalone_examples/.../*.py`, not Python options like `-c` or `-m`.
+
+For Isaac Sim `5.1.x`, this standalone Python streaming path uses NVIDIA's
+default WebRTC ports `49100/tcp` and `47998/udp`.
 
 ### Isaac Lab Workflow
 
@@ -468,6 +517,7 @@ jupyter lab --no-browser --ip 127.0.0.1 --port 8888
 | `./isaac_vmctl.sh start isaacsim --gui` | Start native Isaac Sim UI on the current X display |
 | `./isaac_vmctl.sh start isaacsim --vnc` | Alias for `--gui`; useful from TigerVNC terminal |
 | `./isaac_vmctl.sh start isaacsim --headless` | Start Isaac Sim without WebRTC |
+| `./isaac_vmctl.sh run --py [--gui\|--livestream public\|private [--public-ip <ip>]] '<python.sh args>'` | Run an Isaac Sim `python.sh` command in a one-shot container |
 | `./isaac_vmctl.sh run isaaclab '<args>'` | Run Isaac Lab with the same arguments you would pass to `./isaaclab.sh` |
 | `./isaac_vmctl.sh run -- <command>` | Run a one-shot command inside the Isaac Sim image |
 | `./isaac_vmctl.sh stop isaacsim` | Stop the container |

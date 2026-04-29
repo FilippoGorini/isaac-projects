@@ -38,6 +38,14 @@ source configs/simplepod-tigervnc.env
 # Start native Isaac Sim UI inside the TigerVNC desktop
 ./isaac_vmctl.sh start isaacsim --gui
 
+# Run a standalone Isaac Sim python.sh example inside TigerVNC
+./isaac_vmctl.sh run --py --gui \
+  'standalone_examples/api/isaacsim.robot.policy.examples/anymal_standalone.py'
+
+# Or stream the same kind of standalone example through WebRTC
+./isaac_vmctl.sh run --py --livestream public \
+  'standalone_examples/api/isaacsim.robot.policy.examples/anymal_standalone.py'
+
 # Or, for Isaac Lab inside TigerVNC, source the overlay and bootstrap the
 # managed Isaac Lab image first.
 source configs/isaac-lab.env

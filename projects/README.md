@@ -39,25 +39,36 @@ On SimplePod, if you sourced `configs/simplepod-tigervnc.env` and want the
 native Isaac Sim UI inside the VNC desktop instead of WebRTC, use:
 
 ```bash
-./isaac_vmctl.sh start isaacsim --vnc
+./isaac_vmctl.sh start isaacsim --gui
 ```
 
-For Isaac Lab scripts that need a remote UI on SimplePod, do not start a
-separate `isaacsim` session first. Run the Isaac Lab command itself with
-livestreaming:
+For Isaac Sim standalone `python.sh` examples inside TigerVNC, use:
+
+```bash
+./isaac_vmctl.sh run --py --gui \
+  'standalone_examples/api/isaacsim.robot.policy.examples/anymal_standalone.py'
+```
+
+For the same kind of standalone example through WebRTC, use:
+
+```bash
+./isaac_vmctl.sh run --py --livestream public \
+  'standalone_examples/api/isaacsim.robot.policy.examples/anymal_standalone.py'
+```
+
+For Isaac Lab scripts, do not start a separate `isaacsim` session first. Run
+the Isaac Lab command itself:
 
 ```bash
 source projects/my-legged-robot/.env
 source ~/isaac-projects/configs/isaac-sim-5.1.0.env
 source ~/isaac-projects/configs/isaac-lab.env
-~/isaac-projects/isaac_vmctl.sh run --livestream public -- \
-  bash -lc 'cd external/IsaacLab && ./isaaclab.sh -p scripts/tutorials/00_sim/launch_app.py'
+~/isaac-projects/isaac_vmctl.sh bootstrap
+~/isaac-projects/isaac_vmctl.sh run isaaclab \
+  '-p scripts/tutorials/00_sim/launch_app.py'
 ```
 
-If the task renders camera sensors, add `--enable-cameras`. If the printed IP
-is not the one your laptop can reach, rerun with `--public-ip <reachable-ip>`.
-Install the laptop-side client once using the repo-level
-[WebRTC instructions](../README.md#quick-start).
+For Isaac Lab GUI runs, launch the command from the terminal inside TigerVNC.
 
 Source the project environment in each new terminal:
 
