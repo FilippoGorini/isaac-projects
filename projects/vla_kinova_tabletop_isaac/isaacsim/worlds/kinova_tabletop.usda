@@ -7,8 +7,8 @@
                 double radius = 2.6735292434692384
             }
             dictionary Perspective = {
-                double3 position = (-0.3737951552097377, -2.7795349063875467, 2.4061177477748035)
-                double3 target = (0.8213499832402992, 1.9235463104047512, -0.620193653123926)
+                double3 position = (1.5008999291469636, -3.44685085891615, 2.51772892689932)
+                double3 target = (-1.2688855676851498, 5.501800568197888, -3.473613992858966)
             }
             dictionary Right = {
                 double3 position = (-0.0025831043571606276, -5, 1.2875876568113325)
@@ -169,6 +169,89 @@ def Xform "World"
             }
         }
     }
+
+    def Xform "ground_plane" (
+        prepend references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Environments/Grid/default_environment.usd@
+    )
+    {
+        quatf xformOp:orient = (1, 0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, -0.7909023797082686)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "SphereLight"
+        {
+            quatd xformOp:orient = (0.5000000000000001, 0.5, 0.49999999999999994, 0.5)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (-1.8231490071858814e-62, -2, 3.5)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+        }
+
+        over "GroundPlane"
+        {
+        }
+
+        def SphereLight "SphereLight_01" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            float inputs:intensity = 100000
+            float inputs:radius = 0.25
+            float inputs:shaping:cone:angle = 180
+            float intensity = 100000
+            float radius = 0.25
+            float shaping:cone:angle = 180
+            float shaping:cone:softness
+            float shaping:focus
+            color3f shaping:focusTint
+            asset shaping:ies:file
+            token visibility = "inherited"
+            quatd xformOp:orient = (0.5000000000000001, 0.5, 0.49999999999999994, 0.5)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (-1.8231490071858814e-62, 2, 3.5)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+        }
+    }
+
+    def Xform "small_KLT_visual_collision" (
+        prepend references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Props/KLT_Bin/small_KLT_visual_collision.usd@
+    )
+    {
+        float3 xformOp:rotateXYZ = (0, 0, 90)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0.5748653410642041, -0.24453799315410096, 0.06123168723746844)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        over "Visuals"
+        {
+            over "FOF_Mesh_Magenta_Box"
+            {
+                float3 xformOp:rotateXYZ = (90.00001, -0, 0)
+                float3 xformOp:scale = (0.00999999, 0.00999999, 0.00999999)
+                double3 xformOp:translate = (-5.273559366969494e-16, 0.03268365601721124, -0.06820124473718003)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+            }
+        }
+    }
+
+    def Xform "table_instanceable" (
+        active = true
+        prepend references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Props/Mounts/ThorlabsTable/table_instanceable.usd@
+    )
+    {
+        quatd xformOp:orient = (1, 0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+
+    over "SphereLight"
+    {
+        quatd xformOp:orient = (0.5000000000000001, 0.5, 0.49999999999999994, 0.5)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-1.8231490071858814e-62, -1, 2.5)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
 }
 
 def "Render" (
@@ -213,6 +296,25 @@ def "Render" (
                 custom bool overrideClipRange = 0
                 uniform int2 resolution = (1920, 1080)
             }
+
+            def RenderProduct "Replicator" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </World/kinova_gen3_6dof_2f85_ros2/bracelet_link/end_effector_link/camera_color_frame/rgb_camera>
+                custom string ogPostProcessPath = "/Render/OmniverseKit/HydraTextures/Replicator/PostRender"
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                rel orderedVars = [
+                    </Render/Vars/LdrColorSD>,
+                    </Render/Vars/LdrColor>,
+                ]
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (1280, 720)
+            }
         }
     }
 
@@ -221,7 +323,10 @@ def "Render" (
         no_delete = true
     )
     {
-        rel products = </Render/OmniverseKit/HydraTextures/omni_kit_widget_viewport_ViewportTexture_0>
+        rel products = [
+            </Render/OmniverseKit/HydraTextures/omni_kit_widget_viewport_ViewportTexture_0>,
+            </Render/OmniverseKit/HydraTextures/Replicator>,
+        ]
     }
 
     def "Vars"
@@ -234,11 +339,5 @@ def "Render" (
             uniform string sourceName = "LdrColor"
         }
     }
-}
-
-def "FlatGrid" (
-    prepend references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Environments/Grid/default_environment.usd@
-)
-{
 }
 

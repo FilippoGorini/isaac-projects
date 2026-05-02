@@ -7,8 +7,8 @@
                 double radius = 2.6735292434692384
             }
             dictionary Perspective = {
-                double3 position = (0.4767101258094123, 0.6155005881957334, 1.8536092540007385)
-                double3 target = (-0.9061696657378376, -1.3579381385853253, -1.6250677731317242)
+                double3 position = (0.15418850562370345, -2.9410171870852198, 1.4679801073239989)
+                double3 target = (0.7402827728917616, 9.20109519640393, -1.1763264824351474)
             }
             dictionary Right = {
                 double3 position = (-0.0025831043571606276, -5, 1.2875876568113325)
@@ -81,6 +81,20 @@ def "Render" (
                 custom bool overrideClipRange = 0
                 uniform int2 resolution = (1920, 1080)
             }
+
+            def RenderProduct "Replicator" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera>
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:useViewLightingMode = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (1280, 720)
+            }
         }
     }
 
@@ -89,7 +103,10 @@ def "Render" (
         no_delete = true
     )
     {
-        rel products = </Render/OmniverseKit/HydraTextures/omni_kit_widget_viewport_ViewportTexture_0>
+        rel products = [
+            </Render/OmniverseKit/HydraTextures/omni_kit_widget_viewport_ViewportTexture_0>,
+            </Render/OmniverseKit/HydraTextures/Replicator>,
+        ]
     }
 
     def "Vars"
@@ -139,6 +156,10 @@ def "kinova_gen3_6dof_2f85" (
 
     over "spherical_wrist_1_link"
     {
+        string isaac:nameOverride (
+            displayName = "Name Override"
+            doc = "Name override for prim lookup in base name search"
+        )
     }
 
     over "spherical_wrist_2_link"
@@ -151,6 +172,42 @@ def "kinova_gen3_6dof_2f85" (
             displayName = "Name Override"
             doc = "Name override for prim lookup in base name search"
         )
+
+        over "end_effector_link"
+        {
+            over "camera_color_frame"
+            {
+                def Camera "rgb_camera"
+                {
+                    float2 clippingRange = (0.3, 10)
+                    float focalLength = 18.147562
+                    float focusDistance = 500
+                    float fthetaCx = 160
+                    float fthetaCy = 120
+                    float fthetaHeight = 240
+                    float fthetaMaxFov = 70
+                    float fthetaPolyB = 0
+                    float fthetaWidth = 320
+                    float horizontalAperture = 18.5
+                    bool omni:kit:cameraLock = 0
+                    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -331.06968396726)
+                    float openCVFx = 313.9
+                    float openCVFy = 313.9
+                    float p0 = 0
+                    float p1 = 0
+                    float s0 = 0
+                    float s1 = 0
+                    float s2 = 0
+                    float s3 = 0
+                    float verticalAperture = 13.88
+                    token visibility = "invisible"
+                    quatd xformOp:orient = (6.123233995736766e-17, 1, 2.676497766331783e-24, -2.6469779599000584e-23)
+                    double3 xformOp:scale = (1, 1, 1)
+                    double3 xformOp:translate = (1.0757093955301355e-20, 8.426840807329544e-15, 0)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+                }
+            }
+        }
     }
 
     over "robotiq_85_base_link"
@@ -612,7 +669,7 @@ def "kinova_gen3_6dof_2f85" (
             custom double outputs:timeStamp
             custom double[] outputs:velocityCommand
             uniform token ui:nodegraph:node:expansionState = "open"
-            uniform float2 ui:nodegraph:node:pos = (-413.1818, 494.27203)
+            uniform float2 ui:nodegraph:node:pos = (-410.2424, 511.96945)
         }
 
         def OmniGraphNode "IsaacCommandsMerger" (
@@ -738,6 +795,74 @@ def compute(db):
             int node:typeVersion = 1
             uniform token ui:nodegraph:node:expansionState = "open"
             uniform float2 ui:nodegraph:node:pos = (-404.18683, -316.76633)
+        }
+
+        def OmniGraphNode "RenderProduct" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom rel inputs:cameraPrim = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera> (
+                customData = {
+                    dictionary omni = {
+                        dictionary graph = {
+                            string relType = "target"
+                        }
+                    }
+                }
+            )
+            custom bool inputs:enabled
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
+            custom uint inputs:height
+            custom uint inputs:width
+            token node:type = "isaacsim.core.nodes.IsaacCreateRenderProduct"
+            int node:typeVersion = 2
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom token outputs:renderProductPath
+            uniform float2 ui:nodegraph:node:pos = (-117.61035, -306.51468)
+        }
+
+        def OmniGraphNode "RGBPublish" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint64 inputs:context
+            prepend uint64 inputs:context.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/Context.outputs:context>
+            custom bool inputs:enabled
+            custom bool inputs:enableSemanticLabels
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/RenderProduct.outputs:execOut>
+            custom string inputs:frameId = "sim_camera"
+            custom uint inputs:frameSkipCount
+            custom string inputs:nodeNamespace = ""
+            custom string inputs:qosProfile
+            custom uint64 inputs:queueSize
+            custom token inputs:renderProductPath
+            prepend token inputs:renderProductPath.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/RenderProduct.outputs:renderProductPath>
+            custom bool inputs:resetSimulationTimeOnStop = 1
+            custom string inputs:semanticLabelsTopicName
+            custom float2 inputs:stereoOffset
+            custom string inputs:topicName = "/wrist_mounted_camera/image"
+            custom token inputs:type = "rgb" (
+                allowedTokens = ["rgb", "depth", "depth_pcl", "instance_segmentation", "semantic_segmentation", "bbox_2d_tight", "bbox_2d_loose", "bbox_3d"]
+            )
+            custom bool inputs:useSystemTime
+            custom token inputs:viewport
+            token node:type = "isaacsim.ros2.bridge.ROS2CameraHelper"
+            int node:typeVersion = 2
+            uniform float2 ui:nodegraph:node:pos = (166.31076, -354.2528)
         }
     }
 }
