@@ -7,8 +7,8 @@
                 double radius = 2.6735292434692384
             }
             dictionary Perspective = {
-                double3 position = (0.14420685598675573, -0.6053080705069322, 1.4650543651744004)
-                double3 target = (0.03536063767328741, 0.5327524622572586, 1.0061264084623318)
+                double3 position = (-0.3737951552097377, -2.7795349063875467, 2.4061177477748035)
+                double3 target = (0.8213499832402992, 1.9235463104047512, -0.620193653123926)
             }
             dictionary Right = {
                 double3 position = (-0.0025831043571606276, -5, 1.2875876568113325)
@@ -41,8 +41,8 @@
 
 def Xform "World"
 {
-    def "kinova_gen3_6dof_2f85" (
-        prepend payload = @./kinova_gen3_6dof_2f85.usda@
+    def "kinova_gen3_6dof_2f85_ros2" (
+        prepend payload = @./kinova_gen3_6dof_2f85_ros2.usda@
     )
     {
         string isaac:namespace (
@@ -60,10 +60,6 @@ def Xform "World"
 
         over "shoulder_link"
         {
-            string isaac:nameOverride (
-                displayName = "Name Override"
-                doc = "Name override for prim lookup in base name search"
-            )
         }
 
         over "bicep_link"
@@ -84,30 +80,14 @@ def Xform "World"
 
         over "bracelet_link"
         {
-            string isaac:nameOverride (
-                displayName = "Name Override"
-                doc = "Name override for prim lookup in base name search"
-            )
         }
 
         over "robotiq_85_base_link"
         {
         }
 
-        over "robotiq_85_left_inner_knuckle_link"
-        {
-            string isaac:nameOverride (
-                displayName = "Name Override"
-                doc = "Name override for prim lookup in base name search"
-            )
-        }
-
         over "robotiq_85_left_knuckle_link"
         {
-            string isaac:nameOverride (
-                displayName = "Name Override"
-                doc = "Name override for prim lookup in base name search"
-            )
         }
 
         over "robotiq_85_left_finger_link"
@@ -118,12 +98,8 @@ def Xform "World"
         {
         }
 
-        over "robotiq_85_right_inner_knuckle_link"
+        over "robotiq_85_left_inner_knuckle_link"
         {
-            string isaac:nameOverride (
-                displayName = "Name Override"
-                doc = "Name override for prim lookup in base name search"
-            )
         }
 
         over "robotiq_85_right_knuckle_link"
@@ -132,584 +108,65 @@ def Xform "World"
 
         over "robotiq_85_right_finger_link"
         {
-            string isaac:nameOverride (
-                displayName = "Name Override"
-                doc = "Name override for prim lookup in base name search"
-            )
         }
 
         over "robotiq_85_right_finger_tip_link"
         {
-            string isaac:nameOverride (
-                displayName = "Name Override"
-                doc = "Name override for prim lookup in base name search"
-            )
+        }
+
+        over "robotiq_85_right_inner_knuckle_link"
+        {
         }
 
         over "joints"
         {
+            over "joint_1"
+            {
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+
             over "joint_2"
             {
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
                 float state:angular:physics:position = 0
                 float state:angular:physics:velocity = 0
             }
 
             over "joint_3"
             {
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+
+            over "joint_4"
+            {
                 float state:angular:physics:position = 0
                 float state:angular:physics:velocity = 0
             }
 
             over "joint_5"
             {
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+
+            over "joint_6"
+            {
                 float state:angular:physics:position = 0
                 float state:angular:physics:velocity = 0
             }
 
             over "robotiq_85_left_knuckle_joint"
             {
-                float drive:angular:physics:damping = 0.0004066477
-                float drive:angular:physics:stiffness = 1.0166192
-                float drive:angular:physics:targetPosition = 0
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
                 float state:angular:physics:position = 0
                 float state:angular:physics:velocity = 0
             }
 
             over "robotiq_85_right_knuckle_joint"
             {
-                float drive:angular:physics:damping = 0.00040662993
-                float drive:angular:physics:stiffness = 1.01662
-                float drive:angular:physics:targetPosition = 0
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
                 float state:angular:physics:position = 0
                 float state:angular:physics:velocity = 0
             }
-
-            over "joint_1" (
-                prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
-            )
-            {
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
-                float state:angular:physics:position = 0
-                float state:angular:physics:velocity = 0
-            }
-
-            over "robotiq_85_left_inner_knuckle_joint" (
-                delete apiSchemas = ["PhysicsDriveAPI:angular"]
-            )
-            {
-                float drive:angular:physics:damping = 0.00008807893
-                float drive:angular:physics:stiffness = 0.22019732
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
-                uniform bool physics:excludeFromArticulation = 1
-                float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 28.64789
-                float physxJoint:jointFriction = 0
-                float physxJoint:maxJointVelocity = 28.64789
-            }
-
-            over "robotiq_85_left_finger_tip_joint" (
-                delete apiSchemas = ["PhysicsDriveAPI:angular"]
-            )
-            {
-                float drive:angular:physics:damping = 0.000066541725
-                float drive:angular:physics:stiffness = 0.16635431
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
-                float physxJoint:jointFriction = 0
-            }
-
-            over "robotiq_85_right_inner_knuckle_joint" (
-                delete apiSchemas = ["PhysxDrivePerformanceEnvelopeAPI:angular", "PhysicsDriveAPI:angular"]
-            )
-            {
-                float drive:angular:physics:damping = 0.000087823304
-                float drive:angular:physics:stiffness = 0.21955825
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
-                uniform bool physics:excludeFromArticulation = 1
-                float physxJoint:jointFriction = 0
-            }
-
-            over "robotiq_85_right_finger_tip_joint" (
-                delete apiSchemas = ["PhysicsDriveAPI:angular"]
-            )
-            {
-                float drive:angular:physics:damping = 0.00006653234
-                float drive:angular:physics:stiffness = 0.16633084
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
-                float physxJoint:jointFriction = 0
-            }
-
-            over "robotiq_85_base_joint"
-            {
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
-            }
-
-            over "robotiq_85_left_finger_joint"
-            {
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
-            }
-
-            def PhysicsRevoluteJoint "robotiq_85_left_inner_knuckle_finger_tip_joint" (
-                prepend apiSchemas = ["PhysxJointAPI"]
-            )
-            {
-                uniform token physics:axis = "Y"
-                rel physics:body0 = </World/kinova_gen3_6dof_2f85/robotiq_85_left_inner_knuckle_link>
-                rel physics:body1 = </World/kinova_gen3_6dof_2f85/robotiq_85_left_finger_tip_link>
-                float physics:breakForce = 3.4028235e38
-                float physics:breakTorque = 3.4028235e38
-                uniform bool physics:excludeFromArticulation = 0
-                point3f physics:localPos0 = (0.037170134, -5.016187e-8, 0.04353137)
-                point3f physics:localPos1 = (-0.017887656, -5.013192e-8, 0.006625226)
-                quatf physics:localRot0 = (1, 0, 7.058096e-26, 2.530672e-31)
-                quatf physics:localRot1 = (1, 0, 7.058096e-26, 2.530672e-31)
-                float physxJoint:maxJointVelocity = 28.64789
-            }
-
-            over "robotiq_85_right_finger_joint"
-            {
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
-            }
-
-            def PhysicsRevoluteJoint "robotiq_85_right_inner_knuckle_finger_tip_joint" (
-                prepend apiSchemas = ["PhysxJointAPI"]
-            )
-            {
-                uniform token physics:axis = "Y"
-                rel physics:body0 = </World/kinova_gen3_6dof_2f85/robotiq_85_right_inner_knuckle_link>
-                rel physics:body1 = </World/kinova_gen3_6dof_2f85/robotiq_85_right_finger_tip_link>
-                float physics:breakForce = 3.4028235e38
-                float physics:breakTorque = 3.4028235e38
-                point3f physics:localPos0 = (-0.03717, -3.736264e-8, 0.04353)
-                point3f physics:localPos1 = (0.01789, -3.595584e-8, 0.00663)
-                quatf physics:localRot0 = (1, 0, 0, 0)
-                quatf physics:localRot1 = (1, 0, 0, 0)
-                float physxJoint:maxJointVelocity = 28.64789
-            }
-
-            over "joint_4" (
-                prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
-            )
-            {
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
-                float state:angular:physics:position = 0
-                float state:angular:physics:velocity = 0
-            }
-
-            over "joint_6" (
-                prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
-            )
-            {
-                string isaac:nameOverride (
-                    displayName = "Name Override"
-                    doc = "Name override for prim lookup in base name search"
-                )
-                float state:angular:physics:position = 0
-                float state:angular:physics:velocity = 0
-            }
-        }
-
-        def OmniGraph "ROS2_Bridge_Graph"
-        {
-            token evaluationMode = "Automatic"
-            token evaluator:type = "execution"
-            token fabricCacheBacking = "StageWithoutHistory"
-            int2 fileFormatVersion = (1, 9)
-            token pipelineStage = "pipelineStageSimulation"
-
-            def OmniGraphNode "OnPlaybackTick" (
-                prepend apiSchemas = ["NodeGraphNodeAPI"]
-            )
-            {
-                token node:type = "omni.graph.action.OnPlaybackTick"
-                int node:typeVersion = 2
-                custom double outputs:deltaSeconds
-                custom double outputs:frame
-                custom uint outputs:tick (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                custom double outputs:time
-                uniform float2 ui:nodegraph:node:pos = (-747.60785, 107.534134)
-            }
-
-            def OmniGraphNode "Context" (
-                prepend apiSchemas = ["NodeGraphNodeAPI"]
-            )
-            {
-                custom uchar inputs:domain_id = 30
-                custom bool inputs:useDomainIDEnvVar = 1
-                token node:type = "isaacsim.ros2.bridge.ROS2Context"
-                int node:typeVersion = 2
-                custom uint64 outputs:context
-                uniform float2 ui:nodegraph:node:pos = (-749.6705, -63.927998)
-            }
-
-            def OmniGraphNode "ReadSimTime" (
-                prepend apiSchemas = ["NodeGraphNodeAPI"]
-            )
-            {
-                custom uint64 inputs:referenceTimeDenominator
-                custom int64 inputs:referenceTimeNumerator
-                custom bool inputs:resetOnStop = 0
-                token node:type = "isaacsim.core.nodes.IsaacReadSimulationTime"
-                int node:typeVersion = 1
-                custom double outputs:simulationTime
-                uniform float2 ui:nodegraph:node:pos = (-760.757, -239.11633)
-            }
-
-            def OmniGraphNode "PublisherJointState" (
-                prepend apiSchemas = ["NodeGraphNodeAPI"]
-            )
-            {
-                custom uint64 inputs:context
-                prepend uint64 inputs:context.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/Context.outputs:context>
-                custom uint inputs:execIn (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
-                custom string inputs:nodeNamespace = ""
-                custom string inputs:qosProfile
-                custom uint64 inputs:queueSize
-                custom rel inputs:targetPrim = </World/kinova_gen3_6dof_2f85/root_joint> (
-                    customData = {
-                        dictionary omni = {
-                            dictionary graph = {
-                                string relType = "target"
-                            }
-                        }
-                    }
-                )
-                custom double inputs:timeStamp
-                prepend double inputs:timeStamp.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/ReadSimTime.outputs:simulationTime>
-                custom string inputs:topicName = "/isaac_joint_states"
-                token node:type = "isaacsim.ros2.bridge.ROS2PublishJointState"
-                int node:typeVersion = 1
-                uniform float2 ui:nodegraph:node:pos = (-411.84613, -74.35293)
-            }
-
-            def OmniGraphNode "ArticulationController" (
-                prepend apiSchemas = ["NodeGraphNodeAPI"]
-                instanceable = false
-            )
-            {
-                custom double[] inputs:effortCommand
-                prepend double[] inputs:effortCommand.connect = [
-                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/internal_sim_test.outputs:effortCommand>,
-                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/IsaacCommandsMerger.outputs:effortCommand>,
-                ]
-                custom uint inputs:execIn (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                prepend uint inputs:execIn.connect = [
-                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/internal_sim_test.outputs:execOut>,
-                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/IsaacCommandsMerger.outputs:execOut>,
-                ]
-                custom int[] inputs:jointIndices
-                custom token[] inputs:jointNames
-                prepend token[] inputs:jointNames.connect = [
-                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/internal_sim_test.outputs:jointNames>,
-                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/IsaacCommandsMerger.outputs:jointNames>,
-                ]
-                custom double[] inputs:positionCommand
-                prepend double[] inputs:positionCommand.connect = [
-                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/internal_sim_test.outputs:positionCommand>,
-                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/IsaacCommandsMerger.outputs:positionCommand>,
-                ]
-                custom string inputs:robotPath
-                custom rel inputs:targetPrim = </World/kinova_gen3_6dof_2f85/root_joint> (
-                    customData = {
-                        dictionary omni = {
-                            dictionary graph = {
-                                string relType = "target"
-                            }
-                        }
-                    }
-                )
-                custom double[] inputs:velocityCommand
-                prepend double[] inputs:velocityCommand.connect = [
-                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/internal_sim_test.outputs:velocityCommand>,
-                    </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/IsaacCommandsMerger.outputs:velocityCommand>,
-                ]
-                token node:type = "isaacsim.core.nodes.IsaacArticulationController"
-                int node:typeVersion = 1
-                uniform float2 ui:nodegraph:node:pos = (189.17099, 181.3087)
-            }
-
-            def OmniGraphNode "SubscriberArmState" (
-                prepend apiSchemas = ["NodeGraphNodeAPI"]
-            )
-            {
-                custom uint64 inputs:context
-                prepend uint64 inputs:context.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/Context.outputs:context>
-                custom uint inputs:execIn (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
-                custom string inputs:nodeNamespace = ""
-                custom string inputs:qosProfile
-                prepend string inputs:qosProfile.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/ros2_qos_profile.outputs:qosProfile>
-                custom uint64 inputs:queueSize
-                custom string inputs:topicName = "/isaac_arm_commands"
-                token node:type = "isaacsim.ros2.bridge.ROS2SubscribeJointState"
-                int node:typeVersion = 2
-                custom double[] outputs:effortCommand
-                custom uint outputs:execOut (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                custom token[] outputs:jointNames
-                custom double[] outputs:positionCommand
-                custom double outputs:timeStamp
-                custom double[] outputs:velocityCommand
-                uniform token ui:nodegraph:node:expansionState = "open"
-                uniform float2 ui:nodegraph:node:pos = (-412.15726, 179.00317)
-            }
-
-            def OmniGraphNode "SubscriberGripperState" (
-                prepend apiSchemas = ["NodeGraphNodeAPI"]
-            )
-            {
-                custom uint64 inputs:context
-                prepend uint64 inputs:context.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/Context.outputs:context>
-                custom uint inputs:execIn (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
-                custom string inputs:nodeNamespace = ""
-                custom string inputs:qosProfile
-                prepend string inputs:qosProfile.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/ros2_qos_profile.outputs:qosProfile>
-                custom uint64 inputs:queueSize
-                custom string inputs:topicName = "/isaac_gripper_commands"
-                token node:type = "isaacsim.ros2.bridge.ROS2SubscribeJointState"
-                int node:typeVersion = 2
-                custom double[] outputs:effortCommand
-                custom uint outputs:execOut (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                custom token[] outputs:jointNames
-                custom double[] outputs:positionCommand
-                custom double outputs:timeStamp
-                custom double[] outputs:velocityCommand
-                uniform token ui:nodegraph:node:expansionState = "open"
-                uniform float2 ui:nodegraph:node:pos = (-413.1818, 494.27203)
-            }
-
-            def OmniGraphNode "IsaacCommandsMerger" (
-                prepend apiSchemas = ["NodeGraphNodeAPI"]
-            )
-            {
-                custom double[] inputs:armEfforts
-                prepend double[] inputs:armEfforts.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberArmState.outputs:effortCommand>
-                custom token[] inputs:armNames
-                prepend token[] inputs:armNames.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberArmState.outputs:jointNames>
-                custom double[] inputs:armPositions
-                prepend double[] inputs:armPositions.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberArmState.outputs:positionCommand>
-                custom double[] inputs:armVelocities
-                prepend double[] inputs:armVelocities.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberArmState.outputs:velocityCommand>
-                custom uint inputs:execIn (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
-                custom double[] inputs:gripperEfforts
-                prepend double[] inputs:gripperEfforts.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberGripperState.outputs:effortCommand>
-                custom token[] inputs:gripperNames
-                prepend token[] inputs:gripperNames.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberGripperState.outputs:jointNames>
-                custom double[] inputs:gripperPositions
-                prepend double[] inputs:gripperPositions.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberGripperState.outputs:positionCommand>
-                custom double[] inputs:gripperVelocities
-                prepend double[] inputs:gripperVelocities.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/SubscriberGripperState.outputs:velocityCommand>
-                custom string inputs:script = '''import omni.graph.core as og
-import numpy as np
-
-def setup(db):
-    """Optional initialization logic."""
-    pass
-
-def compute(db):
-    """
-    Inputs required on the node:
-    - armNames (string[]): Joint names from /isaac_arm_commands
-    - armPositions (double[]): Positions from /isaac_arm_commands
-    - armVelocities (double[]): Velocities from /isaac_arm_commands
-    - armEfforts (double[]): Efforts from /isaac_arm_commands
-    
-    - gripperNames (string[]): Joint names from /isaac_gripper_commands
-    - gripperPositions (double[]): Positions from /isaac_gripper_commands
-    - gripperVelocities (double[]): Velocities from /isaac_gripper_commands
-    - gripperEfforts (double[]): Efforts from /isaac_gripper_commands
-
-    Outputs:
-    - jointNames (string[])
-    - positionCommand (double[])
-    - velocityCommand (double[])
-    - effortCommand (double[])
-    """
-    
-    # 1. Start with Arm Data
-    # Convert to lists for easy manipulation
-    names = list(db.inputs.armNames)
-    pos = list(db.inputs.armPositions)
-    vel = list(db.inputs.armVelocities)
-    eff = list(db.inputs.armEfforts)
-
-    # 2. Define target gripper joints (Driven Joints only)
-    # These must match the names in your URDF/USD exactly
-    target_gripper_joints = [
-        "robotiq_85_left_knuckle_joint", 
-        "robotiq_85_right_knuckle_joint"
-    ]
-
-    # 3. Filter and append Gripper Data
-    g_names = db.inputs.gripperNames
-    g_pos = db.inputs.gripperPositions
-    g_vel = db.inputs.gripperVelocities
-    g_eff = db.inputs.gripperEfforts
-
-    if len(g_names) > 0:
-        for i, name in enumerate(g_names):
-            if name in target_gripper_joints:
-                names.append(name)
-                # Safely append if data exists at this index
-                if i < len(g_pos): pos.append(g_pos[i])
-                if i < len(g_vel): vel.append(g_vel[i])
-                if i < len(g_eff): eff.append(g_eff[i])
-
-    # 4. Output the merged set
-    db.outputs.jointNames = names
-    db.outputs.positionCommand = pos
-    db.outputs.velocityCommand = vel
-    db.outputs.effortCommand = eff
-
-    return True'''
-                custom token inputs:scriptPath
-                custom bool inputs:usePath
-                token node:type = "omni.graph.scriptnode.ScriptNode"
-                int node:typeVersion = 2
-                custom double[] outputs:effortCommand
-                custom uint outputs:execOut (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                custom token[] outputs:jointNames
-                custom double[] outputs:positionCommand
-                custom double[] outputs:velocityCommand
-                custom bool state:omni_initialized
-                uniform token ui:nodegraph:node:expansionState = "open"
-                uniform float2 ui:nodegraph:node:pos = (-105.23347, 179.81772)
-            }
-
-            def OmniGraphNode "ROS2PublishClock" (
-                prepend apiSchemas = ["NodeGraphNodeAPI"]
-            )
-            {
-                custom uint64 inputs:context
-                prepend uint64 inputs:context.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/Context.outputs:context>
-                custom uint inputs:execIn (
-                    customData = {
-                        bool isExecution = 1
-                    }
-                )
-                prepend uint inputs:execIn.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
-                custom string inputs:nodeNamespace
-                custom string inputs:qosProfile
-                custom uint64 inputs:queueSize
-                custom double inputs:timeStamp
-                prepend double inputs:timeStamp.connect = </World/kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/ReadSimTime.outputs:simulationTime>
-                custom string inputs:topicName
-                token node:type = "isaacsim.ros2.bridge.ROS2PublishClock"
-                int node:typeVersion = 1
-                uniform token ui:nodegraph:node:expansionState = "open"
-                uniform float2 ui:nodegraph:node:pos = (-404.18683, -316.76633)
-            }
-        }
-    }
-
-    def Cube "Cube" (
-        active = false
-        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysxRigidBodyAPI", "PhysicsCollisionAPI", "PhysxCollisionAPI"]
-    )
-    {
-        float3[] extent = [(-0.5, -0.5, -0.5), (0.5, 0.5, 0.5)]
-        bool physics:collisionEnabled = 1
-        bool physics:kinematicEnabled = 0
-        bool physics:rigidBodyEnabled = 1
-        double size = 1
-        quatd xformOp:orient = (1, 0, 0, 0)
-        double3 xformOp:scale = (0.05716460791514051, 0.05716460791514051, 0.05716460791514051)
-        double3 xformOp:translate = (0, 0, 1.325)
-        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
-
-        def PhysicsFixedJoint "FixedJoint"
-        {
-            rel physics:body0 = </World>
-            rel physics:body1 = </World/Cube>
-            float physics:breakForce = 3.4028235e38
-            float physics:breakTorque = 3.4028235e38
-            point3f physics:localPos0 = (0, 0, 1.325)
-            point3f physics:localPos1 = (0, 0, 0)
-            quatf physics:localRot0 = (1, 0, 0, 0)
-            quatf physics:localRot1 = (1, 0, 0, 0)
         }
     }
 }
