@@ -1,8 +1,9 @@
-# Vla Kinova Tabletop
+# Vla Kinova Tabletop Isaac
 
 **Authors:** Filippo Gorini
-**Isaac Sim version:** 5.1.0
-**ROS 2 distro:** Humble
+
+![Isaac Sim](https://img.shields.io/badge/Isaac%20Sim-5.1.0-76B900?logo=nvidia&logoColor=white)
+![ROS 2](https://img.shields.io/badge/ROS%202-Humble-22314E?logo=ros&logoColor=white)
 
 ---
 
@@ -12,7 +13,7 @@ This project provides an Isaac Sim simulation environment to test the use of VLA
 
 ---
 
-### Project Structure
+## Project Structure
 
 ```
 projects/vla_kinova_tabletop_isaac/
@@ -32,33 +33,7 @@ projects/vla_kinova_tabletop_isaac/
 
 ---
 
-### Isaac Sim Scenes (`isaacsim/worlds/`)
-
-| File | Description |
-|------|-------------|
-| `test.usda` | Not used anymore, soon to be deleted |
-| `kinova_gen3_6dof_2f85/` | USD asset directory for the robot (base, physics, robot, sensor layers) |
-| `kinova_gen3_6dof_2f85.usda` | Robot USDA imported from the original URDF. To better emulate the real hardware, only `robotiq_85_left_knuckle_joint` and `robotiq_85_right_knuckle_joint` were assigned a joint drive; all other joints were made passive. Two additional passive joints were added to close the parallel-gripper loop, connecting the `inner_knuckle` links to the `finger_tip` links, preventing the gripper from disassembling while grasping objects. |
-| `kinova_gen3_6dof_2f85_ros2.usda` | References `kinova_gen3_6dof_2f85.usda` and adds the ActionGraph nodes that bridge to ROS 2 (joint states, joint commands, and camera feedback). |
-| `kinova_tabletop.usda` | Simple tabletop scenario built from Isaac assets, referencing the ROS 2-ready `kinova_gen3_6dof_2f85_ros2.usda`. |
-
----
-
-### ROS 2 Package: `vla_kinova_tabletop`
-
-The main project package. It contains:
-
-- **`urdf/`** — Xacro/URDF files describing the Kinova Gen3 + Robotiq 2F-85 for `ros2_control` with the Isaac Sim `TopicBasedSystem` hardware interface. The arm listens on `/isaac_arm_commands` and the gripper on `/isaac_gripper_commands`.
-- **`config/ros2_controllers.yaml`** — Controller configuration for `joint_trajectory_controller`, `robotiq_gripper_controller`, and `joint_state_broadcaster`.
-- **`config/moveit_controllers.yaml`** — MoveIt 2 controller config that delegates to the above.
-- **`config/moveit.rviz`** — RViz preset for MoveIt 2 motion planning.
-- **`src/joint_state_merger.cpp`** — Not needed anymore, soon to be deleted.
-- **`launch/kinova_controllers.launch.py`** — Starts `robot_state_publisher`, `ros2_control_node`, and spawns `joint_state_broadcaster`, `joint_trajectory_controller`, and `robotiq_gripper_controller`. Use this for basic joint control without motion planning.
-- **`launch/kinova_controllers_moveit.launch.py`** — Everything in the above launch file, plus MoveIt 2 `move_group` and RViz. Use this when you need motion planning through MoveIt 2.
-
----
-
-### Bootstrap Procedure (fresh server)
+## Bootstrap Procedure (fresh server)
 
 Run this once on each new cloud server.
 
@@ -99,9 +74,9 @@ system packages with `rosdep`, and builds the workspace with `colcon`.
 
 ---
 
-### Starting Isaac Sim
+## Starting Isaac Sim
 
-After bootstrap, in each new terminal source the project environment first:
+After bootstrap, source the project environment in each new terminal:
 
 ```bash
 source ~/isaac-projects/projects/vla_kinova_tabletop_isaac/setup.bash
@@ -128,32 +103,74 @@ the terminal inside the VNC desktop:
 
 ---
 
-### Running the ROS 2 Launch Files
+## Isaac Sim Scenes (`isaacsim/worlds/`)
 
-Source the project environment in every new terminal:
+| File | Description |
+|------|-------------|
+| `kinova_gen3_6dof_2f85/` | Base USD asset directory for the robot (base, physics, robot, sensor layers). |
+| `kinova_gen3_6dof_2f85.usda` | Robot USDA imported from `kinova_gen3_6dof_2f85.urdf`. Mirrors the original URDF: all 6 gripper joints are driven. |
+| `kinova_gen3_6dof_2f85_ros2.usda` | References `kinova_gen3_6dof_2f85.usda` and adds the ActionGraph nodes that bridge to ROS 2 (joint states, joint commands, and camera feedback). To better emulate the real hardware, only `robotiq_85_left_knuckle_joint` and `robotiq_85_right_knuckle_joint` are assigned a joint drive; all other gripper joints are passive. Two additional passive joints close the parallel-gripper loop by connecting the `inner_knuckle` links to the `finger_tip` links, preventing the gripper from disassembling while grasping. To avoid articulation errors, `robotiq_85_left_inner_knuckle_joint` and `robotiq_85_right_inner_knuckle_joint` were excluded from the articulation and are therefore expected to show small position errors. |
+| `kinova_tabletop.usda` | Simple tabletop scenario built from Isaac assets, referencing the ROS 2-ready `kinova_gen3_6dof_2f85_ros2.usda`. |
+
+---
+
+## ROS 2 Packages
+
+| Package | Description |
+|---------|-------------|
+| [`vla_kinova_tabletop`](#vla_kinova_tabletop) | Custom wrapper over the upstream `kortex_description` and `robotiq_description` packages, providing a project-specific robot description and controller setup for Isaac Sim. |
+
+---
+
+## `vla_kinova_tabletop`
+
+This package is a customized wrapper over the upstream `ros2_kortex` packages from Kinova Robotics. Rather than modifying those packages directly, it provides its own xacro files and configuration to expose separate `ros2_control` command topics for the arm (`/isaac_arm_commands`) and gripper (`/isaac_gripper_commands`), instead of the single `/isaac_joint_commands` topic used by the upstream packages. It also ships the controller and MoveIt 2 configuration specific to this project.
+
+### Package Files
+
+- **`urdf/`**: Project-specific xacro files wrapping the upstream robot description. See [URDF Files](#urdf-files-urdf) below.
+- **`config/ros2_controllers.yaml`**: Controller configuration for `joint_trajectory_controller`, `robotiq_gripper_controller`, and `joint_state_broadcaster`.
+- **`config/moveit_controllers.yaml`**: MoveIt 2 controller config.
+- **`config/moveit.rviz`**: RViz preset for MoveIt 2 motion planning.
+
+### URDF Files (`urdf/`)
+
+The xacro files are layered: `gen3.xacro` is the entry point referenced by the launch files; each layer includes the next.
+
+| File | Role |
+|------|------|
+| `gen3.xacro` | Top-level entry point. Declares all xacro arguments and instantiates the `load_robot` macro from `kortex_robot.xacro`. This is the file passed to `xacro` by the launch files. |
+| `kortex_robot.xacro` | `load_robot` macro. Orchestrates the full robot assembly: loads the arm via `gen3_macro.xacro` and the gripper via `robotiq_2f_85_macro.xacro`, routing the arm and gripper command topics separately. |
+| `gen3_macro.xacro` | `load_arm` macro. Defines all kinematic links and joints of the Gen3 arm (`base_link` through `end_effector_link`), with optional wrist-camera frames when `vision:=true`. Instantiates the arm `ros2_control` block via `kortex.ros2_control.xacro`. |
+| `kortex.ros2_control.xacro` | `ros2_control` hardware block for the arm's 6 joints (`joint_1`–`joint_6`). Selects the hardware plugin via xacro conditionals: `topic_based_ros2_control/TopicBasedSystem` for Isaac Sim, `mock_components/GenericSystem` for fake hardware, or `kortex_driver/KortexMultiInterfaceHardware` for the real robot. Exposes position command interfaces and position/velocity/effort state interfaces for each joint. |
+| `robotiq_2f_85_macro.xacro` | `load_gripper` macro. Includes `robotiq_2f_85_macro.urdf.xacro` and instantiates the `robotiq_gripper` macro, conditionally enabling the `ros2_control` block depending on the hardware mode. |
+| `robotiq_2f_85_macro.urdf.xacro` | `robotiq_gripper` macro. Full kinematic model of the Robotiq 2F-85 (all links and joints for the parallel-gripper mechanism). Instantiates the gripper `ros2_control` block via `2f_85.ros2_control.xacro`. |
+| `2f_85.ros2_control.xacro` | `ros2_control` hardware block for the gripper. The actuated joint is `robotiq_85_left_knuckle_joint`; in simulation all dependent mimic joints are registered as well. Uses `topic_based_ros2_control/TopicBasedSystem` for Isaac Sim or `robotiq_driver/RobotiqGripperHardwareInterface` for the real gripper. |
+| `kinova_gen3_6dof_2f85.urdf` | Static URDF export of the full robot. Not used by the launch files, which process `gen3.xacro` directly: this is just the URDF which was imported into Isaac Sim. |
+
+### Launch Files
+
+Source the project environment in every new terminal before running any launch file:
 
 ```bash
 source ~/isaac-projects/projects/vla_kinova_tabletop_isaac/setup.bash
 ```
 
-**Basic joint control (no motion planning):**
+*Basic joint control — no motion planning:*
 
 ```bash
 ros2 launch vla_kinova_tabletop kinova_controllers.launch.py
 ```
 
-Starts `robot_state_publisher`, `ros2_control_node`, and spawns the
-`joint_trajectory_controller`, `robotiq_gripper_controller`, and
-`joint_state_broadcaster`.
+Starts `robot_state_publisher` and `ros2_control_node`, then spawns `joint_state_broadcaster`, `joint_trajectory_controller`, and `robotiq_gripper_controller`. Use this when you only need to send joint trajectories or test the `ros2_control` bridge without motion planning.
 
-**MoveIt 2 + RViz:**
+*MoveIt 2 + RViz:*
 
 ```bash
 ros2 launch vla_kinova_tabletop kinova_controllers_moveit.launch.py
 ```
 
-Starts everything above plus MoveIt 2 `move_group` and RViz with the project
-motion-planning preset.
+Starts everything above, plus MoveIt 2 `move_group` and RViz with the project motion-planning preset. Use this when you need full motion planning through MoveIt 2.
 
 ---
 
