@@ -1,15 +1,159 @@
-# Project Name
+# Vla Kinova Tabletop
 
-**Authors:** <!-- Your name(s) here -->
-**Isaac Sim version:** <!-- e.g. 5.1.0 -->
-**ROS 2 distro:** <!-- Humble / Jazzy -->
+**Authors:** Filippo Gorini
+**Isaac Sim version:** 5.1.0
+**ROS 2 distro:** Humble
 
 ---
 
 ## Overview
 
-<!-- A short description of what this project does. What robot? What task?
-     What learning algorithm or control method are you using? -->
+This project provides an Isaac Sim simulation environment to test the use of VLA models in simple fixed-arm tabletop scenarios. The robot is a Kinova Gen3 6-DoF arm equipped with a Robotiq 2F-85 parallel-jaw gripper. The project ships Isaac Sim USD scenes and ROS 2 launch files that bring up the `ros2_control` stack using the `ros2_kortex` package published by Kinova Robotics.
+
+---
+
+### Project Structure
+
+```
+projects/vla_kinova_tabletop_isaac/
+├── .env.example                  # Template environment file; copy to .env
+├── .env                          # Local config (never committed)
+├── setup.bash                    # Source in every new terminal
+├── isaacsim/
+│   ├── worlds/                   # Isaac Sim USD scenes (see below)
+│   ├── rl_scenes/                # RL scene configs (empty for now)
+│   └── startup_scenes/           # Lab startup scenes (empty for now)
+└── ros2_ws/
+    ├── bootstrap_kinova_ws.sh    # One-shot workspace bootstrap script
+    ├── deps.repos                # vcstool manifest for ros2_kortex and deps
+    └── src/
+        └── vla_kinova_tabletop/  # Main project ROS 2 package
+```
+
+---
+
+### Isaac Sim Scenes (`isaacsim/worlds/`)
+
+| File | Description |
+|------|-------------|
+| `test.usda` | Not used anymore, soon to be deleted |
+| `kinova_gen3_6dof_2f85/` | USD asset directory for the robot (base, physics, robot, sensor layers) |
+| `kinova_gen3_6dof_2f85.usda` | Robot USDA imported from the original URDF. To better emulate the real hardware, only `robotiq_85_left_knuckle_joint` and `robotiq_85_right_knuckle_joint` were assigned a joint drive; all other joints were made passive. Two additional passive joints were added to close the parallel-gripper loop, connecting the `inner_knuckle` links to the `finger_tip` links, preventing the gripper from disassembling while grasping objects. |
+| `kinova_gen3_6dof_2f85_ros2.usda` | References `kinova_gen3_6dof_2f85.usda` and adds the ActionGraph nodes that bridge to ROS 2 (joint states, joint commands, and camera feedback). |
+| `kinova_tabletop.usda` | Simple tabletop scenario built from Isaac assets, referencing the ROS 2-ready `kinova_gen3_6dof_2f85_ros2.usda`. |
+
+---
+
+### ROS 2 Package: `vla_kinova_tabletop`
+
+The main project package. It contains:
+
+- **`urdf/`** — Xacro/URDF files describing the Kinova Gen3 + Robotiq 2F-85 for `ros2_control` with the Isaac Sim `TopicBasedSystem` hardware interface. The arm listens on `/isaac_arm_commands` and the gripper on `/isaac_gripper_commands`.
+- **`config/ros2_controllers.yaml`** — Controller configuration for `joint_trajectory_controller`, `robotiq_gripper_controller`, and `joint_state_broadcaster`.
+- **`config/moveit_controllers.yaml`** — MoveIt 2 controller config that delegates to the above.
+- **`config/moveit.rviz`** — RViz preset for MoveIt 2 motion planning.
+- **`src/joint_state_merger.cpp`** — Not needed anymore, soon to be deleted.
+- **`launch/kinova_controllers.launch.py`** — Starts `robot_state_publisher`, `ros2_control_node`, and spawns `joint_state_broadcaster`, `joint_trajectory_controller`, and `robotiq_gripper_controller`. Use this for basic joint control without motion planning.
+- **`launch/kinova_controllers_moveit.launch.py`** — Everything in the above launch file, plus MoveIt 2 `move_group` and RViz. Use this when you need motion planning through MoveIt 2.
+
+---
+
+### Bootstrap Procedure (fresh server)
+
+Run this once on each new cloud server.
+
+**1. Clone your fork and enter the repo:**
+
+```bash
+git clone https://github.com/FilippoGorini/isaac-projects.git ~/isaac-projects
+cd ~/isaac-projects
+```
+
+**2. Copy and source the project specific environment:**
+
+```bash
+cp projects/vla_kinova_tabletop_isaac/.env.example projects/vla_kinova_tabletop_isaac/.env
+source projects/vla_kinova_tabletop_isaac/.env
+```
+
+**3. Bootstrap the host (Docker, NVIDIA runtime, ROS 2, Isaac Sim image):**
+
+```bash
+./isaac_vmctl.sh bootstrap
+```
+
+**4. Bootstrap the Kinova ROS 2 workspace:**
+
+`bootstrap` writes the ROS 2 setup to `~/.bashrc` but does not source it in the
+current shell, so `ROS_DISTRO` is not yet set. Source ROS 2 manually before
+running the workspace bootstrap script:
+
+```bash
+source /opt/ros/humble/setup.bash   # or jazzy, whichever was installed
+cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac/ros2_ws
+./bootstrap_kinova_ws.sh
+```
+
+This imports `ros2_kortex` and all transitive dependencies via `vcstool`, installs
+system packages with `rosdep`, and builds the workspace with `colcon`.
+
+---
+
+### Starting Isaac Sim
+
+After bootstrap, in each new terminal source the project environment first:
+
+```bash
+source ~/isaac-projects/projects/vla_kinova_tabletop_isaac/setup.bash
+```
+
+Then start Isaac Sim from the repo root:
+
+```bash
+cd ~/isaac-projects
+./isaac_vmctl.sh start isaacsim
+```
+
+Open the Isaac Sim WebRTC Streaming Client on your laptop and connect to the
+server IP printed by `./isaac_vmctl.sh check`. From the Isaac Sim GUI, open the
+desired scene from `projects/vla_kinova_tabletop_isaac/isaacsim/worlds/` (the
+repo is mounted at `/workspace/isaac-projects` inside the container).
+
+For a native GUI inside TigerVNC instead of WebRTC, run the start command from
+the terminal inside the VNC desktop:
+
+```bash
+./isaac_vmctl.sh start isaacsim --gui
+```
+
+---
+
+### Running the ROS 2 Launch Files
+
+Source the project environment in every new terminal:
+
+```bash
+source ~/isaac-projects/projects/vla_kinova_tabletop_isaac/setup.bash
+```
+
+**Basic joint control (no motion planning):**
+
+```bash
+ros2 launch vla_kinova_tabletop kinova_controllers.launch.py
+```
+
+Starts `robot_state_publisher`, `ros2_control_node`, and spawns the
+`joint_trajectory_controller`, `robotiq_gripper_controller`, and
+`joint_state_broadcaster`.
+
+**MoveIt 2 + RViz:**
+
+```bash
+ros2 launch vla_kinova_tabletop kinova_controllers_moveit.launch.py
+```
+
+Starts everything above plus MoveIt 2 `move_group` and RViz with the project
+motion-planning preset.
 
 ---
 
