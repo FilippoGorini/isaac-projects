@@ -7,8 +7,8 @@
                 double radius = 2.6735292434692384
             }
             dictionary Perspective = {
-                double3 position = (0.15418850562370345, -2.9410171870852198, 1.4679801073239989)
-                double3 target = (0.7402827728917616, 9.20109519640393, -1.1763264824351474)
+                double3 position = (-0.3607075622861905, -2.401929998362817, 2.323146148593984)
+                double3 target = (0.21030494781418418, 9.427733687540362, -0.25311543187075625)
             }
             dictionary Right = {
                 double3 position = (-0.0025831043571606276, -5, 1.2875876568113325)
@@ -79,7 +79,7 @@ def "Render" (
                 uint omni:rtx:viewTile:limit = 4294967295
                 rel orderedVars = </Render/Vars/LdrColor>
                 custom bool overrideClipRange = 0
-                uniform int2 resolution = (1920, 1080)
+                uniform int2 resolution = (1280, 720)
             }
 
             def RenderProduct "Replicator" (
@@ -88,12 +88,76 @@ def "Render" (
                 no_delete = true
             )
             {
-                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera>
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_320x240>
                 bool omni:rtx:rt:ecoMode:enabled = 0
                 bool omni:rtx:scene:useViewLightingMode = 1
                 rel orderedVars = </Render/Vars/LdrColor>
                 custom bool overrideClipRange = 0
                 uniform int2 resolution = (1280, 720)
+            }
+
+            def RenderProduct "Replicator_01" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_320x240>
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (1280, 720)
+            }
+
+            def RenderProduct "Replicator_02" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_640x480>
+                custom string ogPostProcessPath = "/Render/OmniverseKit/HydraTextures/Replicator_02/PostRender"
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                rel orderedVars = [
+                    </Render/Vars/LdrColorSD>,
+                    </Render/Vars/LdrColor>,
+                ]
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (640, 480)
+            }
+
+            def RenderProduct "Replicator_03" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_640x480>
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (640, 480)
+            }
+
+            def RenderProduct "Replicator_04" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_320x240>
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (320, 240)
             }
         }
     }
@@ -106,6 +170,10 @@ def "Render" (
         rel products = [
             </Render/OmniverseKit/HydraTextures/omni_kit_widget_viewport_ViewportTexture_0>,
             </Render/OmniverseKit/HydraTextures/Replicator>,
+            </Render/OmniverseKit/HydraTextures/Replicator_01>,
+            </Render/OmniverseKit/HydraTextures/Replicator_02>,
+            </Render/OmniverseKit/HydraTextures/Replicator_03>,
+            </Render/OmniverseKit/HydraTextures/Replicator_04>,
         ]
     }
 
@@ -177,29 +245,63 @@ def "kinova_gen3_6dof_2f85" (
         {
             over "camera_color_frame"
             {
-                def Camera "rgb_camera"
+                def Camera "rgb_camera_320x240" (
+                    active = true
+                )
                 {
-                    float2 clippingRange = (0.3, 10)
+                    float2 clippingRange = (0.01, 10)
                     float focalLength = 18.147562
                     float focusDistance = 500
-                    float fthetaCx = 160
-                    float fthetaCy = 120
+                    float fthetaCx = 156.143
+                    float fthetaCy = 117.923
                     float fthetaHeight = 240
-                    float fthetaMaxFov = 70
+                    float fthetaMaxFov = 65
                     float fthetaPolyB = 0
+                    float fthetaPolyD = 0
                     float fthetaWidth = 320
-                    float horizontalAperture = 18.5
-                    bool omni:kit:cameraLock = 0
+                    float horizontalAperture = 17.529
+                    bool omni:kit:cameraLock = 1
                     custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -331.06968396726)
-                    float openCVFx = 313.9
-                    float openCVFy = 313.9
+                    float openCVFx = 331.289
+                    float openCVFy = 330.585
                     float p0 = 0
                     float p1 = 0
                     float s0 = 0
                     float s1 = 0
                     float s2 = 0
                     float s3 = 0
-                    float verticalAperture = 13.88
+                    float verticalAperture = 13.17213
+                    token visibility = "invisible"
+                    quatd xformOp:orient = (6.123233995736766e-17, 1, 2.676497766331783e-24, -2.6469779599000584e-23)
+                    double3 xformOp:scale = (1, 1, 1)
+                    double3 xformOp:translate = (1.0757093955301355e-20, 8.426840807329544e-15, 0)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+                }
+
+                def Camera "rgb_camera_640x480"
+                {
+                    float2 clippingRange = (0.01, 10)
+                    float focalLength = 18.147562
+                    float focusDistance = 500
+                    float fthetaCx = 311.753
+                    float fthetaCy = 232.401
+                    float fthetaHeight = 480
+                    float fthetaMaxFov = 65
+                    float fthetaPolyB = 0
+                    float fthetaPolyD = 0
+                    float fthetaWidth = 640
+                    float horizontalAperture = 17.767
+                    bool omni:kit:cameraLock = 1
+                    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -331.06968396726)
+                    float openCVFx = 653.682
+                    float openCVFy = 651.856
+                    float p0 = 0
+                    float p1 = 0
+                    float s0 = 0
+                    float s1 = 0
+                    float s2 = 0
+                    float s3 = 0
+                    float verticalAperture = 13.361
                     token visibility = "invisible"
                     quatd xformOp:orient = (6.123233995736766e-17, 1, 2.676497766331783e-24, -2.6469779599000584e-23)
                     double3 xformOp:scale = (1, 1, 1)
@@ -797,11 +899,46 @@ def compute(db):
             uniform float2 ui:nodegraph:node:pos = (-404.18683, -316.76633)
         }
 
-        def OmniGraphNode "RenderProduct" (
+        def OmniGraphNode "RGBPublish" (
             prepend apiSchemas = ["NodeGraphNodeAPI"]
         )
         {
-            custom rel inputs:cameraPrim = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera> (
+            custom uint64 inputs:context
+            prepend uint64 inputs:context.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/Context.outputs:context>
+            custom bool inputs:enabled
+            custom bool inputs:enableSemanticLabels
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/RenderProduct_640x480.outputs:execOut>
+            custom string inputs:frameId = "camera_color_frame"
+            custom uint inputs:frameSkipCount
+            custom string inputs:nodeNamespace = ""
+            custom string inputs:qosProfile
+            custom uint64 inputs:queueSize
+            custom token inputs:renderProductPath
+            prepend token inputs:renderProductPath.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/RenderProduct_640x480.outputs:renderProductPath>
+            custom bool inputs:resetSimulationTimeOnStop = 1
+            custom string inputs:semanticLabelsTopicName
+            custom float2 inputs:stereoOffset
+            custom string inputs:topicName = "/sim_camera/color/image_raw"
+            custom token inputs:type = "rgb" (
+                allowedTokens = ["rgb", "depth", "depth_pcl", "instance_segmentation", "semantic_segmentation", "bbox_2d_tight", "bbox_2d_loose", "bbox_3d"]
+            )
+            custom bool inputs:useSystemTime
+            custom token inputs:viewport
+            token node:type = "isaacsim.ros2.bridge.ROS2CameraHelper"
+            int node:typeVersion = 2
+            uniform float2 ui:nodegraph:node:pos = (166.31076, -354.2528)
+        }
+
+        def OmniGraphNode "RenderProduct_640x480" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom rel inputs:cameraPrim = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_640x480> (
                 customData = {
                     dictionary omni = {
                         dictionary graph = {
@@ -817,8 +954,8 @@ def compute(db):
                 }
             )
             prepend uint inputs:execIn.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
-            custom uint inputs:height
-            custom uint inputs:width
+            custom uint inputs:height = 480
+            custom uint inputs:width = 640
             token node:type = "isaacsim.core.nodes.IsaacCreateRenderProduct"
             int node:typeVersion = 2
             custom uint outputs:execOut (
@@ -827,42 +964,40 @@ def compute(db):
                 }
             )
             custom token outputs:renderProductPath
-            uniform float2 ui:nodegraph:node:pos = (-117.61035, -306.51468)
+            uniform float2 ui:nodegraph:node:pos = (-122.763985, -319.0307)
         }
 
-        def OmniGraphNode "RGBPublish" (
+        def OmniGraphNode "RenderProduct_320x240" (
             prepend apiSchemas = ["NodeGraphNodeAPI"]
         )
         {
-            custom uint64 inputs:context
-            prepend uint64 inputs:context.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/Context.outputs:context>
+            custom rel inputs:cameraPrim = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_320x240> (
+                customData = {
+                    dictionary omni = {
+                        dictionary graph = {
+                            string relType = "target"
+                        }
+                    }
+                }
+            )
             custom bool inputs:enabled
-            custom bool inputs:enableSemanticLabels
             custom uint inputs:execIn (
                 customData = {
                     bool isExecution = 1
                 }
             )
-            prepend uint inputs:execIn.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/RenderProduct.outputs:execOut>
-            custom string inputs:frameId = "sim_camera"
-            custom uint inputs:frameSkipCount
-            custom string inputs:nodeNamespace = ""
-            custom string inputs:qosProfile
-            custom uint64 inputs:queueSize
-            custom token inputs:renderProductPath
-            prepend token inputs:renderProductPath.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/RenderProduct.outputs:renderProductPath>
-            custom bool inputs:resetSimulationTimeOnStop = 1
-            custom string inputs:semanticLabelsTopicName
-            custom float2 inputs:stereoOffset
-            custom string inputs:topicName = "/wrist_mounted_camera/image"
-            custom token inputs:type = "rgb" (
-                allowedTokens = ["rgb", "depth", "depth_pcl", "instance_segmentation", "semantic_segmentation", "bbox_2d_tight", "bbox_2d_loose", "bbox_3d"]
-            )
-            custom bool inputs:useSystemTime
-            custom token inputs:viewport
-            token node:type = "isaacsim.ros2.bridge.ROS2CameraHelper"
+            prepend uint inputs:execIn.connect = </kinova_gen3_6dof_2f85/ROS2_Bridge_Graph/OnPlaybackTick.outputs:tick>
+            custom uint inputs:height = 240
+            custom uint inputs:width = 320
+            token node:type = "isaacsim.core.nodes.IsaacCreateRenderProduct"
             int node:typeVersion = 2
-            uniform float2 ui:nodegraph:node:pos = (166.31076, -354.2528)
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom token outputs:renderProductPath
+            uniform float2 ui:nodegraph:node:pos = (-123.49339, -536.18475)
         }
     }
 }
