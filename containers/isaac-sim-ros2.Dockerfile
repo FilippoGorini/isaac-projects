@@ -12,13 +12,17 @@ USER root
 
 RUN set -euo pipefail; \
     . /etc/os-release; \
+    case "${VERSION_ID}" in \
+      22.04) expected_distro="humble" ;; \
+      24.04) expected_distro="jazzy" ;; \
+      *) echo "Unsupported Ubuntu version for ROS 2 auto selection: ${VERSION_ID}" >&2; exit 1 ;; \
+    esac; \
     requested_distro="${ISAAC_ROS_DISTRO}"; \
     if [[ "${requested_distro}" == "auto" ]]; then \
-      case "${VERSION_ID}" in \
-        22.04) requested_distro="humble" ;; \
-        24.04) requested_distro="jazzy" ;; \
-        *) echo "Unsupported Ubuntu version for ROS 2 auto selection: ${VERSION_ID}" >&2; exit 1 ;; \
-      esac; \
+      requested_distro="${expected_distro}"; \
+    elif [[ "${requested_distro}" != "${expected_distro}" ]]; then \
+      echo "ISAAC_ROS_DISTRO=${requested_distro} is incompatible with Ubuntu ${VERSION_ID}; use ${expected_distro} or auto." >&2; \
+      exit 1; \
     fi; \
     case "${requested_distro}" in humble|jazzy) ;; *) echo "Unsupported ISAAC_ROS_DISTRO=${requested_distro}" >&2; exit 1 ;; esac; \
     case "${ISAAC_ROS_INSTALL_VARIANT}" in ros-base|desktop) ;; *) echo "Unsupported ISAAC_ROS_INSTALL_VARIANT=${ISAAC_ROS_INSTALL_VARIANT}" >&2; exit 1 ;; esac; \

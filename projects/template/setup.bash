@@ -6,7 +6,7 @@
 #
 # It will:
 #   1. Load project-specific variables from .env (if present)
-#   2. Source the ROS 2 environment (Humble or Jazzy, whichever is installed)
+#   2. Source the ROS 2 environment for the current Ubuntu version
 #   3. Source the colcon workspace if it has been built
 #
 # Do not enable strict shell options here: this file is meant to be sourced,
@@ -27,15 +27,39 @@ fi
 
 # ─── 2. Source ROS 2 ──────────────────────────────────────────────────────────
 _ros_sourced=0
-for _ros_setup in /opt/ros/jazzy/setup.bash /opt/ros/humble/setup.bash; do
+_expected_ros_distro=""
+if [[ -r /etc/os-release ]]; then
+  _os_id="$(. /etc/os-release && printf '%s' "${ID:-}")"
+  _os_version="$(. /etc/os-release && printf '%s' "${VERSION_ID:-}")"
+  if [[ "$_os_id" == "ubuntu" ]]; then
+    case "$_os_version" in
+      22.04) _expected_ros_distro="humble" ;;
+      24.04) _expected_ros_distro="jazzy" ;;
+    esac
+  fi
+fi
+
+if [[ -n "$_expected_ros_distro" ]]; then
+  _ros_setup="/opt/ros/${_expected_ros_distro}/setup.bash"
   if [[ -f "$_ros_setup" ]]; then
     # shellcheck source=/dev/null
     source "$_ros_setup"
     _ros_sourced=1
     echo "[setup] Sourced ROS 2: ${_ros_setup}"
-    break
+  else
+    echo "[setup] WARNING: Expected ROS 2 ${_expected_ros_distro} for this Ubuntu version, but ${_ros_setup} was not found."
   fi
-done
+else
+  for _ros_setup in /opt/ros/humble/setup.bash /opt/ros/jazzy/setup.bash /opt/ros/iron/setup.bash /opt/ros/rolling/setup.bash; do
+    if [[ -f "$_ros_setup" ]]; then
+      # shellcheck source=/dev/null
+      source "$_ros_setup"
+      _ros_sourced=1
+      echo "[setup] Sourced ROS 2: ${_ros_setup}"
+      break
+    fi
+  done
+fi
 
 if [[ $_ros_sourced -eq 0 ]]; then
   echo "[setup] WARNING: ROS 2 not found. Run: ./isaac_vmctl.sh install ros2"
@@ -53,4 +77,4 @@ fi
 
 echo "[setup] Done. ROS_DISTRO=${ROS_DISTRO:-not set}"
 
-unset _project_dir _ros_sourced _ros_setup _ws_setup
+unset _project_dir _ros_sourced _ros_setup _expected_ros_distro _os_id _os_version _ws_setup

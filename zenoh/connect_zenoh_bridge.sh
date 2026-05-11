@@ -82,16 +82,34 @@ source_ros_if_needed() {
     return 0
   fi
 
-  local setup_file=""
+  local setup_file="" expected_distro="" os_pretty=""
   if [[ -n "${ROS_SETUP:-}" && -f "${ROS_SETUP}" ]]; then
     setup_file="${ROS_SETUP}"
   else
-    for distro in jazzy humble iron rolling; do
-      if [[ -f "/opt/ros/${distro}/setup.bash" ]]; then
-        setup_file="/opt/ros/${distro}/setup.bash"
-        break
+    if [[ -r /etc/os-release ]]; then
+      local ID="" VERSION_ID="" PRETTY_NAME=""
+      # shellcheck disable=SC1091
+      . /etc/os-release
+      os_pretty="${PRETTY_NAME:-Ubuntu ${VERSION_ID:-unknown}}"
+      if [[ "${ID:-}" == "ubuntu" ]]; then
+        case "${VERSION_ID:-}" in
+          22.04) expected_distro="humble" ;;
+          24.04) expected_distro="jazzy" ;;
+        esac
       fi
-    done
+    fi
+
+    if [[ -n "$expected_distro" ]]; then
+      setup_file="/opt/ros/${expected_distro}/setup.bash"
+      [[ -f "$setup_file" ]] || error "Expected ROS 2 ${expected_distro} for ${os_pretty}, but ${setup_file} was not found. Run: ./isaac_vmctl.sh install ros2"
+    else
+      for distro in humble jazzy iron rolling; do
+        if [[ -f "/opt/ros/${distro}/setup.bash" ]]; then
+          setup_file="/opt/ros/${distro}/setup.bash"
+          break
+        fi
+      done
+    fi
   fi
 
   [[ -n "$setup_file" ]] || error "ROS 2 not found in /opt/ros. Install ROS 2 or source it manually before running this script."

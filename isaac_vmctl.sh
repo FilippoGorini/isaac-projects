@@ -644,6 +644,14 @@ append_unique() {
   target_array+=("$value")
 }
 
+ros_distro_for_ubuntu_version() {
+  case "$1" in
+    22.04) printf '%s\n' "humble" ;;
+    24.04) printf '%s\n' "jazzy" ;;
+    *) return 1 ;;
+  esac
+}
+
 require_supported_host() {
   [[ -r /etc/os-release ]] || error "/etc/os-release not found. Unsupported host."
   # shellcheck disable=SC1091
@@ -651,19 +659,8 @@ require_supported_host() {
 
   [[ "${ID:-}" == "ubuntu" ]] || error "This script only supports Ubuntu hosts. Found: ${PRETTY_NAME:-unknown}."
 
-  case "${VERSION_ID:-}" in
-    22.04)
-      ROS_DISTRO=humble
-      ROS_SETUP=/opt/ros/humble/setup.bash
-      ;;
-    24.04)
-      ROS_DISTRO=jazzy
-      ROS_SETUP=/opt/ros/jazzy/setup.bash
-      ;;
-    *)
-      error "Unsupported Ubuntu version: ${VERSION_ID:-unknown}. This script intentionally supports Ubuntu 22.04 (ROS 2 Humble) and Ubuntu 24.04 (ROS 2 Jazzy) only."
-      ;;
-  esac
+  ROS_DISTRO=$(ros_distro_for_ubuntu_version "${VERSION_ID:-}") || error "Unsupported Ubuntu version: ${VERSION_ID:-unknown}. This script intentionally supports Ubuntu 22.04 (ROS 2 Humble) and Ubuntu 24.04 (ROS 2 Jazzy) only."
+  ROS_SETUP="/opt/ros/${ROS_DISTRO}/setup.bash"
 
   ARCH=$(dpkg --print-architecture)
   case "$ARCH" in
@@ -1259,19 +1256,17 @@ resolve_isaac_ros_distro() {
     return 0
   fi
 
-  if [[ "$ISAAC_ROS_DISTRO" != "auto" ]]; then
-    RESOLVED_ISAAC_ROS_DISTRO="$ISAAC_ROS_DISTRO"
-    printf '%s' "$RESOLVED_ISAAC_ROS_DISTRO"
-    return 0
-  fi
-
-  local image_ubuntu_version
+  local image_ubuntu_version expected_ros_distro
   image_ubuntu_version=$(docker_cmd run --rm --entrypoint bash "$ISAAC_IMAGE" -c '. /etc/os-release && printf "%s" "${VERSION_ID}"')
-  case "$image_ubuntu_version" in
-    22.04) RESOLVED_ISAAC_ROS_DISTRO="humble" ;;
-    24.04) RESOLVED_ISAAC_ROS_DISTRO="jazzy" ;;
-    *) error "Cannot auto-select ROS 2 distro for ${ISAAC_IMAGE}: unsupported Ubuntu ${image_ubuntu_version}." ;;
-  esac
+  expected_ros_distro=$(ros_distro_for_ubuntu_version "$image_ubuntu_version") || error "Cannot auto-select ROS 2 distro for ${ISAAC_IMAGE}: unsupported Ubuntu ${image_ubuntu_version}."
+
+  if [[ "$ISAAC_ROS_DISTRO" == "auto" ]]; then
+    RESOLVED_ISAAC_ROS_DISTRO="$expected_ros_distro"
+  elif [[ "$ISAAC_ROS_DISTRO" == "$expected_ros_distro" ]]; then
+    RESOLVED_ISAAC_ROS_DISTRO="$ISAAC_ROS_DISTRO"
+  else
+    error "ISAAC_ROS_DISTRO=${ISAAC_ROS_DISTRO} is incompatible with ${ISAAC_IMAGE} Ubuntu ${image_ubuntu_version}; use ${expected_ros_distro} or auto."
+  fi
 
   printf '%s' "$RESOLVED_ISAAC_ROS_DISTRO"
 }
@@ -2044,6 +2039,7 @@ build_common_docker_args() {
   DOCKER_RUN_ARGS=(
     --gpus all
     --network=host
+    --ipc=host
     -e ACCEPT_EULA=Y
     -e PRIVACY_CONSENT=Y
     -e "ROS_DOMAIN_ID=${ROS_DOMAIN_ID}"
