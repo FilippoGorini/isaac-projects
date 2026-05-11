@@ -20,8 +20,8 @@
       // bandwidth, especially for camera and point-cloud topics.
       //
       // allow: {
-      //   publishers:    ["/tf", "/tf_static", "/joint_states", "/cmd_vel"],
-      //   subscribers:   ["/cmd_vel"],
+      //   publishers:    ["^/tf$", "^/tf_static$", "^/joint_states$", "^/cmd_vel$"],
+      //   subscribers:   ["^/tf$", "^/tf_static$", "^/joint_states$", "^/cmd_vel$"],
       //   service_servers:  [],
       //   service_clients:  [],
       //   action_servers:   [],
@@ -47,7 +47,7 @@
   },
 
   // Multicast scouting
-  // Keep this false for WAN / internet connections.
+  // Keep this false for WAN / intenet connections.
   // The bridge uses TCP unicast to the router instead.
   scouting: {
     multicast: {

@@ -1,0 +1,62 @@
+// Restrictive Zenoh ROS 2 bridge config for Isaac Sim control/state plus camera.
+//
+// This allows the common Isaac control/state topics and camera image topics,
+// while downsampling camera traffic for WAN use.
+//
+// GPU server:
+//   ./isaac_vmctl.sh stop zenoh
+//   ./isaac_vmctl.sh start zenoh 7447 --config zenoh/configs/isaac_camera_throttled.json5
+//
+// Laptop, optional matching client-side filter:
+//   ./zenoh/connect_zenoh_bridge.sh <GPU_IP> 7447 --config zenoh/configs/isaac_camera_throttled.json5
+{
+  plugins: {
+    ros2dds: {
+      allow: {
+        publishers: [
+          "^/clock$",
+          "^/tf$",
+          "^/tf_static$",
+          "^/joint_states$",
+          "^/isaac_joint_states$",
+          "^/isaac_arm_commands$",
+          "^/isaac_gripper_commands$",
+          "^/sim_camera/.*/image_raw$",
+          "^/camera/.*/image_raw$",
+          "^/.*/camera/.*/image_raw$",
+        ],
+        subscribers: [
+          "^/clock$",
+          "^/tf$",
+          "^/tf_static$",
+          "^/joint_states$",
+          "^/isaac_joint_states$",
+          "^/isaac_arm_commands$",
+          "^/isaac_gripper_commands$",
+          "^/sim_camera/.*/image_raw$",
+          "^/camera/.*/image_raw$",
+          "^/.*/camera/.*/image_raw$",
+        ],
+        service_servers: [],
+        service_clients: [],
+        action_servers: [],
+        action_clients: [],
+      },
+
+      pub_max_frequencies: [
+        "^/tf$=30.0",
+        "^/joint_states$=50.0",
+        "^/isaac_joint_states$=50.0",
+        "^/sim_camera/.*/image_raw$=5.0",
+        "^/camera/.*/image_raw$=5.0",
+        "^/.*/camera/.*/image_raw$=5.0",
+      ],
+    },
+  },
+
+  scouting: {
+    multicast: {
+      enabled: false,
+    },
+  },
+}

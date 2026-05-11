@@ -6,8 +6,9 @@
 #
 # It will:
 #   1. Load project-specific variables from .env (if present)
-#   2. Source the ROS 2 environment for the current Ubuntu version
-#   3. Source the colcon workspace if it has been built
+#   2. Load the default ROS_DOMAIN_ID for this machine
+#   3. Source the ROS 2 environment for the current Ubuntu version
+#   4. Source the colcon workspace if it has been built
 #
 # Do not enable strict shell options here: this file is meant to be sourced,
 # and changing set -e/-u/pipefail would leak into the user's interactive shell.
@@ -26,6 +27,12 @@ else
 fi
 
 # ─── 2. Source ROS 2 ──────────────────────────────────────────────────────────
+if [[ -z "${ROS_DOMAIN_ID:-}" && -r /etc/isaac-projects/ros.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/isaac-projects/ros.env
+fi
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+
 _ros_sourced=0
 _expected_ros_distro=""
 if [[ -r /etc/os-release ]]; then
@@ -75,6 +82,6 @@ else
   echo "[setup] Workspace not built yet. Run: cd ros2_ws && colcon build"
 fi
 
-echo "[setup] Done. ROS_DISTRO=${ROS_DISTRO:-not set}"
+echo "[setup] Done. ROS_DISTRO=${ROS_DISTRO:-not set} ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-not set}"
 
 unset _project_dir _ros_sourced _ros_setup _expected_ros_distro _os_id _os_version _ws_setup

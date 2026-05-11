@@ -49,15 +49,30 @@ cd ~/isaac-projects
 ./isaac_vmctl.sh start zenoh 7447
 ```
 
+When Isaac Sim is already running, `isaac_vmctl.sh start zenoh` starts the
+server bridge inside the Isaac Sim container so Zenoh uses the same ROS 2
+runtime as Isaac's ROS bridge. This is important on Ubuntu 22.04 hosts, where
+the host ROS 2 runtime is Humble but the Isaac Sim 5.1 container runtime is
+Jazzy. Set `ZENOH_BRIDGE_CONTEXT=host` only when you intentionally want the
+host ROS 2 bridge runtime, or `ZENOH_BRIDGE_CONTEXT=isaac` when the bridge must
+fail instead of falling back to the host.
+
 With a ROS domain:
 
 ```bash
-./isaac_vmctl.sh start zenoh 7447 --domain 0
+./isaac_vmctl.sh start zenoh 7447 --domain <id>
+```
+
+Stop the server bridge:
+
+```bash
+./isaac_vmctl.sh stop zenoh
 ```
 
 > [!WARNING]
-> `ROS_DOMAIN_ID` must match on the GPU server and laptop. If Isaac Sim uses
-> domain `0`, both Zenoh bridges should use domain `0`.
+> `ROS_DOMAIN_ID` must match on the GPU server and laptop. Bootstrap persists
+> the GPU server default in `/etc/isaac-projects/ros.env`; use `--domain <id>`
+> only when you need to override that default for one bridge process.
 
 ## Connect From Your Laptop
 
@@ -77,7 +92,7 @@ Vast.ai mapped port:
 Then verify:
 
 ```bash
-source /opt/ros/jazzy/setup.bash   # or humble
+source /opt/ros/<distro>/setup.bash
 ros2 topic list
 ros2 topic hz /tf
 ```
@@ -85,7 +100,7 @@ ros2 topic hz /tf
 Useful variants:
 
 ```bash
-./zenoh/connect_zenoh_bridge.sh <GPU_PUBLIC_IP> 7447 --domain 0
+./zenoh/connect_zenoh_bridge.sh <GPU_PUBLIC_IP> 7447 --domain <id>
 ./zenoh/connect_zenoh_bridge.sh <GPU_PUBLIC_IP> 7447 --namespace /sim
 ./zenoh/connect_zenoh_bridge.sh <GPU_PUBLIC_IP> 7447 --config zenoh/configs/example_filter.json5
 ```
@@ -107,20 +122,44 @@ source configs/isaac-lab.env
 ./isaac_vmctl.sh start isaacsim
 ```
 
+On mixed Humble/Jazzy machines, the container-side bridge can still log a
+warning about older ROS discovery GIDs if a host Humble `ros2 daemon` is active
+in the same `ROS_DOMAIN_ID`. That warning is from the host CLI daemon, not from
+Isaac's publishers, and the setup is healthy when the bridge log also shows
+routes for Isaac topics such as `/clock`, `/isaac_joint_states`, and camera
+topics. Stop the host daemon with `ros2 daemon stop` if you only want to quiet
+that warning while using Zenoh from a laptop.
+
 ## Topic Filtering
 
-WAN links should not carry every camera image or point cloud at full rate. Use
-the example config when needed:
+WAN links should not carry every topic. Start with one of the supplied configs:
+
+| Config | Use |
+|---|---|
+| [isaac_control_only.json5](configs/isaac_control_only.json5) | Clock, TF, joint state, and Isaac command topics only. No camera stream. |
+| [isaac_camera_throttled.json5](configs/isaac_camera_throttled.json5) | Control/state topics plus camera image topics capped to `5 Hz`. |
+| [example_filter.json5](configs/example_filter.json5) | Commented template for custom allowlists, frequency caps, and namespaces. |
+
+Apply filtering on the GPU server. Restart the bridge when changing configs:
 
 ```bash
-# GPU server
-./isaac_vmctl.sh start zenoh 7447 --config zenoh/configs/example_filter.json5
-
-# Laptop
-./zenoh/connect_zenoh_bridge.sh <GPU_PUBLIC_IP> 7447 --config zenoh/configs/example_filter.json5
+./isaac_vmctl.sh stop zenoh
+./isaac_vmctl.sh start zenoh 7447 --config zenoh/configs/isaac_control_only.json5
 ```
 
-See [configs/example_filter.json5](configs/example_filter.json5).
+Use the camera config when a student needs images:
+
+```bash
+./isaac_vmctl.sh stop zenoh
+./isaac_vmctl.sh start zenoh 7447 --config zenoh/configs/isaac_camera_throttled.json5
+```
+
+The laptop can optionally use the same config to restrict local ROS publishers
+and subscribers too:
+
+```bash
+./zenoh/connect_zenoh_bridge.sh <GPU_PUBLIC_IP> 7447 --config zenoh/configs/isaac_control_only.json5
+```
 
 | Topic Type | Practical WAN Limit |
 |---|---|
@@ -134,9 +173,9 @@ See [configs/example_filter.json5](configs/example_filter.json5).
 | File | Purpose |
 |---|---|
 | [setup.sh](setup.sh) | Downloads the bridge binary. |
-| [start_zenoh_bridge.sh](start_zenoh_bridge.sh) | Starts the GPU-server router on TCP `7447`. |
+| [start_zenoh_bridge.sh](start_zenoh_bridge.sh) | Starts the GPU-server router on TCP `7447` in the current ROS 2 shell. Prefer `../isaac_vmctl.sh start zenoh` for Isaac Sim sessions so the container runtime is used when available. |
 | [connect_zenoh_bridge.sh](connect_zenoh_bridge.sh) | Connects the laptop to the GPU-server router. |
-| [configs/example_filter.json5](configs/example_filter.json5) | Topic filtering and bandwidth example. |
+| [configs/](configs) | Ready-to-use and template Zenoh filtering configs. |
 
 ## Troubleshooting
 

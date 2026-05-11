@@ -19,12 +19,17 @@ ALLOWED_CLIENT_IP="${ALLOWED_CLIENT_IP:-}"               # optional; only used i
 ISAAC_EXTRA_ARGS="${ISAAC_EXTRA_ARGS:-}"
 PRIVACY_USERID="${PRIVACY_USERID:-}"
 START_TIMEOUT_SEC="${START_TIMEOUT_SEC:-30}"
+if [[ -z "${ROS_DOMAIN_ID:-}" && -r /etc/isaac-projects/ros.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/isaac-projects/ros.env
+fi
 ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-}"
 HOST_WORKSPACE_ROOT="${HOST_WORKSPACE_ROOT:-$SCRIPT_DIR}"
 CONTAINER_WORKSPACE="${CONTAINER_WORKSPACE:-/workspace/isaac-projects}"
 CONTAINER_UID="${CONTAINER_UID:-}"
 CONTAINER_GID="${CONTAINER_GID:-}"
+ZENOH_BRIDGE_CONTEXT="${ZENOH_BRIDGE_CONTEXT:-auto}"
 ISAACLAB_ENABLE="${ISAACLAB_ENABLE:-0}"
 ISAACLAB_PATH="${ISAACLAB_PATH:-external/IsaacLab}"
 ISAACLAB_REPO_URL="${ISAACLAB_REPO_URL:-https://github.com/isaac-sim/IsaacLab.git}"
@@ -498,6 +503,7 @@ Usage:
                                  Run a one-shot command inside the Isaac Sim container image.
   ${SCRIPT_NAME} stop isaacsim       Stop the Isaac Sim container.
   ${SCRIPT_NAME} stop tigervnc|vnc   Stop the TigerVNC desktop.
+  ${SCRIPT_NAME} stop zenoh|bridge   Stop server-side Zenoh ROS 2 bridge processes.
   ${SCRIPT_NAME} restart isaacsim    Restart Isaac Sim.
   ${SCRIPT_NAME} status              Show VM / Docker / Isaac Sim / ROS status.
   ${SCRIPT_NAME} logs                Show Isaac Sim container logs.
@@ -531,6 +537,7 @@ Optional environment variables:
   CONTAINER_WORKSPACE=/workspace/isaac-projects
   CONTAINER_UID=<host-uid>            # optional; defaults to current user
   CONTAINER_GID=<host-gid>            # optional; defaults to current user
+  ZENOH_BRIDGE_CONTEXT=auto|isaac|host # auto uses the Isaac container ROS runtime when it is running
   ISAACLAB_ENABLE=0|1                 # when 1, bootstrap clones/builds a pinned Isaac Lab setup
   ISAACLAB_PATH=external/IsaacLab     # workspace-relative path that contains isaaclab.sh
   ISAACLAB_REPO_URL=https://github.com/isaac-sim/IsaacLab.git
@@ -569,7 +576,8 @@ Examples:
   ${SCRIPT_NAME} start isaacsim --gui
   ${SCRIPT_NAME} start tigervnc
   ${SCRIPT_NAME} start zenoh
-  ${SCRIPT_NAME} start bridge 7447 --domain 0
+  ${SCRIPT_NAME} stop zenoh
+  ${SCRIPT_NAME} start bridge 7447 --domain <id>
   ${SCRIPT_NAME} start isaacsim --headless
   ISAACLAB_ENABLE=1 ${SCRIPT_NAME} bootstrap
   ${SCRIPT_NAME} run isaaclab '-p scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ant-v0 --headless'
@@ -652,6 +660,14 @@ ros_distro_for_ubuntu_version() {
   esac
 }
 
+validate_ros_domain_id() {
+  [[ "$ROS_DOMAIN_ID" =~ ^[0-9]+$ ]] || error "ROS_DOMAIN_ID must be an integer between 0 and 232. Found: ${ROS_DOMAIN_ID}"
+  local domain_id=$((10#$ROS_DOMAIN_ID))
+  (( domain_id <= 232 )) || error "ROS_DOMAIN_ID must be between 0 and 232. Found: ${ROS_DOMAIN_ID}"
+  ROS_DOMAIN_ID="$domain_id"
+  export ROS_DOMAIN_ID
+}
+
 require_supported_host() {
   [[ -r /etc/os-release ]] || error "/etc/os-release not found. Unsupported host."
   # shellcheck disable=SC1091
@@ -661,6 +677,7 @@ require_supported_host() {
 
   ROS_DISTRO=$(ros_distro_for_ubuntu_version "${VERSION_ID:-}") || error "Unsupported Ubuntu version: ${VERSION_ID:-unknown}. This script intentionally supports Ubuntu 22.04 (ROS 2 Humble) and Ubuntu 24.04 (ROS 2 Jazzy) only."
   ROS_SETUP="/opt/ros/${ROS_DISTRO}/setup.bash"
+  validate_ros_domain_id
 
   ARCH=$(dpkg --print-architecture)
   case "$ARCH" in
@@ -879,8 +896,26 @@ ensure_ros2_installed() {
     rosdep update || true
   fi
 
+  ensure_ros_domain_env_file
   ensure_ros_setup_in_bashrc
   ensure_ros_profile_script
+}
+
+ensure_ros_domain_env_file() {
+  local env_dir="/etc/isaac-projects"
+  local env_path="${env_dir}/ros.env"
+  local tmp_file
+
+  tmp_file=$(mktemp)
+  cat >"$tmp_file" <<EOF_DOMAIN
+# Managed by isaac_vmctl.sh. Sets the default ROS 2 DDS domain for this machine.
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID}"
+EOF_DOMAIN
+
+  as_root install -d -m 0755 "$env_dir"
+  as_root install -m 0644 "$tmp_file" "$env_path"
+  rm -f "$tmp_file"
+  info "Ensured ROS_DOMAIN_ID=${ROS_DOMAIN_ID} is sourced from ${env_path}."
 }
 
 ensure_ros_setup_in_bashrc() {
@@ -905,6 +940,10 @@ ensure_ros_setup_in_bashrc() {
 
   {
     printf '\n%s\n' "$marker_begin"
+    printf 'if [ -z "${ROS_DOMAIN_ID:-}" ] && [ -r /etc/isaac-projects/ros.env ]; then\n'
+    printf '  . /etc/isaac-projects/ros.env\n'
+    printf 'fi\n'
+    printf 'export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-%s}"\n' "$ROS_DOMAIN_ID"
     printf 'if [ "${ROS_DISTRO:-}" != "%s" ] && [ -f "%s" ]; then\n' "$ROS_DISTRO" "$ROS_SETUP"
     printf '  __isaac_projects_nounset_was_enabled=0\n'
     printf '  case $- in *u*) __isaac_projects_nounset_was_enabled=1; set +u ;; esac\n'
@@ -931,7 +970,11 @@ ensure_ros_profile_script() {
 
   tmp_file=$(mktemp)
   cat >"$tmp_file" <<EOF_PROFILE
-# Source ROS 2 for login shells on the GPU host.
+# Source ROS 2 and the project DDS domain for login shells on the GPU host.
+if [ -z "\${ROS_DOMAIN_ID:-}" ] && [ -r /etc/isaac-projects/ros.env ]; then
+  . /etc/isaac-projects/ros.env
+fi
+export ROS_DOMAIN_ID="\${ROS_DOMAIN_ID:-${ROS_DOMAIN_ID}}"
 if [ "\${ROS_DISTRO:-}" != "${ROS_DISTRO}" ] && [ -f "${ROS_SETUP%setup.bash}setup.sh" ]; then
   __isaac_projects_nounset_was_enabled=0
   case \$- in *u*) __isaac_projects_nounset_was_enabled=1; set +u ;; esac
@@ -946,7 +989,11 @@ EOF_PROFILE
 
   marker_begin="# >>> isaac-projects ROS 2 setup >>>"
   marker_end="# <<< isaac-projects ROS 2 setup <<<"
-  bash_block="if [ \"\${ROS_DISTRO:-}\" != \"${ROS_DISTRO}\" ] && [ -f \"${ROS_SETUP}\" ]; then
+  bash_block="if [ -z \"\${ROS_DOMAIN_ID:-}\" ] && [ -r /etc/isaac-projects/ros.env ]; then
+  . /etc/isaac-projects/ros.env
+fi
+export ROS_DOMAIN_ID=\"\${ROS_DOMAIN_ID:-${ROS_DOMAIN_ID}}\"
+if [ \"\${ROS_DISTRO:-}\" != \"${ROS_DISTRO}\" ] && [ -f \"${ROS_SETUP}\" ]; then
   __isaac_projects_nounset_was_enabled=0
   case \$- in *u*) __isaac_projects_nounset_was_enabled=1; set +u ;; esac
   source \"${ROS_SETUP}\"
@@ -1317,14 +1364,14 @@ ensure_isaac_runtime_image() {
     image_variant=$(docker_cmd image inspect "$runtime_image" --format '{{ index .Config.Labels "rice.isaacsim.ros2.install_variant" }}' 2>/dev/null || true)
     image_dockerfile_hash=$(docker_cmd image inspect "$runtime_image" --format '{{ index .Config.Labels "rice.isaacsim.ros2.dockerfile_hash" }}' 2>/dev/null || true)
     if [[ "$image_base" == "$ISAAC_IMAGE" && "$image_base_id" == "$base_image_id" && "$image_distro" == "$ros_distro" && "$image_variant" == "$ISAAC_ROS_INSTALL_VARIANT" && "$image_dockerfile_hash" == "$dockerfile_hash" ]]; then
-      info "ROS-enabled Isaac Sim image already present: ${runtime_image}"
+      info "ROS-enabled Isaac Sim image already present: ${runtime_image} (container ROS 2 ${ros_distro}; host ROS 2 ${ROS_DISTRO:-unknown})"
       ISAAC_RUNTIME_IMAGE="$runtime_image"
       return 0
     fi
     warn "Existing ROS-enabled Isaac Sim image ${runtime_image} does not match the requested config; rebuilding."
   fi
 
-  info "Building ROS-enabled Isaac Sim image ${runtime_image} from ${ISAAC_IMAGE} (${ros_distro}, ${ISAAC_ROS_INSTALL_VARIANT})..."
+  info "Building ROS-enabled Isaac Sim image ${runtime_image} from ${ISAAC_IMAGE} (container ROS 2 ${ros_distro}; host ROS 2 ${ROS_DISTRO:-unknown}; ${ISAAC_ROS_INSTALL_VARIANT})..."
   docker_cmd build \
     -f "$dockerfile_path" \
     --build-arg "ISAAC_IMAGE=${ISAAC_IMAGE}" \
@@ -2151,7 +2198,7 @@ start_isaacsim() {
     prepare_gui_x11_access
   fi
 
-  local public_ip signal_ready ros_status
+  local public_ip signal_ready ros_status container_ros_status
   public_ip="not needed"
   if [[ "$mode" == "webrtc" ]]; then
     public_ip=$(get_public_ip)
@@ -2160,6 +2207,10 @@ start_isaacsim() {
     ros_status="${ROS_DISTRO} (${ROS_SETUP})"
   else
     ros_status="not installed on host; run ./${SCRIPT_NAME} bootstrap if Zenoh/host ROS 2 is needed"
+  fi
+  container_ros_status="disabled"
+  if is_truthy "$ISAAC_ROS_ENABLE"; then
+    container_ros_status="$(resolve_isaac_ros_distro) (${ISAAC_RUNTIME_IMAGE})"
   fi
 
   build_isaac_command "$mode" "$public_ip"
@@ -2187,7 +2238,8 @@ Isaac Sim headless start requested.
 Container:      ${CONTAINER_NAME}
 Image:          ${ISAAC_RUNTIME_IMAGE}
 Workspace:      ${HOST_WORKSPACE_ROOT} -> ${CONTAINER_WORKSPACE}
-ROS 2 host:     ${ros_status}
+Host ROS 2:     ${ros_status}
+Container ROS 2: ${container_ros_status}
 ROS_DOMAIN_ID:  ${ROS_DOMAIN_ID}
 
 Useful commands:
@@ -2207,7 +2259,8 @@ Container:      ${CONTAINER_NAME}
 Image:          ${ISAAC_RUNTIME_IMAGE}
 Workspace:      ${HOST_WORKSPACE_ROOT} -> ${CONTAINER_WORKSPACE}
 X display:      ${GUI_DISPLAY}
-ROS 2 host:     ${ros_status}
+Host ROS 2:     ${ros_status}
+Container ROS 2: ${container_ros_status}
 ROS_DOMAIN_ID:  ${ROS_DOMAIN_ID}
 
 Useful commands:
@@ -2254,8 +2307,8 @@ Signal port:    ${WEBRTC_SIGNAL_PORT}/tcp
 Media port:     ${WEBRTC_STREAM_PORT}/udp
 Container:      ${CONTAINER_NAME}
 Image:          ${ISAAC_RUNTIME_IMAGE}
-ROS 2 distro:   ${ROS_DISTRO}
-ROS 2 host:     ${ros_status}
+Host ROS 2:     ${ros_status}
+Container ROS 2: ${container_ros_status}
 ROS_DOMAIN_ID:  ${ROS_DOMAIN_ID}
 Workspace:      ${HOST_WORKSPACE_ROOT} -> ${CONTAINER_WORKSPACE}
 
@@ -2277,6 +2330,52 @@ stop_isaacsim() {
     docker_cmd stop "$CONTAINER_NAME" >/dev/null
   else
     warn "${CONTAINER_NAME} is not running."
+  fi
+}
+
+stop_zenoh_bridge() {
+  init_paths
+
+  local stopped=0
+  local pattern='[z]enoh-bridge-ros2dds.*router'
+  local docker_exec_pattern='[d]ocker exec .*start_zenoh_bridge\.sh'
+
+  if have_cmd docker; then
+    get_docker_cmd
+    if "${DOCKER[@]}" ps --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER_NAME"; then
+      if "${DOCKER[@]}" exec "$CONTAINER_NAME" pgrep -f "$pattern" >/dev/null 2>&1; then
+        info "Stopping Zenoh bridge inside ${CONTAINER_NAME}..."
+        "${DOCKER[@]}" exec "$CONTAINER_NAME" pkill -TERM -f "$pattern" >/dev/null 2>&1 || true
+        stopped=1
+      fi
+    fi
+  fi
+
+  if pgrep -f "$pattern" >/dev/null 2>&1; then
+    info "Stopping host-visible Zenoh bridge processes..."
+    pkill -TERM -f "$pattern" >/dev/null 2>&1 || true
+    stopped=1
+  fi
+  if pgrep -f "$docker_exec_pattern" >/dev/null 2>&1; then
+    pkill -TERM -f "$docker_exec_pattern" >/dev/null 2>&1 || true
+    stopped=1
+  fi
+
+  sleep 1
+  if pgrep -f "$pattern" >/dev/null 2>&1; then
+    warn "Zenoh bridge did not exit after SIGTERM; forcing remaining bridge processes down."
+    pkill -KILL -f "$pattern" >/dev/null 2>&1 || true
+    stopped=1
+  fi
+  if pgrep -f "$docker_exec_pattern" >/dev/null 2>&1; then
+    pkill -KILL -f "$docker_exec_pattern" >/dev/null 2>&1 || true
+    stopped=1
+  fi
+
+  if [[ "$stopped" -eq 1 ]]; then
+    success "Stopped Zenoh bridge processes."
+  else
+    warn "No Zenoh server bridge processes were running."
   fi
 }
 
@@ -2810,21 +2909,131 @@ zenoh_setup() {
   exec bash "$setup_script" "$@"
 }
 
+zenoh_container_bridge_available() {
+  have_cmd docker || return 1
+  get_docker_cmd
+  "${DOCKER[@]}" ps --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER_NAME" || return 1
+  "${DOCKER[@]}" exec "$CONTAINER_NAME" test -f "${CONTAINER_WORKSPACE}/zenoh/start_zenoh_bridge.sh" >/dev/null 2>&1
+}
+
+zenoh_bridge_port_from_args() {
+  local port="7447"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --domain|--namespace|--config)
+        shift 2
+        ;;
+      -*)
+        shift
+        ;;
+      *)
+        port="$1"
+        break
+        ;;
+    esac
+  done
+  printf '%s\n' "$port"
+}
+
+zenoh_report_existing_listener() {
+  local port="$1"
+  local listener pid command_line
+
+  listener=$(ss -H -lntp "sport = :${port}" 2>/dev/null || true)
+  [[ -n "$listener" ]] || return 1
+
+  if [[ "$listener" != *zenoh-bridge* ]]; then
+    error "TCP port ${port} is already in use by another process: ${listener}"
+  fi
+
+  pid=$(printf '%s\n' "$listener" | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | head -n 1)
+  command_line=""
+  if [[ -n "$pid" ]]; then
+    command_line=$(ps -p "$pid" -o args= 2>/dev/null || true)
+  fi
+
+  info "Zenoh bridge is already listening on tcp/0.0.0.0:${port}${pid:+ (pid ${pid})}."
+  if [[ "$command_line" == *"${CONTAINER_WORKSPACE}/zenoh/zenoh-bridge-ros2dds"* ]]; then
+    info "Existing bridge is running from the Isaac container workspace."
+  elif [[ -n "$command_line" ]]; then
+    warn "Existing bridge command: ${command_line}"
+  fi
+  info "Local laptops connect to: tcp/<GPU_PUBLIC_IP>:${port}"
+  return 0
+}
+
 zenoh_start_bridge() {
   local start_script="${SCRIPT_DIR}/zenoh/start_zenoh_bridge.sh"
   local has_domain_arg=0
-  local arg
+  local domain_for_bridge="${ROS_DOMAIN_ID}"
+  local requested_port
+  local idx
+  local -a bridge_args=("$@")
   [[ -f "$start_script" ]] || error "Zenoh start script not found at ${start_script}"
-  for arg in "$@"; do
-    if [[ "$arg" == "--domain" ]]; then
+  for idx in "${!bridge_args[@]}"; do
+    case "${bridge_args[$idx]}" in
+      -h|--help) exec bash "$start_script" "${bridge_args[@]}" ;;
+    esac
+  done
+  case "$ZENOH_BRIDGE_CONTEXT" in
+    auto|isaac|host) ;;
+    *) error "ZENOH_BRIDGE_CONTEXT must be one of: auto, isaac, host. Found: ${ZENOH_BRIDGE_CONTEXT}" ;;
+  esac
+  init_paths
+  requested_port=$(zenoh_bridge_port_from_args "${bridge_args[@]}")
+
+  for idx in "${!bridge_args[@]}"; do
+    if [[ "${bridge_args[$idx]}" == "--domain" ]]; then
       has_domain_arg=1
+      [[ $((idx + 1)) -lt ${#bridge_args[@]} ]] || error "--domain requires a value"
+      domain_for_bridge="${bridge_args[$((idx + 1))]}"
       break
     fi
   done
   if [[ "$has_domain_arg" -eq 0 ]]; then
-    exec bash "$start_script" "$@" --domain "$ROS_DOMAIN_ID"
+    validate_ros_domain_id
+    domain_for_bridge="$ROS_DOMAIN_ID"
+    bridge_args+=(--domain "$domain_for_bridge")
+  else
+    ROS_DOMAIN_ID="$domain_for_bridge"
+    validate_ros_domain_id
+    domain_for_bridge="$ROS_DOMAIN_ID"
   fi
-  exec bash "$start_script" "$@"
+
+  if zenoh_report_existing_listener "$requested_port"; then
+    return 0
+  fi
+
+  if [[ "$ZENOH_BRIDGE_CONTEXT" != "host" ]]; then
+    if zenoh_container_bridge_available; then
+      local -a docker_exec_args=(
+        exec -i
+        -w "$CONTAINER_WORKSPACE"
+        -e "ROS_DOMAIN_ID=${domain_for_bridge}"
+      )
+      if [[ -n "$RMW_IMPLEMENTATION" ]]; then
+        docker_exec_args+=(-e "RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION}")
+      fi
+      docker_exec_args+=(
+        "$CONTAINER_NAME"
+        bash -lc 'if [[ -r /etc/profile.d/isaac-projects-ros2.sh ]]; then source /etc/profile.d/isaac-projects-ros2.sh; fi; exec bash "$@"'
+        _
+        ./zenoh/start_zenoh_bridge.sh
+        "${bridge_args[@]}"
+      )
+      info "Starting Zenoh bridge inside ${CONTAINER_NAME} so it uses the Isaac container ROS runtime."
+      exec "${DOCKER[@]}" "${docker_exec_args[@]}"
+    fi
+
+    if [[ "$ZENOH_BRIDGE_CONTEXT" == "isaac" ]]; then
+      error "ZENOH_BRIDGE_CONTEXT=isaac requires a running ${CONTAINER_NAME} container with ${CONTAINER_WORKSPACE} mounted."
+    fi
+
+    warn "Isaac container bridge context was not available; starting Zenoh with the host ROS runtime."
+    warn "For Isaac Sim topics on mixed Ubuntu 22/Humble host and Jazzy Isaac containers, start Isaac Sim first or set ZENOH_BRIDGE_CONTEXT=isaac."
+  fi
+
+  exec bash "$start_script" "${bridge_args[@]}"
 }
 
 install_docker_stack() {
@@ -2919,8 +3128,13 @@ main() {
         tigervnc|vnc)
           stop_tigervnc_server
           ;;
+        zenoh|bridge)
+          shift 2
+          [[ $# -eq 0 ]] || error "Usage: ${SCRIPT_NAME} stop {zenoh|bridge}"
+          stop_zenoh_bridge
+          ;;
         *)
-          error "Usage: ${SCRIPT_NAME} stop {isaacsim|tigervnc|vnc}"
+          error "Usage: ${SCRIPT_NAME} stop {isaacsim|tigervnc|vnc|zenoh|bridge}"
           ;;
       esac
       ;;

@@ -531,6 +531,7 @@ jupyter lab --no-browser --ip 127.0.0.1 --port 8888
 | `./isaac_vmctl.sh stop isaacsim` | Stop the container |
 | `./isaac_vmctl.sh start tigervnc` | Install/start the TigerVNC desktop |
 | `./isaac_vmctl.sh stop tigervnc` | Stop the TigerVNC desktop |
+| `./isaac_vmctl.sh stop zenoh` | Stop server-side Zenoh bridge processes |
 | `./isaac_vmctl.sh restart isaacsim` | Restart the container |
 | `./isaac_vmctl.sh status` | Check host, GPU, Docker, ROS 2, container |
 | `./isaac_vmctl.sh logs` | Follow Isaac Sim logs |
@@ -591,9 +592,12 @@ export ISAAC_EXTRA_ARGS="--/app/enableExtensions/0=isaacsim.ros2.bridge"
 ```
 
 The Isaac container uses `--network=host` and the same `ROS_DOMAIN_ID` as the
-host by default. ROS 2 nodes on the host and ROS 2 nodes in the container can
-discover each other directly on the GPU machine. Direct sample delivery still
-depends on compatible ROS/RMW stacks. On Ubuntu 22.04 hosts with Isaac Sim 5.1,
+host by default. Bootstrap writes the selected domain into
+`/etc/isaac-projects/ros.env` and the managed host shell startup blocks; rerun
+it with `ROS_DOMAIN_ID=<id>` to change the default for future shells and
+container launches. ROS 2 nodes on the host and ROS 2
+nodes in the container can discover each other directly on the GPU machine.
+Direct sample delivery still depends on compatible ROS/RMW stacks. On Ubuntu 22.04 hosts with Isaac Sim 5.1,
 the host uses ROS 2 Humble while the container uses ROS 2 Jazzy because the
 Isaac image is Ubuntu 24.04 based; in that mixed-distro setup, use Zenoh for the
 reliable host/laptop topic path.
@@ -612,6 +616,23 @@ Use **Zenoh** when you need ROS 2 topics on your laptop:
 # Laptop with a Vast.ai mapped port
 ./zenoh/connect_zenoh_bridge.sh <VAST_PUBLIC_IP> <EXTERNAL_MAPPED_PORT>
 ```
+
+When the Isaac Sim container is running, the managed Zenoh server command
+starts the bridge inside that container so it uses the same ROS 2 runtime as
+Isaac's ROS bridge. This avoids host/container discovery issues on mixed
+Ubuntu 22.04 Humble host and Jazzy Isaac container setups. Use
+`ZENOH_BRIDGE_CONTEXT=host ./isaac_vmctl.sh start zenoh` only when you
+intentionally want the host ROS runtime.
+
+Restrict WAN traffic with a Zenoh config:
+
+```bash
+./isaac_vmctl.sh stop zenoh
+./isaac_vmctl.sh start zenoh 7447 --config zenoh/configs/isaac_control_only.json5
+```
+
+Use `zenoh/configs/isaac_camera_throttled.json5` when students need camera
+images but the link should be capped.
 
 Full guide: [zenoh/README.md](zenoh/README.md).
 

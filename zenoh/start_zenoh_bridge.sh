@@ -16,7 +16,7 @@
 #
 # Examples:
 #   ./zenoh/start_zenoh_bridge.sh
-#   ./zenoh/start_zenoh_bridge.sh 7447 --domain 0
+#   ./zenoh/start_zenoh_bridge.sh 7447 --domain <id>
 #   ./zenoh/start_zenoh_bridge.sh 7447 --config zenoh/configs/example_filter.json5
 
 set -Eeuo pipefail
@@ -55,13 +55,34 @@ Options:
 
 Examples:
   $(basename "$0")
-  $(basename "$0") 7447 --domain 0
+  $(basename "$0") 7447 --domain <id>
   $(basename "$0") 7447 --namespace /sim --config zenoh/configs/example_filter.json5
 EOF
 }
 
 is_valid_port() {
   [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
+}
+
+validate_domain_id() {
+  [[ "$1" =~ ^[0-9]+$ ]] || error "Invalid ROS_DOMAIN_ID value: '$1'"
+  local domain_id=$((10#$1))
+  (( domain_id <= 232 )) || error "ROS_DOMAIN_ID must be between 0 and 232. Found: $1"
+  printf '%s' "$domain_id"
+}
+
+source_domain_if_needed() {
+  if [[ -z "${ROS_DOMAIN_ID:-}" && -r /etc/isaac-projects/ros.env ]]; then
+    # shellcheck disable=SC1091
+    set +u
+    source /etc/isaac-projects/ros.env
+    set -u
+  fi
+
+  if [[ -n "${ROS_DOMAIN_ID:-}" ]]; then
+    ROS_DOMAIN_ID=$(validate_domain_id "$ROS_DOMAIN_ID")
+    export ROS_DOMAIN_ID
+  fi
 }
 
 source_ros_if_needed() {
@@ -131,11 +152,12 @@ if [[ -n "$CONFIG_FILE" && ! -f "$CONFIG_FILE" ]]; then
   error "Config file not found: ${CONFIG_FILE}"
 fi
 
+source_domain_if_needed
 source_ros_if_needed
 
 if [[ -n "$DOMAIN_ID" ]]; then
-  [[ "$DOMAIN_ID" =~ ^[0-9]+$ ]] || error "Invalid --domain value: '${DOMAIN_ID}'"
-  export ROS_DOMAIN_ID="$DOMAIN_ID"
+  ROS_DOMAIN_ID=$(validate_domain_id "$DOMAIN_ID")
+  export ROS_DOMAIN_ID
 fi
 
 echo ""

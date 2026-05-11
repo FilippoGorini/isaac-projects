@@ -72,6 +72,7 @@ RUN set -euo pipefail; \
       printf '%s\n' '# Source ROS 2 for normal shell work. Isaac Sim app launches use non-login'; \
       printf '%s\n' "# shells so the system ROS Python environment does not interfere with Isaac's"; \
       printf '%s\n' '# embedded Python runtime.'; \
+      printf '%s\n' 'export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"'; \
       printf '%s\n' "if [ \"\${ISAAC_PROJECTS_NO_AUTO_ROS:-0}\" != \"1\" ] && [ \"\${ROS_DISTRO:-}\" != \"${ros_distro}\" ] && [ -f \"/opt/ros/${ros_distro}/setup.sh\" ]; then"; \
       printf '%s\n' '  __isaac_projects_nounset_was_enabled=0'; \
       printf '%s\n' '  case $- in *u*) __isaac_projects_nounset_was_enabled=1; set +u ;; esac'; \
@@ -83,7 +84,7 @@ RUN set -euo pipefail; \
     chmod 0644 /etc/profile.d/isaac-projects-ros2.sh; \
     block_begin="# >>> isaac-projects ROS 2 setup >>>"; \
     block_end="# <<< isaac-projects ROS 2 setup <<<"; \
-    block_body="if [ \"\${ISAAC_PROJECTS_NO_AUTO_ROS:-0}\" != \"1\" ] && [ \"\${ROS_DISTRO:-}\" != \"${ros_distro}\" ] && [ -f \"/opt/ros/${ros_distro}/setup.bash\" ]; then\n  __isaac_projects_nounset_was_enabled=0\n  case \$- in *u*) __isaac_projects_nounset_was_enabled=1; set +u ;; esac\n  source \"/opt/ros/${ros_distro}/setup.bash\"\n  if [ \"\$__isaac_projects_nounset_was_enabled\" = \"1\" ]; then set -u; fi\n  unset __isaac_projects_nounset_was_enabled\nfi"; \
+    block_body="export ROS_DOMAIN_ID=\"\${ROS_DOMAIN_ID:-0}\"\nif [ \"\${ISAAC_PROJECTS_NO_AUTO_ROS:-0}\" != \"1\" ] && [ \"\${ROS_DISTRO:-}\" != \"${ros_distro}\" ] && [ -f \"/opt/ros/${ros_distro}/setup.bash\" ]; then\n  __isaac_projects_nounset_was_enabled=0\n  case \$- in *u*) __isaac_projects_nounset_was_enabled=1; set +u ;; esac\n  source \"/opt/ros/${ros_distro}/setup.bash\"\n  if [ \"\$__isaac_projects_nounset_was_enabled\" = \"1\" ]; then set -u; fi\n  unset __isaac_projects_nounset_was_enabled\nfi"; \
     for shell_file in /etc/bash.bashrc /root/.bashrc /etc/skel/.bashrc; do \
       touch "${shell_file}"; \
       tmp_file="$(mktemp)"; \

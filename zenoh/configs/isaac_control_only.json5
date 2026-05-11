@@ -1,0 +1,53 @@
+// Restrictive Zenoh ROS 2 bridge config for Isaac Sim control/state topics.
+//
+// Use this when students need clock, transforms, joint state, and command
+// topics, but should not stream camera images or other high-bandwidth data.
+//
+// GPU server:
+//   ./isaac_vmctl.sh stop zenoh
+//   ./isaac_vmctl.sh start zenoh 7447 --config zenoh/configs/isaac_control_only.json5
+//
+// Laptop, optional matching client-side filter:
+//   ./zenoh/connect_zenoh_bridge.sh <GPU_IP> 7447 --config zenoh/configs/isaac_control_only.json5
+{
+  plugins: {
+    ros2dds: {
+      allow: {
+        publishers: [
+          "^/clock$",
+          "^/tf$",
+          "^/tf_static$",
+          "^/joint_states$",
+          "^/isaac_joint_states$",
+          "^/isaac_arm_commands$",
+          "^/isaac_gripper_commands$",
+        ],
+        subscribers: [
+          "^/clock$",
+          "^/tf$",
+          "^/tf_static$",
+          "^/joint_states$",
+          "^/isaac_joint_states$",
+          "^/isaac_arm_commands$",
+          "^/isaac_gripper_commands$",
+        ],
+        service_servers: [],
+        service_clients: [],
+        action_servers: [],
+        action_clients: [],
+      },
+
+      pub_max_frequencies: [
+        "^/tf$=30.0",
+        "^/joint_states$=50.0",
+        "^/isaac_joint_states$=50.0",
+      ],
+    },
+  },
+
+  scouting: {
+    multicast: {
+      enabled: false,
+    },
+  },
+}

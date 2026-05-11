@@ -70,6 +70,10 @@ export ISAAC_ROS_ENABLE=1
 export ISAAC_ROS_DISTRO=auto
 export ISAAC_ROS_INSTALL_VARIANT=ros-base
 export ISAAC_ROS_IMAGE=
+if [[ -z "${ROS_DOMAIN_ID:-}" && -r /etc/isaac-projects/ros.env ]]; then
+  source /etc/isaac-projects/ros.env
+fi
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 ```
 
 Bootstrap builds a local image such as

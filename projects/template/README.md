@@ -2,7 +2,8 @@
 
 **Authors:** <!-- Your name(s) here -->
 **Isaac Sim version:** <!-- e.g. 5.1.0 -->
-**ROS 2 distro:** <!-- Humble / Jazzy -->
+**Host ROS 2 distro:** <!-- Humble on Ubuntu 22.04, Jazzy on Ubuntu 24.04 -->
+**Isaac container ROS 2 distro:** <!-- Auto-selected from the Isaac image OS -->
 
 ---
 
@@ -216,6 +217,7 @@ Restore on a fresh server:
 | `ISAAC_ROS_ENABLE` | `1` |
 | `ISAAC_ROS_DISTRO` | `auto` |
 | `ISAAC_ROS_INSTALL_VARIANT` | `ros-base` |
+| `ROS_DOMAIN_ID` | machine default from `/etc/isaac-projects/ros.env`, or `0` |
 | `WEBRTC_SIGNAL_PORT` | `49100` |
 | `WEBRTC_STREAM_PORT` | `47998` |
 | `VSCODE_REMOTE_ENABLE` | `1` |
