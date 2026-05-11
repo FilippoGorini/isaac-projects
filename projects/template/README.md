@@ -213,6 +213,9 @@ Restore on a fresh server:
 | Variable | Value |
 |----------|-------|
 | `ISAAC_IMAGE` | `nvcr.io/nvidia/isaac-sim:5.1.0` |
+| `ISAAC_ROS_ENABLE` | `1` |
+| `ISAAC_ROS_DISTRO` | `auto` |
+| `ISAAC_ROS_INSTALL_VARIANT` | `ros-base` |
 | `WEBRTC_SIGNAL_PORT` | `49100` |
 | `WEBRTC_STREAM_PORT` | `47998` |
 | `VSCODE_REMOTE_ENABLE` | `1` |

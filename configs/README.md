@@ -60,6 +60,32 @@ source configs/isaac-sim-5.1.0.env
 ALLOWED_CLIENT_IP=203.0.113.5 ./isaac_vmctl.sh start isaacsim
 ```
 
+## ROS 2 in the Isaac Sim Container
+
+The version configs enable a managed ROS-enabled Isaac Sim runtime image by
+default:
+
+```bash
+export ISAAC_ROS_ENABLE=1
+export ISAAC_ROS_DISTRO=auto
+export ISAAC_ROS_INSTALL_VARIANT=ros-base
+export ISAAC_ROS_IMAGE=
+```
+
+Bootstrap builds a local image such as
+`rice/isaac-sim-ros2:5.1.0-jazzy-ros-base` from `ISAAC_IMAGE`. Normal container
+shells source ROS 2 automatically, while Isaac Sim app launches avoid
+auto-sourcing system ROS so Isaac's ROS 2 bridge can use compatible internal
+libraries.
+
+`ISAAC_ROS_DISTRO=auto` follows the Isaac image OS, not necessarily the host OS.
+For example, an Ubuntu 22.04 host gets ROS 2 Humble on the host, but Isaac Sim
+5.1 gets ROS 2 Jazzy inside the container because that image is Ubuntu 24.04
+based. Use Zenoh for reliable topic flow across that Humble/Jazzy boundary.
+
+Set `ISAAC_ROS_ENABLE=0` only when you explicitly want to run the unmodified
+NVIDIA Isaac Sim image.
+
 ## Adding a New Version
 
 1. Copy the closest existing `.env` file.

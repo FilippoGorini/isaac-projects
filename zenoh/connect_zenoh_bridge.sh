@@ -97,7 +97,9 @@ source_ros_if_needed() {
   [[ -n "$setup_file" ]] || error "ROS 2 not found in /opt/ros. Install ROS 2 or source it manually before running this script."
   warn "ROS 2 not sourced. Sourcing ${setup_file}..."
   # shellcheck source=/dev/null
+  set +u
   source "${setup_file}"
+  set -u
 }
 
 POSITIONAL=()

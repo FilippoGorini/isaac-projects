@@ -6,11 +6,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Defaults; can be overridden with environment variables.
 ISAAC_IMAGE="${ISAAC_IMAGE:-nvcr.io/nvidia/isaac-sim:5.1.0}"
+ROS_INSTALL_VARIANT="${ROS_INSTALL_VARIANT:-ros-base}"   # ros-base | desktop
+ISAAC_ROS_ENABLE="${ISAAC_ROS_ENABLE:-1}"
+ISAAC_ROS_DISTRO="${ISAAC_ROS_DISTRO:-auto}"
+ISAAC_ROS_INSTALL_VARIANT="${ISAAC_ROS_INSTALL_VARIANT:-$ROS_INSTALL_VARIANT}"
+ISAAC_ROS_IMAGE="${ISAAC_ROS_IMAGE:-}"
 CONTAINER_NAME="${CONTAINER_NAME:-isaac-sim}"
 ISAAC_HOST_ROOT="${ISAAC_HOST_ROOT:-$HOME/docker/isaac-sim}"
 WEBRTC_SIGNAL_PORT="${WEBRTC_SIGNAL_PORT:-49100}"
 WEBRTC_STREAM_PORT="${WEBRTC_STREAM_PORT:-47998}"
-ROS_INSTALL_VARIANT="${ROS_INSTALL_VARIANT:-ros-base}"   # ros-base | desktop
 ALLOWED_CLIENT_IP="${ALLOWED_CLIENT_IP:-}"               # optional; only used if ufw is active
 ISAAC_EXTRA_ARGS="${ISAAC_EXTRA_ARGS:-}"
 PRIVACY_USERID="${PRIVACY_USERID:-}"
@@ -45,6 +49,8 @@ ACTIVE_LOG_FILE=""
 INVOCATION_STRING="$SCRIPT_NAME"
 DOCKER_GROUP_RELOGIN_REQUIRED=0
 TIGERVNC_XSTARTUP_UPDATED=0
+ISAAC_RUNTIME_IMAGE=""
+RESOLVED_ISAAC_ROS_DISTRO=""
 
 COLOR_RESET=""
 COLOR_BOLD=""
@@ -511,6 +517,10 @@ Usage:
 
 Optional environment variables:
   ISAAC_IMAGE=nvcr.io/nvidia/isaac-sim:5.1.0
+  ISAAC_ROS_ENABLE=1                  # when 1, bootstrap builds a ROS-enabled Isaac Sim runtime image
+  ISAAC_ROS_DISTRO=auto|humble|jazzy   # auto selects from the Isaac Sim image Ubuntu version
+  ISAAC_ROS_INSTALL_VARIANT=ros-base|desktop
+  ISAAC_ROS_IMAGE=<tag>                # optional local tag for the ROS-enabled Isaac Sim image
   CONTAINER_NAME=isaac-sim
   ISAAC_HOST_ROOT=
   WEBRTC_SIGNAL_PORT=49100
@@ -873,24 +883,17 @@ ensure_ros2_installed() {
   fi
 
   ensure_ros_setup_in_bashrc
+  ensure_ros_profile_script
 }
 
 ensure_ros_setup_in_bashrc() {
   local bashrc_path="${USER_HOME}/.bashrc"
   local marker_begin="# >>> isaac-projects ROS 2 setup >>>"
   local marker_end="# <<< isaac-projects ROS 2 setup <<<"
-  local setup_line_quoted="source \"${ROS_SETUP}\""
-  local setup_line_unquoted="source ${ROS_SETUP}"
   local tmp_file user_group
 
   mkdir -p "$USER_HOME"
   touch "$bashrc_path"
-
-  if ! grep -Fqx "$marker_begin" "$bashrc_path" && \
-     { grep -Fqx "$setup_line_quoted" "$bashrc_path" || grep -Fqx "$setup_line_unquoted" "$bashrc_path"; }; then
-    info "ROS 2 setup already sourced in ${bashrc_path}."
-    return 0
-  fi
 
   tmp_file=$(mktemp)
   if grep -Fqx "$marker_begin" "$bashrc_path"; then
@@ -905,8 +908,12 @@ ensure_ros_setup_in_bashrc() {
 
   {
     printf '\n%s\n' "$marker_begin"
-    printf 'if [ -f "%s" ]; then\n' "$ROS_SETUP"
+    printf 'if [ "${ROS_DISTRO:-}" != "%s" ] && [ -f "%s" ]; then\n' "$ROS_DISTRO" "$ROS_SETUP"
+    printf '  __isaac_projects_nounset_was_enabled=0\n'
+    printf '  case $- in *u*) __isaac_projects_nounset_was_enabled=1; set +u ;; esac\n'
     printf '  source "%s"\n' "$ROS_SETUP"
+    printf '  if [ "$__isaac_projects_nounset_was_enabled" = "1" ]; then set -u; fi\n'
+    printf '  unset __isaac_projects_nounset_was_enabled\n'
     printf 'fi\n'
     printf '%s\n' "$marker_end"
   } >>"$tmp_file"
@@ -919,6 +926,53 @@ ensure_ros_setup_in_bashrc() {
   fi
   rm -f "$tmp_file"
   info "Ensured ROS 2 setup is sourced from ${bashrc_path}."
+}
+
+ensure_ros_profile_script() {
+  local profile_path="/etc/profile.d/isaac-projects-ros2.sh"
+  local tmp_file marker_begin marker_end bash_block shell_file
+
+  tmp_file=$(mktemp)
+  cat >"$tmp_file" <<EOF_PROFILE
+# Source ROS 2 for login shells on the GPU host.
+if [ "\${ROS_DISTRO:-}" != "${ROS_DISTRO}" ] && [ -f "${ROS_SETUP%setup.bash}setup.sh" ]; then
+  __isaac_projects_nounset_was_enabled=0
+  case \$- in *u*) __isaac_projects_nounset_was_enabled=1; set +u ;; esac
+  . "${ROS_SETUP%setup.bash}setup.sh"
+  if [ "\$__isaac_projects_nounset_was_enabled" = "1" ]; then set -u; fi
+  unset __isaac_projects_nounset_was_enabled
+fi
+EOF_PROFILE
+  as_root install -m 0644 "$tmp_file" "$profile_path"
+  rm -f "$tmp_file"
+  info "Ensured ROS 2 setup is sourced from ${profile_path}."
+
+  marker_begin="# >>> isaac-projects ROS 2 setup >>>"
+  marker_end="# <<< isaac-projects ROS 2 setup <<<"
+  bash_block="if [ \"\${ROS_DISTRO:-}\" != \"${ROS_DISTRO}\" ] && [ -f \"${ROS_SETUP}\" ]; then
+  __isaac_projects_nounset_was_enabled=0
+  case \$- in *u*) __isaac_projects_nounset_was_enabled=1; set +u ;; esac
+  source \"${ROS_SETUP}\"
+  if [ \"\$__isaac_projects_nounset_was_enabled\" = \"1\" ]; then set -u; fi
+  unset __isaac_projects_nounset_was_enabled
+fi"
+  for shell_file in /etc/bash.bashrc /etc/skel/.bashrc; do
+    [[ -f "$shell_file" ]] || as_root touch "$shell_file"
+    tmp_file=$(mktemp)
+    awk -v begin="$marker_begin" -v end="$marker_end" '
+      $0 == begin { skip=1; next }
+      $0 == end { skip=0; next }
+      !skip { print }
+    ' "$shell_file" >"$tmp_file"
+    {
+      printf '\n%s\n' "$marker_begin"
+      printf '%s\n' "$bash_block"
+      printf '%s\n' "$marker_end"
+    } >>"$tmp_file"
+    as_root install -m 0644 "$tmp_file" "$shell_file"
+    rm -f "$tmp_file"
+  done
+  info "Ensured ROS 2 setup is sourced from system bash startup files."
 }
 
 ensure_shell_block() {
@@ -1183,6 +1237,110 @@ ensure_isaac_image() {
   fi
 
   error "Failed to pull ${ISAAC_IMAGE}. If nvcr.io requires auth in your environment, export NGC_API_KEY and rerun."
+}
+
+validate_isaac_ros_config() {
+  case "$ISAAC_ROS_DISTRO" in
+    auto|humble|jazzy) ;;
+    *) error "ISAAC_ROS_DISTRO must be 'auto', 'humble', or 'jazzy'." ;;
+  esac
+
+  case "$ISAAC_ROS_INSTALL_VARIANT" in
+    ros-base|desktop) ;;
+    *) error "ISAAC_ROS_INSTALL_VARIANT must be 'ros-base' or 'desktop'." ;;
+  esac
+}
+
+resolve_isaac_ros_distro() {
+  validate_isaac_ros_config
+
+  if [[ -n "$RESOLVED_ISAAC_ROS_DISTRO" ]]; then
+    printf '%s' "$RESOLVED_ISAAC_ROS_DISTRO"
+    return 0
+  fi
+
+  if [[ "$ISAAC_ROS_DISTRO" != "auto" ]]; then
+    RESOLVED_ISAAC_ROS_DISTRO="$ISAAC_ROS_DISTRO"
+    printf '%s' "$RESOLVED_ISAAC_ROS_DISTRO"
+    return 0
+  fi
+
+  local image_ubuntu_version
+  image_ubuntu_version=$(docker_cmd run --rm --entrypoint bash "$ISAAC_IMAGE" -c '. /etc/os-release && printf "%s" "${VERSION_ID}"')
+  case "$image_ubuntu_version" in
+    22.04) RESOLVED_ISAAC_ROS_DISTRO="humble" ;;
+    24.04) RESOLVED_ISAAC_ROS_DISTRO="jazzy" ;;
+    *) error "Cannot auto-select ROS 2 distro for ${ISAAC_IMAGE}: unsupported Ubuntu ${image_ubuntu_version}." ;;
+  esac
+
+  printf '%s' "$RESOLVED_ISAAC_ROS_DISTRO"
+}
+
+resolve_isaac_runtime_image() {
+  if ! is_truthy "$ISAAC_ROS_ENABLE"; then
+    printf '%s' "$ISAAC_IMAGE"
+    return 0
+  fi
+
+  local ros_distro base_tag variant_tag
+  ros_distro=$(resolve_isaac_ros_distro)
+  if [[ -n "$ISAAC_ROS_IMAGE" ]]; then
+    printf '%s' "$ISAAC_ROS_IMAGE"
+    return 0
+  fi
+
+  base_tag=$(sanitize_docker_component "${ISAAC_IMAGE##*:}")
+  variant_tag=$(sanitize_docker_component "$ISAAC_ROS_INSTALL_VARIANT")
+  printf 'rice/isaac-sim-ros2:%s-%s-%s' "$base_tag" "$ros_distro" "$variant_tag"
+}
+
+ensure_isaac_runtime_image() {
+  ensure_isaac_image
+
+  if ! is_truthy "$ISAAC_ROS_ENABLE"; then
+    ISAAC_RUNTIME_IMAGE="$ISAAC_IMAGE"
+    return 0
+  fi
+
+  validate_isaac_ros_config
+
+  local ros_distro runtime_image dockerfile_path dockerfile_hash base_image_id
+  ros_distro=$(resolve_isaac_ros_distro)
+  runtime_image=$(resolve_isaac_runtime_image)
+  dockerfile_path="${SCRIPT_DIR}/containers/isaac-sim-ros2.Dockerfile"
+  [[ -f "$dockerfile_path" ]] || error "ROS-enabled Isaac Sim Dockerfile not found at ${dockerfile_path}"
+
+  dockerfile_hash=$(sha256sum "$dockerfile_path" | awk '{print $1}')
+  [[ -n "$dockerfile_hash" ]] || error "Unable to compute the Dockerfile hash for ${dockerfile_path}"
+  base_image_id=$(docker_cmd image inspect "$ISAAC_IMAGE" --format '{{ .Id }}')
+
+  if docker_cmd image inspect "$runtime_image" >/dev/null 2>&1; then
+    local image_base image_base_id image_distro image_variant image_dockerfile_hash
+    image_base=$(docker_cmd image inspect "$runtime_image" --format '{{ index .Config.Labels "rice.isaacsim.ros2.base_image" }}' 2>/dev/null || true)
+    image_base_id=$(docker_cmd image inspect "$runtime_image" --format '{{ index .Config.Labels "rice.isaacsim.ros2.base_image_id" }}' 2>/dev/null || true)
+    image_distro=$(docker_cmd image inspect "$runtime_image" --format '{{ index .Config.Labels "rice.isaacsim.ros2.distro" }}' 2>/dev/null || true)
+    image_variant=$(docker_cmd image inspect "$runtime_image" --format '{{ index .Config.Labels "rice.isaacsim.ros2.install_variant" }}' 2>/dev/null || true)
+    image_dockerfile_hash=$(docker_cmd image inspect "$runtime_image" --format '{{ index .Config.Labels "rice.isaacsim.ros2.dockerfile_hash" }}' 2>/dev/null || true)
+    if [[ "$image_base" == "$ISAAC_IMAGE" && "$image_base_id" == "$base_image_id" && "$image_distro" == "$ros_distro" && "$image_variant" == "$ISAAC_ROS_INSTALL_VARIANT" && "$image_dockerfile_hash" == "$dockerfile_hash" ]]; then
+      info "ROS-enabled Isaac Sim image already present: ${runtime_image}"
+      ISAAC_RUNTIME_IMAGE="$runtime_image"
+      return 0
+    fi
+    warn "Existing ROS-enabled Isaac Sim image ${runtime_image} does not match the requested config; rebuilding."
+  fi
+
+  info "Building ROS-enabled Isaac Sim image ${runtime_image} from ${ISAAC_IMAGE} (${ros_distro}, ${ISAAC_ROS_INSTALL_VARIANT})..."
+  docker_cmd build \
+    -f "$dockerfile_path" \
+    --build-arg "ISAAC_IMAGE=${ISAAC_IMAGE}" \
+    --build-arg "ISAAC_BASE_IMAGE_ID=${base_image_id}" \
+    --build-arg "ISAAC_ROS_DISTRO=${ros_distro}" \
+    --build-arg "ISAAC_ROS_INSTALL_VARIANT=${ISAAC_ROS_INSTALL_VARIANT}" \
+    --build-arg "ISAAC_ROS_DOCKERFILE_HASH=${dockerfile_hash}" \
+    -t "$runtime_image" \
+    "$SCRIPT_DIR" || error "Failed to build ROS-enabled Isaac Sim image ${runtime_image}."
+
+  ISAAC_RUNTIME_IMAGE="$runtime_image"
 }
 
 get_public_ip() {
@@ -1785,7 +1943,7 @@ ensure_isaaclab_checkout() {
 
 ensure_isaaclab_image() {
   validate_isaaclab_workspace
-  ensure_isaac_image
+  ensure_isaac_runtime_image
   ensure_isaaclab_checkout
 
   local checkout_path="${HOST_WORKSPACE_ROOT}/${ISAACLAB_PATH}"
@@ -1802,8 +1960,9 @@ ensure_isaaclab_image() {
   dockerfile_hash=$(sha256sum "$dockerfile_path" | awk '{print $1}')
   [[ -n "$dockerfile_hash" ]] || error "Unable to compute the Dockerfile hash for ${dockerfile_path}"
 
-  local isaaclab_image
+  local isaaclab_image isaaclab_base_image
   isaaclab_image=$(resolve_isaaclab_image)
+  isaaclab_base_image="$ISAAC_RUNTIME_IMAGE"
 
   if docker_cmd image inspect "$isaaclab_image" >/dev/null 2>&1; then
     local image_ref image_frameworks image_path image_base image_checkout_rev image_dockerfile_hash
@@ -1813,7 +1972,7 @@ ensure_isaaclab_image() {
     image_base=$(docker_cmd image inspect "$isaaclab_image" --format '{{ index .Config.Labels "rice.isaaclab.base_image" }}' 2>/dev/null || true)
     image_checkout_rev=$(docker_cmd image inspect "$isaaclab_image" --format '{{ index .Config.Labels "rice.isaaclab.checkout_rev" }}' 2>/dev/null || true)
     image_dockerfile_hash=$(docker_cmd image inspect "$isaaclab_image" --format '{{ index .Config.Labels "rice.isaaclab.dockerfile_hash" }}' 2>/dev/null || true)
-    if [[ -z "$dirty_checkout" && "$image_ref" == "$ISAACLAB_REF" && "$image_frameworks" == "$ISAACLAB_FRAMEWORKS" && "$image_path" == "$ISAACLAB_PATH" && "$image_base" == "$ISAAC_IMAGE" && "$image_checkout_rev" == "$checkout_rev" && "$image_dockerfile_hash" == "$dockerfile_hash" ]]; then
+    if [[ -z "$dirty_checkout" && "$image_ref" == "$ISAACLAB_REF" && "$image_frameworks" == "$ISAACLAB_FRAMEWORKS" && "$image_path" == "$ISAACLAB_PATH" && "$image_base" == "$isaaclab_base_image" && "$image_checkout_rev" == "$checkout_rev" && "$image_dockerfile_hash" == "$dockerfile_hash" ]]; then
       info "Isaac Lab image already present: ${isaaclab_image}"
       return 0
     fi
@@ -1826,14 +1985,14 @@ ensure_isaaclab_image() {
   info "Building Isaac Lab image ${isaaclab_image} from ${checkout_path} (${ISAACLAB_REF}, ${ISAACLAB_FRAMEWORKS}, ${checkout_rev:0:12})..."
   docker_cmd build \
     -f "${HOST_WORKSPACE_ROOT}/containers/isaac-lab.Dockerfile" \
-    --build-arg "ISAAC_IMAGE=${ISAAC_IMAGE}" \
+    --build-arg "ISAAC_IMAGE=${isaaclab_base_image}" \
     --build-arg "ISAACLAB_PATH=${ISAACLAB_PATH}" \
     --build-arg "ISAACLAB_REF=${ISAACLAB_REF}" \
     --build-arg "ISAACLAB_FRAMEWORKS=${ISAACLAB_FRAMEWORKS}" \
     --build-arg "ISAACLAB_CHECKOUT_REV=${checkout_rev}" \
     --build-arg "ISAACLAB_DOCKERFILE_HASH=${dockerfile_hash}" \
     -t "$isaaclab_image" \
-    "$HOST_WORKSPACE_ROOT"
+    "$HOST_WORKSPACE_ROOT" || error "Failed to build Isaac Lab image ${isaaclab_image}."
 }
 
 prepare_gui_x11_access() {
@@ -1989,7 +2148,7 @@ start_isaacsim() {
   init_paths
   verify_nvidia_container_runtime
   ensure_isaac_dirs
-  ensure_isaac_image
+  ensure_isaac_runtime_image
   if [[ "$mode" == "webrtc" ]]; then
     configure_ufw_if_active
   elif [[ "$mode" == "gui" ]]; then
@@ -2009,19 +2168,19 @@ start_isaacsim() {
 
   build_isaac_command "$mode" "$public_ip"
   build_common_docker_args
-  local docker_launch_args=(bash -lc 'cd /isaac-sim && exec "$@"' _)
+  local docker_launch_args=(bash -c 'cd /isaac-sim && exec "$@"' _)
   if [[ "$mode" == "gui" ]]; then
     append_gui_docker_args
     DOCKER_RUN_ARGS+=(--entrypoint bash)
-    docker_launch_args=(-lc 'cd /isaac-sim && exec "$@"' _)
+    docker_launch_args=(-c 'cd /isaac-sim && exec "$@"' _)
   fi
   remove_existing_container
 
-  info "Starting ${CONTAINER_NAME} from ${ISAAC_IMAGE} (${mode})..."
+  info "Starting ${CONTAINER_NAME} from ${ISAAC_RUNTIME_IMAGE} (${mode})..."
   docker_cmd run -d \
     --name "$CONTAINER_NAME" \
     "${DOCKER_RUN_ARGS[@]}" \
-    "$ISAAC_IMAGE" \
+    "$ISAAC_RUNTIME_IMAGE" \
     "${docker_launch_args[@]}" "${ISAAC_CMD[@]}"
 
   if [[ "$mode" == "headless" ]]; then
@@ -2030,7 +2189,7 @@ start_isaacsim() {
 Isaac Sim headless start requested.
 
 Container:      ${CONTAINER_NAME}
-Image:          ${ISAAC_IMAGE}
+Image:          ${ISAAC_RUNTIME_IMAGE}
 Workspace:      ${HOST_WORKSPACE_ROOT} -> ${CONTAINER_WORKSPACE}
 ROS 2 host:     ${ros_status}
 ROS_DOMAIN_ID:  ${ROS_DOMAIN_ID}
@@ -2049,7 +2208,7 @@ EOF_SUMMARY
 Isaac Sim GUI start requested.
 
 Container:      ${CONTAINER_NAME}
-Image:          ${ISAAC_IMAGE}
+Image:          ${ISAAC_RUNTIME_IMAGE}
 Workspace:      ${HOST_WORKSPACE_ROOT} -> ${CONTAINER_WORKSPACE}
 X display:      ${GUI_DISPLAY}
 ROS 2 host:     ${ros_status}
@@ -2098,7 +2257,7 @@ Public IP:      ${public_ip}
 Signal port:    ${WEBRTC_SIGNAL_PORT}/tcp
 Media port:     ${WEBRTC_STREAM_PORT}/udp
 Container:      ${CONTAINER_NAME}
-Image:          ${ISAAC_IMAGE}
+Image:          ${ISAAC_RUNTIME_IMAGE}
 ROS 2 distro:   ${ROS_DISTRO}
 ROS 2 host:     ${ros_status}
 ROS_DOMAIN_ID:  ${ROS_DOMAIN_ID}
@@ -2285,7 +2444,7 @@ run_in_isaac_container() {
   init_paths
   verify_nvidia_container_runtime
   ensure_isaac_dirs
-  ensure_isaac_image
+  ensure_isaac_runtime_image
   if [[ "$livestream_mode" != "0" ]]; then
     configure_ufw_if_active
   fi
@@ -2307,7 +2466,7 @@ run_in_isaac_container() {
     DOCKER_RUN_ARGS+=(-e "ENABLE_CAMERAS=1")
   fi
 
-  info "Running one-shot command in ${ISAAC_IMAGE}..."
+  info "Running one-shot command in ${ISAAC_RUNTIME_IMAGE}..."
   info "Workspace: ${HOST_WORKSPACE_ROOT} -> ${CONTAINER_WORKSPACE}"
   if [[ "$livestream_mode" == "1" ]]; then
     info "One-shot WebRTC mode: public"
@@ -2330,7 +2489,7 @@ run_in_isaac_container() {
   if run_docker_attached "isaac-run" \
     "${DOCKER_RUN_ARGS[@]}" \
     --entrypoint "$entrypoint_cmd" \
-    "$ISAAC_IMAGE" \
+    "$ISAAC_RUNTIME_IMAGE" \
     "$@"; then
     run_status=0
   else
@@ -2471,7 +2630,7 @@ run_isaacsim_python() {
   init_paths
   verify_nvidia_container_runtime
   ensure_isaac_dirs
-  ensure_isaac_image
+  ensure_isaac_runtime_image
   local isaac_tag
   isaac_tag="${ISAAC_IMAGE##*:}"
   if [[ "$livestream_mode" != "0" ]]; then
@@ -2497,7 +2656,7 @@ run_isaacsim_python() {
     append_gui_docker_args
   fi
 
-  info "Running Isaac Sim python.sh command from ${ISAAC_IMAGE} (${mode})..."
+  info "Running Isaac Sim python.sh command from ${ISAAC_RUNTIME_IMAGE} (${mode})..."
   info "Workspace: ${HOST_WORKSPACE_ROOT} -> ${CONTAINER_WORKSPACE}"
   if [[ "$mode" == "gui" ]]; then
     info "Isaac Sim GUI will open on ${GUI_DISPLAY}. Run this from the terminal inside TigerVNC when you want the viewport there."
@@ -2541,8 +2700,8 @@ run_isaacsim_python() {
   if run_docker_attached "isaacpy-run" \
     "${DOCKER_RUN_ARGS[@]}" \
     --entrypoint bash \
-    "$ISAAC_IMAGE" \
-    -lc "cd /isaac-sim && ./python.sh ${python_launch_cmd}"; then
+    "$ISAAC_RUNTIME_IMAGE" \
+    -c "cd /isaac-sim && ./python.sh ${python_launch_cmd}"; then
     run_status=0
   else
     run_status=$?
@@ -2619,7 +2778,7 @@ run_isaaclab() {
   if run_docker_attached "isaaclab-run" \
     "${DOCKER_RUN_ARGS[@]}" \
     "$isaaclab_image" \
-    -lc 'cd "$1" && shift && exec ./isaaclab.sh "$@"' _ "$container_isaaclab_dir" "${isaaclab_args[@]}"; then
+    -c 'cd "$1" && shift && exec ./isaaclab.sh "$@"' _ "$container_isaaclab_dir" "${isaaclab_args[@]}"; then
     run_status=0
   else
     run_status=$?
@@ -2657,7 +2816,18 @@ zenoh_setup() {
 
 zenoh_start_bridge() {
   local start_script="${SCRIPT_DIR}/zenoh/start_zenoh_bridge.sh"
+  local has_domain_arg=0
+  local arg
   [[ -f "$start_script" ]] || error "Zenoh start script not found at ${start_script}"
+  for arg in "$@"; do
+    if [[ "$arg" == "--domain" ]]; then
+      has_domain_arg=1
+      break
+    fi
+  done
+  if [[ "$has_domain_arg" -eq 0 ]]; then
+    exec bash "$start_script" "$@" --domain "$ROS_DOMAIN_ID"
+  fi
   exec bash "$start_script" "$@"
 }
 
@@ -2698,7 +2868,7 @@ install_all() {
   run_install_step "$total_steps" 3 "Install or verify ROS 2" ensure_ros2_installed
   run_install_step "$total_steps" 4 "Install or verify default student tooling" ensure_student_tooling
   run_install_step "$total_steps" 5 "Prepare Isaac Sim cache and data directories" ensure_isaac_dirs
-  run_install_step "$total_steps" 6 "Pull or verify the Isaac Sim container image" ensure_isaac_image
+  run_install_step "$total_steps" 6 "Pull or verify the Isaac Sim runtime image" ensure_isaac_runtime_image
   if is_truthy "$ISAACLAB_ENABLE"; then
     run_install_step "$total_steps" 7 "Clone/update Isaac Lab and build the managed Isaac Lab image" ensure_isaaclab_image
   fi

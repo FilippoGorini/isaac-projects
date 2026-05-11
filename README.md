@@ -11,9 +11,10 @@ This repository helps RICE lab thesis students start reproducible
 
 The main tool is [isaac_vmctl.sh](isaac_vmctl.sh). It bootstraps Docker,
 NVIDIA Container Toolkit, ROS 2, default student tooling such as VS Code
-remote support and Jupyter, pulls the Isaac Sim container, mounts this repo
-into the container, and starts WebRTC, a native GUI on the current X display
-such as TigerVNC, or headless sessions.
+remote support and Jupyter, pulls the Isaac Sim container, builds a local
+ROS-enabled Isaac Sim runtime image, mounts this repo into the container, and
+starts WebRTC, a native GUI on the current X display such as TigerVNC, or
+headless sessions.
 
 **What To Do First**
 
@@ -80,6 +81,13 @@ Run this once on each new cloud server. After that, use `start` or `run`
 commands without reinstalling host packages. Add `--verbose` only when you
 want the full installer output in the terminal. If you are using a pinned
 config or TigerVNC, source those files before `bootstrap`.
+
+Bootstrap installs ROS 2 on the host and, by default, builds a managed Isaac
+Sim runtime image with ROS 2 installed inside the container too. This means
+students can run `ros2`, `colcon`, and project ROS nodes from either the host
+or an Isaac container shell. Isaac Sim app launches still avoid auto-sourcing
+system ROS so the ROS 2 bridge can use Isaac Sim's compatible internal bridge
+libraries.
 
 ### Workflow Summary
 
@@ -551,6 +559,44 @@ For Isaac Lab, use `./isaac_vmctl.sh run isaaclab '...'`. Keep `--headless`
 for non-interactive runs. When you want to see the viewport, omit
 `--headless` and launch the command from the terminal inside TigerVNC so the
 GUI lands on that desktop instead of on WebRTC.
+
+## ROS 2 Everywhere
+
+Bootstrap configures ROS 2 at two levels:
+
+| Level | What is installed | How it is sourced |
+|---|---|---|
+| GPU host | Ubuntu ROS 2 (`humble` on 22.04, `jazzy` on 24.04), `colcon`, `rosdep`, ROS dev tools | Managed blocks in the current user's `.bashrc`, `/etc/bash.bashrc`, `/etc/skel/.bashrc`, and `/etc/profile.d/isaac-projects-ros2.sh` |
+| Isaac Sim container | A managed image such as `rice/isaac-sim-ros2:5.1.0-jazzy-ros-base` built from `ISAAC_IMAGE` | `/etc/profile.d/isaac-projects-ros2.sh`, `/etc/bash.bashrc`, `/root/.bashrc`, and `/etc/skel/.bashrc` |
+
+The container image is controlled by:
+
+```bash
+export ISAAC_ROS_ENABLE=1
+export ISAAC_ROS_DISTRO=auto
+export ISAAC_ROS_INSTALL_VARIANT=ros-base
+export ISAAC_ROS_IMAGE=
+```
+
+Use `ros-base` for cloud machines. Use `desktop` only when you intentionally
+want GUI ROS tools inside the container and have enough disk space.
+
+Isaac Sim itself is launched from a non-login shell, so the system ROS Python
+environment does not override Isaac Sim's embedded Python. Enable the bridge
+when you need Isaac to publish or subscribe to ROS 2 topics:
+
+```bash
+export ISAAC_EXTRA_ARGS="--/app/enableExtensions/0=isaacsim.ros2.bridge"
+./isaac_vmctl.sh start isaacsim
+```
+
+The Isaac container uses `--network=host` and the same `ROS_DOMAIN_ID` as the
+host by default. ROS 2 nodes on the host and ROS 2 nodes in the container can
+discover each other directly on the GPU machine. Direct sample delivery still
+depends on compatible ROS/RMW stacks. On Ubuntu 22.04 hosts with Isaac Sim 5.1,
+the host uses ROS 2 Humble while the container uses ROS 2 Jazzy because the
+Isaac image is Ubuntu 24.04 based; in that mixed-distro setup, use Zenoh for the
+reliable host/laptop topic path.
 
 Use **Zenoh** when you need ROS 2 topics on your laptop:
 

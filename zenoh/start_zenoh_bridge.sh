@@ -84,7 +84,9 @@ source_ros_if_needed() {
   [[ -n "$setup_file" ]] || error "ROS 2 not found. Source /opt/ros/<distro>/setup.bash or run: ./isaac_vmctl.sh install ros2"
   warn "ROS 2 not sourced. Sourcing ${setup_file}..."
   # shellcheck source=/dev/null
+  set +u
   source "${setup_file}"
+  set -u
 }
 
 POSITIONAL=()
