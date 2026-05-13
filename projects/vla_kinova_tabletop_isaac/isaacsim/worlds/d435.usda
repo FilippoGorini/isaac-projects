@@ -117,16 +117,43 @@ over "realsense2_camera" (
             displayName = "Name Override"
             doc = "Name override for prim lookup in base name search"
         )
+        bool physics:rigidBodyEnabled = 0
     }
 
     over "base_link"
     {
+        string isaac:nameOverride (
+            displayName = "Name Override"
+            doc = "Name override for prim lookup in base name search"
+        )
+        bool physics:rigidBodyEnabled = 0
+
         over "visuals" (
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
             rel material:binding = None (
                 bindMaterialAs = "weakerThanDescendants"
+            )
+        }
+    }
+
+    over "root_joint" (
+        active = false
+    )
+    {
+        bool physxArticulation:articulationEnabled = 0
+    }
+
+    over "joints"
+    {
+        over "camera_link_joint" (
+            active = false
+        )
+        {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
             )
         }
     }

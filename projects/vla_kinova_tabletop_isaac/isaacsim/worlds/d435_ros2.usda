@@ -8,7 +8,7 @@
             }
             dictionary Perspective = {
                 double3 position = (0.2963165013350689, 0.3933060639913601, 0.22290533030443221)
-                double3 target = (-0.484866313756374, -0.8276878942208898, -0.6634746382019014)
+                double3 target = (-0.48486631375637435, -0.8276878942208907, -0.6634746382019021)
             }
             dictionary Right = {
                 double3 position = (0, -5, 0)
@@ -141,6 +141,11 @@ def "d435" (
 
     over "camera_link"
     {
+        string isaac:nameOverride (
+            displayName = "Name Override"
+            doc = "Name override for prim lookup in base name search"
+        )
+
         over "camera_color_frame"
         {
             over "camera_color_optical_frame"
@@ -345,6 +350,10 @@ def "d435" (
 
     over "base_link"
     {
+        string isaac:nameOverride (
+            displayName = "Name Override"
+            doc = "Name override for prim lookup in base name search"
+        )
     }
 }
 
