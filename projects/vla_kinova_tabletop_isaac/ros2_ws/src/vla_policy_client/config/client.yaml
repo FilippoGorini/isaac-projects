@@ -1,0 +1,7 @@
+policy_client:
+  ros__parameters:
+    policy_host: "localhost"
+    policy_port: 8000
+    prompt: "pick up the object"
+    control_hz: 50.0
+    chunk_size: 50
