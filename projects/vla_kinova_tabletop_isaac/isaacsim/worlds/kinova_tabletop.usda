@@ -7,8 +7,8 @@
                 double radius = 2.6735292434692384
             }
             dictionary Perspective = {
-                double3 position = (3.4412529772199414, -3.92148014428943, 3.369383963124151)
-                double3 target = (-4.683804483010761, 5.8217288063825015, -4.332558026229867)
+                double3 position = (2.293604872123887, -0.34045416630685954, 2.2239504242134327)
+                double3 target = (-6.275371480463334, 0.5130002765714314, -6.818278291401079)
             }
             dictionary Right = {
                 double3 position = (-0.0025831043571606276, -5, 1.2875876568113325)
@@ -276,6 +276,49 @@ def Xform "World"
         double3 xformOp:translate = (-1.8231490071858814e-62, -1, 2.5)
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
     }
+
+    def "SM_Mug_D1" (
+        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysxRigidBodyAPI"]
+        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Props/Mugs/SM_Mug_D1.usd@
+    )
+    {
+        bool physics:kinematicEnabled = 0
+        bool physics:rigidBodyEnabled = 1
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (0.01, 0.01, 0.01)
+        double3 xformOp:translate = (0.5319087374322683, 0.03789825908588568, 0.0005327369188462687)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        over "SM_Mug_D1" (
+            prepend apiSchemas = ["PhysicsCollisionAPI", "PhysxCollisionAPI", "PhysxConvexHullCollisionAPI", "PhysicsMeshCollisionAPI"]
+        )
+        {
+            uniform token physics:approximation = "convexHull"
+            bool physics:collisionEnabled = 1
+            quatf xformOp:orient = (1, 0, 0, 0)
+            float3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+        }
+    }
+
+    def "green_block" (
+        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Props/Blocks/green_block.usd@
+    )
+    {
+        double3 xformOp:rotateZYX = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0.5330862853992308, 0.23132014828749298, 0.03407904378718683)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateZYX", "xformOp:scale"]
+
+        over "Cube"
+        {
+            quatf xformOp:orient = (1, 0, 0, 0)
+            double3 xformOp:scale = (0.025, 0.025, 0.025)
+            float3 xformOp:translate = (0, 0, 1.3877788e-17)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+        }
+    }
 }
 
 def "Render" (
@@ -318,7 +361,7 @@ def "Render" (
                 uint omni:rtx:viewTile:limit = 4294967295
                 rel orderedVars = </Render/Vars/LdrColor>
                 custom bool overrideClipRange = 0
-                uniform int2 resolution = (1280, 720)
+                uniform int2 resolution = (2048, 1080)
             }
 
             def RenderProduct "Replicator" (
@@ -407,6 +450,42 @@ def "Render" (
                 custom bool overrideClipRange = 0
                 uniform int2 resolution = (640, 480)
             }
+
+            def RenderProduct "Replicator_05" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </World/kinova_gen3_6dof_2f85_ros2/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_320x240>
+                bool omni:rtx:dlss:frameGeneration = 1
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (320, 240)
+            }
+
+            def RenderProduct "Replicator_06" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </World/kinova_gen3_6dof_2f85_ros2/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_640x480>
+                custom string ogPostProcessPath = "/Render/OmniverseKit/HydraTextures/Replicator_06/PostRender"
+                bool omni:rtx:dlss:frameGeneration = 1
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                rel orderedVars = [
+                    </Render/Vars/LdrColorSD>,
+                    </Render/Vars/LdrColor>,
+                ]
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (640, 480)
+            }
         }
     }
 
@@ -422,6 +501,8 @@ def "Render" (
             </Render/OmniverseKit/HydraTextures/Replicator_02>,
             </Render/OmniverseKit/HydraTextures/Replicator_03>,
             </Render/OmniverseKit/HydraTextures/Replicator_04>,
+            </Render/OmniverseKit/HydraTextures/Replicator_05>,
+            </Render/OmniverseKit/HydraTextures/Replicator_06>,
         ]
     }
 
