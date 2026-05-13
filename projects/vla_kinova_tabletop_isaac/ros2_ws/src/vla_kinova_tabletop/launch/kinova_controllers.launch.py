@@ -1,6 +1,7 @@
 import os
 from launch import LaunchDescription
-from launch.actions import OpaqueFunction
+from launch.actions import OpaqueFunction, RegisterEventHandler
+from launch.event_handlers import OnProcessExit
 from launch.substitutions import Command, FindExecutable
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
@@ -44,12 +45,23 @@ def launch_setup(context, *args, **kwargs):
     jtc_spawner = Node(package="controller_manager", executable="spawner", arguments=["joint_trajectory_controller"])
     gripper_spawner = Node(package="controller_manager", executable="spawner", arguments=["robotiq_gripper_controller"])
 
+    home_node = Node(
+        package="vla_kinova_tabletop",
+        executable="home_robot.py",
+        output="screen",
+    )
+
+    home_on_jtc_ready = RegisterEventHandler(
+        OnProcessExit(target_action=jtc_spawner, on_exit=[home_node])
+    )
+
     return [
         rsp_node,
         ros2_control_node,
         jsb_spawner,
         jtc_spawner,
         gripper_spawner,
+        home_on_jtc_ready,
     ]
 
 def generate_launch_description():

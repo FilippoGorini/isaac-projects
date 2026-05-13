@@ -20,6 +20,8 @@
   <depend>xacro</depend>
   <depend>kinova_gen3_6dof_robotiq_2f_85_moveit_config</depend>
   <depend>kortex_description</depend>
+  <depend>rclpy</depend>
+  <depend>trajectory_msgs</depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

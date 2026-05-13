@@ -26,4 +26,3 @@ GIT_LFS_SKIP_SMUDGE=1 uv pip install -e .
 
 echo ""
 echo "==> openpi ready at $OPENPI_DIR"
-echo "    Serve smoke test: policy_server/scripts/serve_smoke.sh"
