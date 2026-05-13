@@ -14,11 +14,12 @@ from sensor_msgs.msg import Image, JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 try:
-    from openpi_client import WebsocketClientPolicy
+    from openpi_client.websocket_client_policy import WebsocketClientPolicy
     from openpi_client.image_tools import resize_with_pad
 except ImportError as e:
     raise SystemExit(
-        "openpi-client not installed — run: pip install openpi-client"
+        f"Failed to import openpi_client ({e}). "
+        "Run: pip install openpi-client typing-extensions"
     ) from e
 
 ARM_JOINTS = [

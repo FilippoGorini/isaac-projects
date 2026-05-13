@@ -24,11 +24,15 @@ projects/vla_kinova_tabletop_isaac/
 │   ├── worlds/                   # Isaac Sim USD scenes (see below)
 │   ├── rl_scenes/                # RL scene configs (empty for now)
 │   └── startup_scenes/           # Lab startup scenes (empty for now)
+├── openpi_policy_server/
+│   ├── bootstrap_openpi.sh       # One-shot openpi bootstrap script
+│   └── src/                      # Policy server entry point and kinova policy definition
 └── ros2_ws/
     ├── bootstrap_kinova_ws.sh    # One-shot workspace bootstrap script
     ├── deps.repos                # vcstool manifest for ros2_kortex and deps
     └── src/
-        └── vla_kinova_tabletop/  # Main project ROS 2 package
+        ├── vla_kinova_tabletop/  # Robot description and controller config
+        └── vla_policy_client/    # ROS 2 WebSocket client for the VLA policy server
 ```
 
 ---
@@ -57,7 +61,18 @@ source projects/vla_kinova_tabletop_isaac/.env
 ./isaac_vmctl.sh bootstrap
 ```
 
-**4. Bootstrap the Kinova ROS 2 workspace:**
+**4. Bootstrap the openpi policy server (you can skip this if you don't want to run the $\pi_0/\pi_{0.5}$ VLA models) :**
+
+```bash
+cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac/openpi_policy_server
+./bootstrap_openpi.sh
+```
+
+This clones the `openpi` repository into `external/openpi`, creates a `uv`-managed
+virtual environment for the policy server, and installs `openpi-client` plus its
+dependencies into system Python so the ROS 2 policy client node can import them.
+
+**5. Bootstrap the Kinova ROS 2 workspace:**
 
 `bootstrap` writes the ROS 2 setup to `~/.bashrc` but does not source it in the
 current shell, so `ROS_DISTRO` is not yet set. Source ROS 2 manually before
@@ -119,6 +134,7 @@ the terminal inside the VNC desktop:
 | Package | Description |
 |---------|-------------|
 | [`vla_kinova_tabletop`](#vla_kinova_tabletop) | Custom wrapper over the upstream `kortex_description` and `robotiq_description` packages, providing a project-specific robot description and controller setup for Isaac Sim. |
+| [`vla_policy_client`](#vla_policy_client) | ROS 2 node that connects to the $\pi_0$ VLA policy server over WebSocket, subscribes to joint states and camera images, and publishes joint trajectories and gripper commands at inference rate. |
 
 ---
 
@@ -171,6 +187,47 @@ ros2 launch vla_kinova_tabletop kinova_controllers_moveit.launch.py
 ```
 
 Starts everything above, plus MoveIt 2 `move_group` and RViz with the project motion-planning preset. Use this when you need full motion planning through MoveIt 2.
+
+---
+
+## `vla_policy_client`
+
+This package implements the ROS 2 side of the VLA inference loop. It connects to the $\pi_0$ policy server (started via `openpi_policy_server/scripts/serve_kinova.sh`) over a WebSocket using `openpi-client`, and drives the robot at inference rate by publishing joint trajectories and gripper commands.
+
+### Node: `policy_client`
+
+**Subscriptions:**
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/joint_states` | `sensor_msgs/JointState` | Current arm and gripper joint positions. |
+| `/isaac_external_camera/color/image_raw` | `sensor_msgs/Image` | Base/scene RGB camera feed. |
+| `/isaac_wrist_camera/color/image_raw` | `sensor_msgs/Image` | Wrist RGB camera feed. |
+
+**Publications:**
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/joint_trajectory_controller/joint_trajectory` | `trajectory_msgs/JointTrajectory` | 50-step arm trajectory chunk (absolute joint positions). |
+| `/robotiq_gripper_controller/gripper_cmd` | `control_msgs/GripperCommand` (action) | Gripper position goal derived from the last action in the chunk. |
+
+**Parameters** (set in `config/client.yaml`):
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `policy_host` | `localhost` | Hostname or IP of the policy server. |
+| `policy_port` | `8000` | WebSocket port of the policy server. |
+| `prompt` | `pick up the object` | Language instruction passed to the VLA model. |
+| `control_hz` | `50.0` | Control frequency; determines per-step time delta. |
+| `chunk_size` | `50` | Number of action steps per inference call. |
+
+### Launch File
+
+Make sure the policy server is already running (`serve_kinova.sh`) and Isaac Sim is streaming joint states and camera images before launching the client.
+
+```bash
+ros2 launch vla_policy_client policy_client.launch.py prompt:="Pick up the green cube"
+```
 
 ---
 

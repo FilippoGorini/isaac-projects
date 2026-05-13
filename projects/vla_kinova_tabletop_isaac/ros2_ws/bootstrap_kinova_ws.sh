@@ -33,11 +33,6 @@ sudo apt-get update && sudo apt-get install -y ros-$ROS_DISTRO-topic-based-ros2-
 rosdep install --from-paths src --ignore-src -r -y
 echo ""
 
-echo ""
-echo "==> Installing openpi-client (policy server WebSocket client)..."
-pip install openpi-client
-echo ""
-
 # Build workspace
 echo ""
 echo "==> Building workspace..."
