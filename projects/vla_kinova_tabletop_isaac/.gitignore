@@ -28,3 +28,6 @@ checkpoints/
 # Python
 __pycache__/
 *.pyc
+
+# Ignore external directory, which for now just holds the openpi repo
+external/
