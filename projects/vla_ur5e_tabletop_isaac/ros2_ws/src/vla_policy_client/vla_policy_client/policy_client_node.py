@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""ROS 2 policy client for pi0 VLA — Kinova Gen3 6-DoF + Robotiq 2F-85.
+"""ROS 2 policy client for pi0 VLA — UR5e 6-DoF, direct Isaac Sim joint control.
 
-The inference thread runs flat-out and publishes a fresh JointTrajectory on
-every completion, replacing whatever the JTC was executing. Since inference
-takes ~70 ms and each trajectory spans 1 s, the JTC always has a fresh chunk
-and there is no gap between chunks.
+Architecture:
+  - Inference thread: runs flat-out, replaces the action buffer on every completion.
+  - Execution timer (50 Hz): pops one action per tick and publishes it.
+    Holds the last position if the buffer is momentarily empty.
+
+This decouples inference latency from execution rate and eliminates the
+gap between chunks that a sequential infer→execute loop would have.
 """
 
+import collections
 import threading
 import time
 
 import numpy as np
 import rclpy
-from builtin_interfaces.msg import Duration
-from control_msgs.action import GripperCommand
-from rclpy.action import ActionClient
 from rclpy.node import Node
 from sensor_msgs.msg import Image, JointState
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 try:
     from openpi_client.websocket_client_policy import WebsocketClientPolicy
@@ -29,10 +29,13 @@ except ImportError as e:
     ) from e
 
 ARM_JOINTS = [
-    "joint_1", "joint_2", "joint_3",
-    "joint_4", "joint_5", "joint_6",
+    "shoulder_pan_joint",
+    "shoulder_lift_joint",
+    "elbow_joint",
+    "wrist_1_joint",
+    "wrist_2_joint",
+    "wrist_3_joint",
 ]
-GRIPPER_JOINT = "robotiq_85_left_knuckle_joint"
 IMAGE_SIZE = 224
 
 
@@ -52,16 +55,13 @@ class PolicyClientNode(Node):
         self.declare_parameter("policy_port", 8000)
         self.declare_parameter("prompt", "pick up the object")
         self.declare_parameter("control_hz", 50.0)
-        self.declare_parameter("inference_hz", 5.0)  # 0 = flat-out (no throttle)
 
         host = self.get_parameter("policy_host").get_parameter_value().string_value
         port = self.get_parameter("policy_port").get_parameter_value().integer_value
         self._prompt = self.get_parameter("prompt").get_parameter_value().string_value
         hz = self.get_parameter("control_hz").get_parameter_value().double_value
-        infer_hz = self.get_parameter("inference_hz").get_parameter_value().double_value
 
         self._dt = 1.0 / hz
-        self._infer_period = (1.0 / infer_hz) if infer_hz > 0.0 else 0.0
 
         # --- policy server connection ---
         self.get_logger().info(f"Connecting to policy server ws://{host}:{port} ...")
@@ -72,35 +72,30 @@ class PolicyClientNode(Node):
         self._obs_lock = threading.Lock()
         self._joint_positions: dict[str, float] = {}
         self._base_image: np.ndarray | None = None
-        self._wrist_image: np.ndarray | None = None
 
-        # --- publishers / action clients ---
-        self._arm_pub = self.create_publisher(
-            JointTrajectory,
-            "/joint_trajectory_controller/joint_trajectory",
-            10,
-        )
-        self._gripper_client = ActionClient(
-            self, GripperCommand, "/robotiq_gripper_controller/gripper_cmd"
-        )
+        # --- action buffer (guarded by _buf_lock) ---
+        # Inference thread replaces the whole buffer; execution timer pops from it.
+        self._buf_lock = threading.Lock()
+        self._action_buffer: collections.deque = collections.deque()
+        self._last_positions: list[float] | None = None
+
+        # --- publisher ---
+        self._arm_pub = self.create_publisher(JointState, "/isaac_joint_commands", 10)
 
         # --- subscriptions ---
-        self.create_subscription(JointState, "/joint_states", self._cb_joint_states, 10)
+        self.create_subscription(JointState, "/isaac_joint_states", self._cb_joint_states, 10)
         self.create_subscription(
             Image, "/isaac_external_camera/color/image_raw", self._cb_base_image, 2
         )
-        self.create_subscription(
-            Image, "/isaac_wrist_camera/color/image_raw", self._cb_wrist_image, 2
-        )
 
-        # --- chunk timing (for skipped-step logging) ---
-        self._last_chunk_time: float | None = None
-        self._last_chunk_size: int = 0
+        # --- 50 Hz execution timer ---
+        self.create_timer(self._dt, self._execution_step)
 
         # --- inference thread ---
         self._running = True
         self._infer_thread = threading.Thread(target=self._inference_loop, daemon=True)
         self._infer_thread.start()
+
         self.get_logger().info("Policy client started.")
 
     # ------------------------------------------------------------------
@@ -117,68 +112,48 @@ class PolicyClientNode(Node):
         with self._obs_lock:
             self._base_image = resize_with_pad(arr, IMAGE_SIZE, IMAGE_SIZE)
 
-    def _cb_wrist_image(self, msg: Image) -> None:
-        arr = _ros_image_to_uint8_hwc(msg)
-        with self._obs_lock:
-            self._wrist_image = resize_with_pad(arr, IMAGE_SIZE, IMAGE_SIZE)
-
     # ------------------------------------------------------------------
-    # Publishing helpers
+    # Execution timer (50 Hz) — runs in the ROS2 executor thread
     # ------------------------------------------------------------------
 
-    def _publish_arm_chunk(self, actions: np.ndarray) -> None:
-        msg = JointTrajectory()
-        msg.joint_names = ARM_JOINTS
-        for i, action in enumerate(actions):
-            pt = JointTrajectoryPoint()
-            pt.positions = [float(v) for v in action[:6]]
-            elapsed_ns = int((i + 1) * self._dt * 1e9)
-            pt.time_from_start = Duration(
-                sec=elapsed_ns // 1_000_000_000,
-                nanosec=elapsed_ns % 1_000_000_000,
-            )
-            msg.points.append(pt)
+    def _execution_step(self) -> None:
+        with self._buf_lock:
+            if self._action_buffer:
+                action = self._action_buffer.popleft()
+                self._last_positions = [float(v) for v in action[:6]]
+
+        if self._last_positions is None:
+            return  # waiting for first inference
+
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = ARM_JOINTS
+        msg.position = self._last_positions
         self._arm_pub.publish(msg)
 
-    def _send_gripper_goal(self, position: float) -> None:
-        if not self._gripper_client.wait_for_server(timeout_sec=0.0):
-            return
-        goal = GripperCommand.Goal()
-        goal.command.position = float(position)
-        goal.command.max_effort = 50.0
-        self._gripper_client.send_goal_async(goal)
-
     # ------------------------------------------------------------------
-    # Inference loop
+    # Inference loop — runs in a background thread
     # ------------------------------------------------------------------
 
     def _build_obs(self) -> dict | None:
         with self._obs_lock:
-            missing = [
-                j for j in ARM_JOINTS + [GRIPPER_JOINT]
-                if j not in self._joint_positions
-            ]
-            if missing or self._base_image is None or self._wrist_image is None:
+            missing = [j for j in ARM_JOINTS if j not in self._joint_positions]
+            if missing or self._base_image is None:
                 return None
             joints = np.array(
                 [self._joint_positions[j] for j in ARM_JOINTS], dtype=np.float32
             )
-            gripper = np.array(
-                [self._joint_positions[GRIPPER_JOINT]], dtype=np.float32
-            )
             obs = {
                 "joints": joints,
-                "gripper": gripper,
+                "gripper": np.zeros(1, dtype=np.float32),
                 "base_rgb": self._base_image.copy(),
-                "wrist_rgb": self._wrist_image.copy(),
+                "wrist_rgb": np.zeros((IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.uint8),
                 "prompt": self._prompt,
             }
         return obs
 
     def _inference_loop(self) -> None:
         while self._running and rclpy.ok():
-            t_loop_start = time.monotonic()
-
             obs = self._build_obs()
             if obs is None:
                 time.sleep(0.05)
@@ -193,32 +168,19 @@ class PolicyClientNode(Node):
                 continue
             t_infer = time.monotonic() - t0
 
-            actions = np.asarray(result["actions"])  # (50, 7)
+            actions = np.asarray(result["actions"])
             if actions.ndim != 2 or actions.shape[1] < 7:
                 self.get_logger().error(f"Unexpected action shape: {actions.shape}")
                 continue
 
-            now = time.monotonic()
-            if self._last_chunk_time is not None:
-                elapsed_steps = int((now - self._last_chunk_time) / self._dt)
-                steps_remaining = max(0, self._last_chunk_size - elapsed_steps)
-            else:
-                steps_remaining = 0
-
-            self._publish_arm_chunk(actions)
-            self._send_gripper_goal(actions[0, 6])
-            self._last_chunk_time = now
-            self._last_chunk_size = len(actions)
+            with self._buf_lock:
+                buf_remaining = len(self._action_buffer)
+                self._action_buffer = collections.deque(actions)
 
             self.get_logger().info(
                 f"Inference {t_infer * 1e3:.1f} ms | "
-                f"replaced chunk ({steps_remaining} steps remaining)"
+                f"replaced buffer ({buf_remaining} steps remaining)"
             )
-
-            if self._infer_period > 0.0:
-                wait = self._infer_period - (time.monotonic() - t_loop_start)
-                if wait > 0.0:
-                    time.sleep(wait)
 
     # ------------------------------------------------------------------
 

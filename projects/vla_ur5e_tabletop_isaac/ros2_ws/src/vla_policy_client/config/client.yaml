@@ -4,4 +4,3 @@ policy_client:
     policy_port: 8000
     prompt: "pick up the object"
     control_hz: 50.0
-    inference_hz: 0.0  # 0 = flat-out; set e.g. 5.0 for 200 ms between inferences
