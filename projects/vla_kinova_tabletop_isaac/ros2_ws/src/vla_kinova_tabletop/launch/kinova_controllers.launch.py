@@ -1,35 +1,44 @@
 import os
 from launch import LaunchDescription
-from launch.actions import OpaqueFunction, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, OpaqueFunction, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
-from launch.substitutions import Command, FindExecutable
+from launch.substitutions import Command, FindExecutable, LaunchConfiguration
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
 def launch_setup(context, *args, **kwargs):
     my_package = "vla_kinova_tabletop"
-    
-    # Generate the standard URDF using xacro without any extra patches
+    use_sim    = LaunchConfiguration("use_sim").perform(context)
+    robot_ip   = LaunchConfiguration("robot_ip").perform(context)
+    auto_home  = LaunchConfiguration("auto_home").perform(context)
+    is_sim     = use_sim.lower() == "true"
+    use_sim_time = is_sim
+
+    xacro_args = (
+        f"arm:=gen3 dof:=6 gripper:=robotiq_2f_85 vision:=true "
+        f"sim_isaac:={use_sim} use_fake_hardware:=false "
+        f"isaac_arm_joint_commands:=/isaac_arm_commands "
+        f"isaac_gripper_joint_commands:=/isaac_gripper_commands"
+    )
+    if not is_sim:
+        xacro_args += f" robot_ip:={robot_ip}"
+
     robot_description_content = Command(
         [
             FindExecutable(name="xacro"), " ",
             os.path.join(get_package_share_directory(my_package), "urdf", "gen3.xacro"), " ",
-            "arm:=gen3 dof:=6 gripper:=robotiq_2f_85 vision:=true sim_isaac:=true use_fake_hardware:=false ",
-            "isaac_arm_joint_commands:=/isaac_arm_commands ",
-            "isaac_gripper_joint_commands:=/isaac_gripper_commands",
+            xacro_args,
         ]
     )
     robot_description = {"robot_description": robot_description_content}
 
-    # Node 1: Robot State Publisher
     rsp_node = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
         output="both",
-        parameters=[robot_description, {"use_sim_time": True}],
+        parameters=[robot_description, {"use_sim_time": use_sim_time}],
     )
 
-    # Node 2: ROS 2 Control Node (The Bridge)
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
@@ -40,29 +49,42 @@ def launch_setup(context, *args, **kwargs):
         output="both",
     )
 
-    # Controller Spawners
-    jsb_spawner = Node(package="controller_manager", executable="spawner", arguments=["joint_state_broadcaster"])
-    jtc_spawner = Node(package="controller_manager", executable="spawner", arguments=["joint_trajectory_controller"])
+    jsb_spawner     = Node(package="controller_manager", executable="spawner", arguments=["joint_state_broadcaster"])
+    jtc_spawner     = Node(package="controller_manager", executable="spawner", arguments=["joint_trajectory_controller"])
     gripper_spawner = Node(package="controller_manager", executable="spawner", arguments=["robotiq_gripper_controller"])
 
-    home_node = Node(
-        package="vla_kinova_tabletop",
-        executable="home_robot.py",
-        output="screen",
-    )
+    nodes = [rsp_node, ros2_control_node, jsb_spawner, jtc_spawner, gripper_spawner]
 
-    home_on_jtc_ready = RegisterEventHandler(
-        OnProcessExit(target_action=jtc_spawner, on_exit=[home_node])
-    )
+    # Home on startup: always in sim, opt-in on real robot via auto_home:=true
+    run_home = is_sim or auto_home.lower() == "true"
+    if run_home:
+        home_node = Node(
+            package="vla_kinova_tabletop",
+            executable="home_robot.py",
+            output="screen",
+        )
+        nodes.append(RegisterEventHandler(
+            OnProcessExit(target_action=jtc_spawner, on_exit=[home_node])
+        ))
 
-    return [
-        rsp_node,
-        ros2_control_node,
-        jsb_spawner,
-        jtc_spawner,
-        gripper_spawner,
-        home_on_jtc_ready,
-    ]
+    return nodes
 
 def generate_launch_description():
-    return LaunchDescription([OpaqueFunction(function=launch_setup)])
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            "use_sim",
+            default_value="true",
+            description="Set to true when running in Isaac Sim, false for the real robot",
+        ),
+        DeclareLaunchArgument(
+            "robot_ip",
+            default_value="192.168.11.11",
+            description="IP address of the real Kinova arm (ignored when use_sim:=true)",
+        ),
+        DeclareLaunchArgument(
+            "auto_home",
+            default_value="false",
+            description="Run the homing script on startup (always true in sim, opt-in on real robot)",
+        ),
+        OpaqueFunction(function=launch_setup),
+    ])

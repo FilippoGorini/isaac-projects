@@ -172,21 +172,51 @@ Source the project environment in every new terminal before running any launch f
 source ~/isaac-projects/projects/vla_kinova_tabletop_isaac/setup.bash
 ```
 
-*Basic joint control — no motion planning:*
+Both launch files accept the same arguments:
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `use_sim` | `true` | Set to `true` for Isaac Sim, `false` for the real robot. Controls the hardware interface, `use_sim_time`, and whether `robot_ip` is forwarded to the driver. |
+| `robot_ip` | `192.168.11.11` | IP address of the real Kinova arm. Ignored when `use_sim:=true`. |
+| `auto_home` | `false` | Run the homing script after the controllers come up. Always enabled in simulation; opt-in on the real robot. |
+
+---
+
+*Basic joint control — Isaac Sim (no motion planning):*
 
 ```bash
 ros2 launch vla_kinova_tabletop kinova_controllers.launch.py
 ```
 
+*Basic joint control — real robot:*
+
+```bash
+ros2 launch vla_kinova_tabletop kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.11.11
+```
+
 Starts `robot_state_publisher` and `ros2_control_node`, then spawns `joint_state_broadcaster`, `joint_trajectory_controller`, and `robotiq_gripper_controller`. Use this when you only need to send joint trajectories or test the `ros2_control` bridge without motion planning.
 
-*MoveIt 2 + RViz:*
+---
+
+*MoveIt 2 + RViz — Isaac Sim:*
 
 ```bash
 ros2 launch vla_kinova_tabletop kinova_controllers_moveit.launch.py
 ```
 
+*MoveIt 2 + RViz — real robot:*
+
+```bash
+ros2 launch vla_kinova_tabletop kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.11.11
+```
+
 Starts everything above, plus MoveIt 2 `move_group` and RViz with the project motion-planning preset. Use this when you need full motion planning through MoveIt 2.
+
+To also run the homing script when connecting to the real robot:
+
+```bash
+ros2 launch vla_kinova_tabletop kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.11.11 auto_home:=true
+```
 
 ---
 

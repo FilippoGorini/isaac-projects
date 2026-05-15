@@ -7,8 +7,8 @@
                 double radius = 2.6735292434692384
             }
             dictionary Perspective = {
-                double3 position = (-0.3607075622861905, -2.401929998362817, 2.323146148593984)
-                double3 target = (0.21030494781418418, 9.427733687540362, -0.25311543187075625)
+                double3 position = (0.35756111080963837, 0.00915160774308888, 0.6464062689289304)
+                double3 target = (-5.728619776286381, 0.3791850135170453, -2.5663200863227917)
             }
             dictionary Right = {
                 double3 position = (-0.0025831043571606276, -5, 1.2875876568113325)
@@ -29,6 +29,7 @@
         }
         int refinementOverrideImplVersion = 0
         dictionary renderSettings = {
+            bool "rtx:useViewLightingMode" = 1
         }
     }
     defaultPrim = "kinova_gen3_6dof_2f85"
@@ -75,7 +76,7 @@ def "Render" (
                 bool omni:rtx:rt:lightcache:spatialCache:dontResolveConflicts = 1
                 bool omni:rtx:scene:hydra:materialSyncLoads = 1
                 bool omni:rtx:scene:hydra:mdlMaterialWarmup = 1
-                bool omni:rtx:scene:useViewLightingMode
+                bool omni:rtx:scene:useViewLightingMode = 1
                 uint omni:rtx:viewTile:limit = 4294967295
                 rel orderedVars = </Render/Vars/LdrColor>
                 custom bool overrideClipRange = 0
@@ -159,6 +160,116 @@ def "Render" (
                 custom bool overrideClipRange = 0
                 uniform int2 resolution = (320, 240)
             }
+
+            def RenderProduct "Replicator_05" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_640x480>
+                custom string ogPostProcessPath = "/Render/OmniverseKit/HydraTextures/Replicator_05/PostRender"
+                bool omni:rtx:dlss:frameGeneration = 1
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                bool omni:rtx:scene:useViewLightingMode = 1
+                rel orderedVars = [
+                    </Render/Vars/LdrColorSD>,
+                    </Render/Vars/LdrColor>,
+                ]
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (640, 480)
+            }
+
+            def RenderProduct "Replicator_06" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_320x240>
+                bool omni:rtx:dlss:frameGeneration = 1
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                bool omni:rtx:scene:useViewLightingMode = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (320, 240)
+            }
+
+            def RenderProduct "Replicator_07" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_640x480>
+                bool omni:rtx:dlss:frameGeneration = 1
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                bool omni:rtx:scene:useViewLightingMode = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (640, 480)
+            }
+
+            def RenderProduct "Replicator_08" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_320x240>
+                bool omni:rtx:dlss:frameGeneration = 1
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                bool omni:rtx:scene:useViewLightingMode = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (320, 240)
+            }
+
+            def RenderProduct "Replicator_09" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_640x480>
+                custom string ogPostProcessPath = "/Render/OmniverseKit/HydraTextures/Replicator_09/PostRender"
+                bool omni:rtx:dlss:frameGeneration = 1
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                bool omni:rtx:scene:useViewLightingMode = 1
+                rel orderedVars = [
+                    </Render/Vars/LdrColorSD>,
+                    </Render/Vars/LdrColor>,
+                ]
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (640, 480)
+            }
+
+            def RenderProduct "Replicator_10" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </kinova_gen3_6dof_2f85/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_320x240>
+                bool omni:rtx:dlss:frameGeneration = 1
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                bool omni:rtx:scene:useViewLightingMode = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (320, 240)
+            }
         }
     }
 
@@ -174,6 +285,12 @@ def "Render" (
             </Render/OmniverseKit/HydraTextures/Replicator_02>,
             </Render/OmniverseKit/HydraTextures/Replicator_03>,
             </Render/OmniverseKit/HydraTextures/Replicator_04>,
+            </Render/OmniverseKit/HydraTextures/Replicator_05>,
+            </Render/OmniverseKit/HydraTextures/Replicator_06>,
+            </Render/OmniverseKit/HydraTextures/Replicator_07>,
+            </Render/OmniverseKit/HydraTextures/Replicator_08>,
+            </Render/OmniverseKit/HydraTextures/Replicator_09>,
+            </Render/OmniverseKit/HydraTextures/Replicator_10>,
         ]
     }
 
@@ -372,6 +489,8 @@ def "kinova_gen3_6dof_2f85" (
     {
         over "joint_2"
         {
+            float drive:angular:physics:damping = 6.274272
+            float drive:angular:physics:stiffness = 295.66812
             string isaac:nameOverride (
                 displayName = "Name Override"
                 doc = "Name override for prim lookup in base name search"
@@ -382,6 +501,8 @@ def "kinova_gen3_6dof_2f85" (
 
         over "joint_3"
         {
+            float drive:angular:physics:damping = 49.882286
+            float drive:angular:physics:stiffness = 3482.4407
             string isaac:nameOverride (
                 displayName = "Name Override"
                 doc = "Name override for prim lookup in base name search"
@@ -392,6 +513,8 @@ def "kinova_gen3_6dof_2f85" (
 
         over "joint_5"
         {
+            float drive:angular:physics:damping = 0.594987
+            float drive:angular:physics:stiffness = 46.730167
             string isaac:nameOverride (
                 displayName = "Name Override"
                 doc = "Name override for prim lookup in base name search"
@@ -402,21 +525,24 @@ def "kinova_gen3_6dof_2f85" (
 
         over "robotiq_85_left_knuckle_joint"
         {
-            float drive:angular:physics:damping = 0.0004066477
-            float drive:angular:physics:stiffness = 1.0166192
+            float drive:angular:physics:damping = 0.000046867593
+            float drive:angular:physics:stiffness = 0.005521458
             float drive:angular:physics:targetPosition = 0
             string isaac:nameOverride (
                 displayName = "Name Override"
                 doc = "Name override for prim lookup in base name search"
             )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 28.64789
+            float physxJoint:jointFriction = 1
+            float physxJoint:maxJointVelocity = 28.64789
             float state:angular:physics:position = 0
             float state:angular:physics:velocity = 0
         }
 
         over "robotiq_85_right_knuckle_joint"
         {
-            float drive:angular:physics:damping = 0.00040662993
-            float drive:angular:physics:stiffness = 1.01662
+            float drive:angular:physics:damping = 0.00004685377
+            float drive:angular:physics:stiffness = 0.0055198297
             float drive:angular:physics:targetPosition = 0
             string isaac:nameOverride (
                 displayName = "Name Override"
@@ -430,10 +556,14 @@ def "kinova_gen3_6dof_2f85" (
             prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
         )
         {
+            float drive:angular:physics:damping = 0.16091579
+            float drive:angular:physics:stiffness = 7.582978
             string isaac:nameOverride (
                 displayName = "Name Override"
                 doc = "Name override for prim lookup in base name search"
             )
+            float physics:lowerLimit = -360
+            float physics:upperLimit = 360
             float state:angular:physics:position = 0
             float state:angular:physics:velocity = 0
         }
@@ -458,13 +588,15 @@ def "kinova_gen3_6dof_2f85" (
             delete apiSchemas = ["PhysicsDriveAPI:angular"]
         )
         {
-            float drive:angular:physics:damping = 0.000066541725
-            float drive:angular:physics:stiffness = 0.16635431
+            float drive:angular:physics:damping = 0
+            float drive:angular:physics:stiffness = 0
             string isaac:nameOverride (
                 displayName = "Name Override"
                 doc = "Name override for prim lookup in base name search"
             )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 28.64789
             float physxJoint:jointFriction = 0
+            float physxJoint:maxJointVelocity = 28.64789
         }
 
         over "robotiq_85_right_inner_knuckle_joint" (
@@ -479,19 +611,22 @@ def "kinova_gen3_6dof_2f85" (
             )
             uniform bool physics:excludeFromArticulation = 1
             float physxJoint:jointFriction = 0
+            float physxJoint:maxJointVelocity = 28.64789
         }
 
         over "robotiq_85_right_finger_tip_joint" (
             delete apiSchemas = ["PhysicsDriveAPI:angular"]
         )
         {
-            float drive:angular:physics:damping = 0.00006653234
-            float drive:angular:physics:stiffness = 0.16633084
+            float drive:angular:physics:damping = 0
+            float drive:angular:physics:stiffness = 0
             string isaac:nameOverride (
                 displayName = "Name Override"
                 doc = "Name override for prim lookup in base name search"
             )
+            float physxDrivePerformanceEnvelope:angular:maxActuatorVelocity = 28.64789
             float physxJoint:jointFriction = 0
+            float physxJoint:maxJointVelocity = 28.64789
         }
 
         over "robotiq_85_base_joint"
@@ -527,12 +662,15 @@ def "kinova_gen3_6dof_2f85" (
             float physxJoint:maxJointVelocity = 28.64789
         }
 
-        over "robotiq_85_right_finger_joint"
+        over "robotiq_85_right_finger_joint" (
+            prepend apiSchemas = ["PhysxJointAPI"]
+        )
         {
             string isaac:nameOverride (
                 displayName = "Name Override"
                 doc = "Name override for prim lookup in base name search"
             )
+            float physxJoint:maxJointVelocity = 1000000
         }
 
         def PhysicsRevoluteJoint "robotiq_85_right_inner_knuckle_finger_tip_joint" (
@@ -555,10 +693,14 @@ def "kinova_gen3_6dof_2f85" (
             prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
         )
         {
+            float drive:angular:physics:damping = 4.495504
+            float drive:angular:physics:stiffness = 313.8454
             string isaac:nameOverride (
                 displayName = "Name Override"
                 doc = "Name override for prim lookup in base name search"
             )
+            float physics:lowerLimit = -360
+            float physics:upperLimit = 360
             float state:angular:physics:position = 0
             float state:angular:physics:velocity = 0
         }
@@ -567,10 +709,14 @@ def "kinova_gen3_6dof_2f85" (
             prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
         )
         {
+            float drive:angular:physics:damping = 0.04340251
+            float drive:angular:physics:stiffness = 3.4088254
             string isaac:nameOverride (
                 displayName = "Name Override"
                 doc = "Name override for prim lookup in base name search"
             )
+            float physics:lowerLimit = -360
+            float physics:upperLimit = 360
             float state:angular:physics:position = 0
             float state:angular:physics:velocity = 0
         }
