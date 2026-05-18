@@ -24,7 +24,9 @@ def launch_setup(context, *args, **kwargs):
         f"isaac_gripper_joint_commands:=/isaac_gripper_commands"
     )
     if not is_sim:
-        xacro_args += f" robot_ip:={robot_ip}"
+        # On real hardware, route the Robotiq gripper through the Kinova arm's
+        # internal bus (Kortex). Otherwise the gripper plugin tries /dev/ttyUSB0.
+        xacro_args += f" robot_ip:={robot_ip} use_internal_bus_gripper_comm:=true"
 
     moveit_mappings = {
         "arm": "gen3",
@@ -40,6 +42,7 @@ def launch_setup(context, *args, **kwargs):
     }
     if not is_sim:
         moveit_mappings["robot_ip"] = robot_ip
+        moveit_mappings["use_internal_bus_gripper_comm"] = "true"
 
     robot_description_content = Command(
         [
@@ -76,6 +79,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             robot_description,
             os.path.join(get_package_share_directory(my_package), "config", "ros2_controllers.yaml"),
+            {"use_sim_time": use_sim_time},
         ],
         output="both",
     )
@@ -83,6 +87,21 @@ def launch_setup(context, *args, **kwargs):
     jsb_spawner     = Node(package="controller_manager", executable="spawner", arguments=["joint_state_broadcaster"])
     jtc_spawner     = Node(package="controller_manager", executable="spawner", arguments=["joint_trajectory_controller"])
     gripper_spawner = Node(package="controller_manager", executable="spawner", arguments=["robotiq_gripper_controller"])
+
+    # Real-robot-only controllers: twist (loaded inactive) and fault reset.
+    # tcp/twist.* interfaces and fault reset are exposed by kortex_driver, not Isaac sim.
+    real_only_spawners = []
+    if not is_sim:
+        real_only_spawners.append(Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=["twist_controller", "--inactive"],
+        ))
+        real_only_spawners.append(Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=["fault_controller"],
+        ))
 
     move_group_node = Node(
         package="moveit_ros_move_group",
@@ -104,7 +123,7 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    nodes = [rsp_node, ros2_control_node, jsb_spawner, jtc_spawner, gripper_spawner, move_group_node, rviz_node]
+    nodes = [rsp_node, ros2_control_node, jsb_spawner, jtc_spawner, gripper_spawner, *real_only_spawners, move_group_node, rviz_node]
 
     # Home on startup: always in sim, opt-in on real robot via auto_home:=true
     run_home = is_sim or auto_home.lower() == "true"
@@ -129,7 +148,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "robot_ip",
-            default_value="192.168.11.11",
+            default_value="192.168.2.12",
             description="IP address of the real Kinova arm (ignored when use_sim:=true)",
         ),
         DeclareLaunchArgument(
