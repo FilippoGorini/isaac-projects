@@ -7,8 +7,8 @@
                 double radius = 2.6735292434692384
             }
             dictionary Perspective = {
-                double3 position = (4.177882281816175, -0.025947074048216636, 2.2214161599067426)
-                double3 target = (-5.897925760103738, 0.7120782839438877, -2.7084965212733696)
+                double3 position = (2.2330065900282268, 1.9182667090962318, 1.990330624059232)
+                double3 target = (-5.441095851201792, -3.8931082432190296, -3.815416619476961)
             }
             dictionary Right = {
                 double3 position = (-0.0025831043571606276, -5, 1.2875876568113325)
@@ -1062,6 +1062,51 @@ def "Render" (
                 custom bool overrideClipRange = 0
                 uniform int2 resolution = (320, 240)
             }
+
+            def RenderProduct "Replicator_34" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </World/kinova_gen3_6dof_2f85_ros2/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_640x480>
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (640, 480)
+            }
+
+            def RenderProduct "Replicator_35" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </World/kinova_gen3_6dof_2f85_ros2/bracelet_link/end_effector_link/camera_color_frame/rgb_camera_320x240>
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (320, 240)
+            }
+
+            def RenderProduct "Replicator_36" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </World/d435_ros2/camera_link/camera_color_frame/camera_color_optical_frame/realsense_camera_color>
+                bool omni:rtx:material:db:syncLoads = 1
+                bool omni:rtx:rt:ecoMode:enabled = 0
+                bool omni:rtx:scene:hydra:materialSyncLoads = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (640, 480)
+            }
         }
     }
 
@@ -1106,6 +1151,9 @@ def "Render" (
             </Render/OmniverseKit/HydraTextures/Replicator_31>,
             </Render/OmniverseKit/HydraTextures/Replicator_32>,
             </Render/OmniverseKit/HydraTextures/Replicator_33>,
+            </Render/OmniverseKit/HydraTextures/Replicator_34>,
+            </Render/OmniverseKit/HydraTextures/Replicator_35>,
+            </Render/OmniverseKit/HydraTextures/Replicator_36>,
         ]
     }
 
