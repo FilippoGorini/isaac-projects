@@ -17,6 +17,11 @@ ros2_ws/src/ros2_kortex
 ros2_ws/src/ros2_robotiq_gripper
 ros2_ws/src/serial
 
+# Exclude Quest2ROS-related packages for now, will switch to our own fork in the future possibly to apply the needed patches
+ros2_ws/src/quest2ros  
+ros2_ws/src/Quest2ROS2
+ros2_ws/src/ROS-TCP-Endpoint
+
 # Training output
 artifacts/
 runs/
