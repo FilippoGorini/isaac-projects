@@ -17,6 +17,7 @@ def launch_setup(context, *args, **kwargs):
     xacro_args = (
         f"arm:=gen3 dof:=6 gripper:=robotiq_2f_85 vision:=true "
         f"sim_isaac:={use_sim} use_fake_hardware:=false "
+        f"gripper_joint_name:=robotiq_85_left_knuckle_joint "
         f"isaac_arm_joint_commands:=/isaac_arm_commands "
         f"isaac_gripper_joint_commands:=/isaac_gripper_commands"
     )
