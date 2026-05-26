@@ -39,7 +39,8 @@ def launch_setup(context, *args, **kwargs):
         package="robot_state_publisher",
         executable="robot_state_publisher",
         output="both",
-        parameters=[robot_description, {"use_sim_time": use_sim_time}],
+        # Manually increase the frequency for /tf publishing so that quest2ros2 node can better read current end effector pose
+        parameters=[robot_description, {"use_sim_time": use_sim_time, "publish_frequency": 150.0}],
     )
 
     ros2_control_node = Node(

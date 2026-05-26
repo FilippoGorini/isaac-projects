@@ -14,7 +14,7 @@ class HomeRobot(Node):
         prefix = prefix.strip('"\'')
 
         if positions is None:
-            self.positions = [0.0, -0.565, -1.621, 0.0, -1.782, 1.5708]
+            self.positions = [0.0, 0.418879, -1.8675, 0.0, 0.750492, 1.5708]
         else:
             self.positions = positions
 
