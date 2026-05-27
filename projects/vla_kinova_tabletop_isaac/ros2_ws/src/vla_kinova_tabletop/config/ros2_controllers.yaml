@@ -36,6 +36,7 @@ joint_trajectory_controller:
     state_publish_rate: 100.0   # Rate for the controller_state topic, it can run at a lower rate
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
+    open_loop_control: true
     constraints:
       stopped_velocity_tolerance: 0.0
       goal_time: 0.5
