@@ -122,52 +122,32 @@ int main(int argc, char** argv)
     return EXIT_FAILURE;
   }
 
-  // DEBUG: log PSM's direct EE pose query so we can compare to what PoseTracking
-  // sees. If PSM returns the homed EE pose but PoseTracking later returns
-  // identity, the bug is inside moveit_servo, not in the input state.
-  {
-    auto state_monitor = psm->getStateMonitor();
-    auto current_state = state_monitor ? state_monitor->getCurrentState() : nullptr;
-    if (!current_state)
-    {
-      RCLCPP_WARN(LOGGER, "[DEBUG] PSM has NO current state at PoseTracking-construction time!");
-    }
-    else
-    {
-      const Eigen::Isometry3d& ee = current_state->getGlobalLinkTransform(servo_parameters->ee_frame_name);
-      const auto& t = ee.translation();
-      Eigen::Quaterniond q(ee.rotation());
-      RCLCPP_INFO(LOGGER,
-                  "[DEBUG] PSM EE (%s in %s): pos=(%.3f, %.3f, %.3f), quat=(%.3f, %.3f, %.3f, %.3f)",
-                  servo_parameters->ee_frame_name.c_str(), servo_parameters->planning_frame.c_str(),
-                  t.x(), t.y(), t.z(), q.x(), q.y(), q.z(), q.w());
-    }
-  }
-
   // The PoseTracking class internally subscribes to "target_pose" (PoseStamped).
   moveit_servo::PoseTracking tracker(node, servo_parameters, psm);
 
-  // DEBUG: PoseTracking's view of the EE pose (used as `current` in error calc).
-  // This should match the PSM log above. If it's identity / zeros, that's the bug.
-  {
-    geometry_msgs::msg::TransformStamped tf_msg;
-    if (tracker.getCommandFrameTransform(tf_msg))
-    {
-      const auto& tr = tf_msg.transform.translation;
-      const auto& q = tf_msg.transform.rotation;
-      RCLCPP_INFO(LOGGER,
-                  "[DEBUG] tracker.getCommandFrameTransform OK: parent=%s child=%s pos=(%.3f, %.3f, %.3f) quat=(%.3f, %.3f, %.3f, %.3f)",
-                  tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(),
-                  tr.x, tr.y, tr.z, q.x, q.y, q.z, q.w);
-    }
-    else
-    {
-      RCLCPP_WARN(LOGGER, "[DEBUG] tracker.getCommandFrameTransform returned false — this is the bug!");
-    }
-  }
-
   // Log Servo's status whenever it changes.
   StatusMonitor status_monitor(node, servo_parameters->status_topic);
+
+  // Log the Jacobian condition number at 10 Hz so we can see proximity to
+  // singularities live while teleoperating. Servo's internal velocity scaling
+  // already kicks in once it crosses `lower_singularity_threshold`, but this
+  // gives the actual number continuously regardless of scaling.
+  auto cond_timer = node->create_wall_timer(
+      std::chrono::milliseconds(100),
+      [psm, jmg_name = servo_parameters->move_group_name]() {
+        auto state_monitor = psm->getStateMonitor();
+        if (!state_monitor) return;
+        auto current_state = state_monitor->getCurrentState();
+        if (!current_state) return;
+        const moveit::core::JointModelGroup* jmg = current_state->getJointModelGroup(jmg_name);
+        if (!jmg) return;
+        Eigen::MatrixXd J = current_state->getJacobian(jmg);
+        Eigen::JacobiSVD<Eigen::MatrixXd> svd(J);
+        const auto& sv = svd.singularValues();
+        if (sv.size() == 0 || sv(sv.size() - 1) < 1e-9) return;
+        const double cond = sv(0) / sv(sv.size() - 1);
+        RCLCPP_INFO(LOGGER, "Jacobian condition number: %.1f", cond);
+      });
 
   // Tolerances are kept tight so that tracking is "continuous": Servo never
   // declares the target reached and exits — it keeps chasing new targets.
@@ -184,33 +164,6 @@ int main(int argc, char** argv)
     auto status = tracker.moveToPose(lin_tol, rot_tol, target_pose_timeout);
     RCLCPP_INFO_STREAM(LOGGER, "PoseTracking iteration ended: "
                                    << moveit_servo::POSE_TRACKING_STATUS_CODE_MAP.at(status));
-
-    // DEBUG: per-iteration snapshot of the EE pose PoseTracking knows about and
-    // the one PSM directly reports. Either of these going stale -> error
-    // computation breaks.
-    {
-      geometry_msgs::msg::TransformStamped tf_msg;
-      if (tracker.getCommandFrameTransform(tf_msg))
-      {
-        const auto& tr = tf_msg.transform.translation;
-        const auto& q = tf_msg.transform.rotation;
-        RCLCPP_INFO(LOGGER, "[DEBUG] tracker EE pos=(%.3f, %.3f, %.3f) quat=(%.3f, %.3f, %.3f, %.3f)",
-                    tr.x, tr.y, tr.z, q.x, q.y, q.z, q.w);
-      }
-      else
-      {
-        RCLCPP_WARN(LOGGER, "[DEBUG] tracker.getCommandFrameTransform returned false");
-      }
-      auto state_monitor = psm->getStateMonitor();
-      auto current_state = state_monitor ? state_monitor->getCurrentState() : nullptr;
-      if (current_state)
-      {
-        const Eigen::Isometry3d& ee = current_state->getGlobalLinkTransform(servo_parameters->ee_frame_name);
-        const auto& t = ee.translation();
-        RCLCPP_INFO(LOGGER, "[DEBUG] PSM EE pos=(%.3f, %.3f, %.3f)", t.x(), t.y(), t.z());
-      }
-    }
-
     tracker.resetTargetPose();
   }
 

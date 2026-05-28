@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /RobotModel1
+        - /TF1
         - /TF1/Frames1
         - /Pose1
       Splitter Ratio: 0.5
@@ -170,9 +171,9 @@ Visualization Manager:
         base_link:
           Value: true
         bicep_link:
-          Value: false
+          Value: true
         bracelet_link:
-          Value: false
+          Value: true
         camera_color_frame:
           Value: false
         camera_depth_frame:
@@ -182,7 +183,7 @@ Visualization Manager:
         end_effector_link:
           Value: true
         forearm_link:
-          Value: false
+          Value: true
         robotiq_85_base_link:
           Value: false
         robotiq_85_left_finger_link:
@@ -202,18 +203,18 @@ Visualization Manager:
         robotiq_85_right_knuckle_link:
           Value: false
         shoulder_link:
-          Value: false
+          Value: true
         spherical_wrist_1_link:
-          Value: false
+          Value: true
         spherical_wrist_2_link:
-          Value: false
+          Value: true
         world:
           Value: false
       Marker Scale: 0.20000000298023224
       Name: TF
-      Show Arrows: true
+      Show Arrows: false
       Show Axes: true
-      Show Names: true
+      Show Names: false
       Tree:
         world:
           base_link:
@@ -283,25 +284,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 1.5577454566955566
+      Distance: 1.1191736459732056
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.4869200587272644
-        Y: 0.23995091021060944
-        Z: 0.3501301407814026
+        X: 0.18874339759349823
+        Y: -0.22775806486606598
+        Z: 0.01396082155406475
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.48000019788742065
+      Pitch: 0.7350001931190491
       Target Frame: base_link
       Value: Orbit (rviz_default_plugins)
-      Yaw: 5.435007572174072
+      Yaw: 2.51001238822937
     Saved: ~
 Window Geometry:
   Displays:

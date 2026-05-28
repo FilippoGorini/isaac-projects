@@ -37,6 +37,9 @@ joint_trajectory_controller:
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
     open_loop_control: true
+    # On (re)activation, re-sync JTC's internal commanded state from the measured
+    # state rather than the stale last command interface value.
+    set_last_command_interface_value_as_state_on_activation: false
     constraints:
       stopped_velocity_tolerance: 0.0
       goal_time: 0.5
