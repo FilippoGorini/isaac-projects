@@ -1,0 +1,42 @@
+#################################
+# PID + saturation config for twist_pose_tracking_node.
+#
+# The node computes a 6D pose error in base_link, runs PID on each axis,
+# saturates the resulting twist, then rotates it into the tool frame
+# (end_effector_link) before publishing. The picknik_twist_controller then
+# forwards it to kortex_driver, which interprets it in CARTESIAN_REFERENCE_FRAME_TOOL.
+
+#################################
+
+twist_pose_tracking_node:
+  ros__parameters:
+    loop_rate_hz: 100.0                 # Pose tracking rate (kinova's twist controller on the firmware runs at 40 Hz)
+    target_pose_timeout_s: 0.5          # After this many seconds without new /target_frame messages the node publishes zero twist and resets the integrator 
+    base_frame: base_link
+    ee_frame: end_effector_link
+    target_topic: /target_frame
+    twist_command_topic: /twist_controller/commands   # Topic on which the kinova twist controller listens for twist commands
+
+    # Saturation applied to norm of linear and angular velocities, applied in base frame before rotation onto the end effector frame
+    max_linear_velocity: 0.40           # [m/s]
+    max_angular_velocity: 1.00          # [rad/s]
+
+    # Anti windup cap to be applied to the integrator state, per axis
+    linear_windup_limit: 0.05
+    angular_windup_limit: 0.05
+
+    # Linear PID gains, applied on error computed in base frame
+    x_proportional_gain: 2.5
+    y_proportional_gain: 2.5
+    z_proportional_gain: 2.5
+    x_integral_gain: 0.4
+    y_integral_gain: 0.4
+    z_integral_gain: 0.4
+    x_derivative_gain: 0.12            
+    y_derivative_gain: 0.12
+    z_derivative_gain: 0.12
+
+    # Angular PID gains, applied on error computed in base frame (shared between roll pitch yaw)
+    angular_proportional_gain: 3.0
+    angular_integral_gain: 0.8
+    angular_derivative_gain: 0.08
