@@ -73,7 +73,13 @@ def launch_setup(context, *args, **kwargs):
             executable="spawner",
             arguments=["fault_controller"],
         )
-        nodes += [twist_spawner, fault_spawner]
+        # We now also load the gripper velocity controller (inactive). The twist pose tracking launchfile switches it active instead
+        gripper_vel_spawner = Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=["gripper_velocity_controller", "--inactive"],
+        )
+        nodes += [twist_spawner, fault_spawner, gripper_vel_spawner]
 
     # Home on startup: always in sim, opt-in on real robot via auto_home:=true
     run_home = is_sim or auto_home.lower() == "true"

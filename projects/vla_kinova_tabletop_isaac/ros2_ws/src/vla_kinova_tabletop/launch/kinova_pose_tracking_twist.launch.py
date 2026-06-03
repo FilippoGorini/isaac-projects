@@ -1,5 +1,5 @@
 """
-Thia launch file brings up controllers, swaps from joint_trajectory_controller
+This launch file brings up controllers, swaps from joint_trajectory_controller
 to picknik_twist_controller, then starts the twist-based pose tracking node.
 This launch file can be used with real robot only, no IsaacSim (for now at least).
 """
@@ -51,13 +51,14 @@ def launch_setup(context, *args, **kwargs):
     )
 
     # Deactivate JTC and activate twist controller (we wait a bit to ensure the kinova_controllers launch is done)
+    # Also swap the gripper controller
     switch_to_twist = TimerAction(
         period=4.0,
         actions=[ExecuteProcess(
             cmd=[
                 "ros2", "control", "switch_controllers",
-                "--activate", "twist_controller",
-                "--deactivate", "joint_trajectory_controller",
+                "--activate", "twist_controller", "gripper_velocity_controller",
+                "--deactivate", "joint_trajectory_controller", "robotiq_gripper_controller",
             ],
             output="screen",
         )],
