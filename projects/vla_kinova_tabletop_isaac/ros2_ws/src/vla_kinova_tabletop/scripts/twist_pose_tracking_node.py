@@ -24,12 +24,14 @@ from tf2_ros import Buffer, TransformListener, LookupException, ExtrapolationExc
 
 # Dynamic parameters: read from the parameter store every tick so that you can use ros2 param set to update them while running the node
 _DYNAMIC_PARAMS = {
-    "target_pose_timeout_s": 0.5,
+    "target_grace_period_s": 0.025,     # While a target pose's age is lower than this threshold the PID runs normally.
+    # As soon as the age is bigger than the grace period, the twist command is scaled down to 0 over a time window set by target_decel_window.
+    # In this way, as soon as new target poses stop being published (e.g. when I release the clutch), the commanded twist is quickly brought down to 0
+    "target_decel_window_s": 0.10,
     "max_linear_velocity": 0.10,
     "max_angular_velocity": 0.40,
     "linear_windup_limit": 0.05,
     "angular_windup_limit": 0.05,
-    "integrator_leak_rate": 5.0,
     # Low defaults, we pass the real ones trough the yaml config at launch time
     "x_proportional_gain": 1.0,
     "y_proportional_gain": 1.0,
@@ -124,7 +126,10 @@ class TwistPoseTrackingNode(Node):
             self._publish_zero_twist()
             return
         age = (now - self.latest_target_stamp).nanoseconds * 1e-9
-        if age > self._p("target_pose_timeout_s"):
+        grace = self._p("target_grace_period_s")
+        decel = self._p("target_decel_window_s")
+        # If a target pose is older than the grace period plus the deceleration window just publish 0 and return
+        if age > grace + decel:
             self._publish_zero_twist()
             self._reset_integrators()
             return
@@ -176,14 +181,10 @@ class TwistPoseTrackingNode(Node):
         ki_ang = self._p("angular_integral_gain")
         kd_ang = self._p("angular_derivative_gain")
 
-        # We use a leaky integrator term so that for example once error is 0 the integrator term ...
-        # ... slowly decays to 0. We do so that when the error is 0 we smoothly decrease the commanded twist
         windup_lin = self._p("linear_windup_limit")
         windup_ang = self._p("angular_windup_limit")
-        leak_rate = self._p("integrator_leak_rate")
-        decay = float(np.exp(-leak_rate * dt)) if leak_rate > 0.0 else 1.0
-        self.integral_lin = np.clip(decay * self.integral_lin + err_lin * dt, -windup_lin, windup_lin)
-        self.integral_ang = np.clip(decay * self.integral_ang + err_ang * dt, -windup_ang, windup_ang)
+        self.integral_lin = np.clip(self.integral_lin + err_lin * dt, -windup_lin, windup_lin)
+        self.integral_ang = np.clip(self.integral_ang + err_ang * dt, -windup_ang, windup_ang)
 
         # Derivative (zero on first tick after reset)
         d_lin = np.zeros(3) if self.prev_error_lin is None else (err_lin - self.prev_error_lin) / dt
@@ -194,6 +195,13 @@ class TwistPoseTrackingNode(Node):
         # Compute linear and angular velocities in base frame
         v_base = kp_lin * err_lin + ki_lin * self.integral_lin + kd_lin * d_lin
         w_base = kp_ang * err_ang + ki_ang * self.integral_ang + kd_ang * d_ang
+
+        # We run full PID while target is fresh (age <= grace), but linearly fade output
+        # over the decel window when target is older than grace period.
+        if age > grace:
+            ramp = 1.0 - (age - grace) / decel
+            v_base = v_base * ramp
+            w_base = w_base * ramp
 
         # Saturate magnitudes in base frame
         v_base = _saturate(v_base, self._p("max_linear_velocity"))

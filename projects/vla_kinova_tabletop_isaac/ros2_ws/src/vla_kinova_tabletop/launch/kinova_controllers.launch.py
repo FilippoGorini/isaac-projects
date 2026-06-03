@@ -98,7 +98,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "robot_ip",
-            default_value="192.168.2.12",
+            default_value="192.168.50.12",
             description="IP address of the real Kinova arm (ignored when use_sim:=true)",
         ),
         DeclareLaunchArgument(

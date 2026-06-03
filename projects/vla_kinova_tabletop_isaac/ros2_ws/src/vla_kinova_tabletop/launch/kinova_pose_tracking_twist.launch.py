@@ -65,7 +65,7 @@ def launch_setup(context, *args, **kwargs):
 
     # Start pose tracking node after the controllers have been switched
     tracking_node = TimerAction(
-        period=5.0,            
+        period=6.0,            
         actions=[Node(
             package=my_package,
             executable="twist_pose_tracking_node.py",
@@ -90,7 +90,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             "robot_ip",
-            default_value="192.168.2.12",
+            default_value="192.168.50.12",
             description="IP address of the real Kinova arm",
         ),
         DeclareLaunchArgument(
