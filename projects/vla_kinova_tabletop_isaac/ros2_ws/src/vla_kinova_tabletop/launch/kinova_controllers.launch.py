@@ -11,6 +11,7 @@ def launch_setup(context, *args, **kwargs):
     use_sim    = LaunchConfiguration("use_sim").perform(context)
     robot_ip   = LaunchConfiguration("robot_ip").perform(context)
     auto_home  = LaunchConfiguration("auto_home").perform(context)
+    gripper_max_velocity = LaunchConfiguration("gripper_max_velocity").perform(context)
     is_sim     = use_sim.lower() == "true"
     use_sim_time = is_sim
 
@@ -18,6 +19,7 @@ def launch_setup(context, *args, **kwargs):
         f"arm:=gen3 dof:=6 gripper:=robotiq_2f_85 vision:=true "
         f"sim_isaac:={use_sim} use_fake_hardware:=false "
         f"gripper_joint_name:=robotiq_85_left_knuckle_joint "
+        f"gripper_max_velocity:={gripper_max_velocity} "
         f"isaac_arm_joint_commands:=/isaac_arm_commands "
         f"isaac_gripper_joint_commands:=/isaac_gripper_commands"
     )
@@ -79,7 +81,13 @@ def launch_setup(context, *args, **kwargs):
             executable="spawner",
             arguments=["gripper_velocity_controller", "--inactive"],
         )
-        nodes += [twist_spawner, fault_spawner, gripper_vel_spawner]
+        # Also load gripper position controller (inactive) if we want to track continuous VLA gripper output (even though this results in steppy motion)
+        gripper_pos_spawner = Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=["gripper_position_controller", "--inactive"],
+        )
+        nodes += [twist_spawner, fault_spawner, gripper_vel_spawner, gripper_pos_spawner]
 
     # Home on startup: always in sim, opt-in on real robot via auto_home:=true
     run_home = is_sim or auto_home.lower() == "true"
@@ -106,6 +114,12 @@ def generate_launch_description():
             "robot_ip",
             default_value="192.168.50.12",
             description="IP address of the real Kinova arm (ignored when use_sim:=true)",
+        ),
+        DeclareLaunchArgument(
+            "gripper_max_velocity",
+            default_value="100.0",
+            description="Gripper go-to speed limit [0-100%] used in the low-level cyclic "
+                        "frame. Lower it to smooth the discrete go-to stepping (slower gripper).",
         ),
         DeclareLaunchArgument(
             "auto_home",

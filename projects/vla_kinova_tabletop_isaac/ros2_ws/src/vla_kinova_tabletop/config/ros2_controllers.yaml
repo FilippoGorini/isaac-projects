@@ -19,6 +19,11 @@ controller_manager:
     # New gripper velocity controller for teleop
     gripper_velocity_controller:
       type: forward_command_controller/ForwardCommandController
+    # New gripper position controller, in order to track VLA's continuous position output
+    # Note: the gripper has its own embedded controller with can't actually track positions at a high rate, ...
+    # ... so you have to either accept steppy discrete motion or lower a lot the max velocity so that it lags behind the trajectory but it does so smoothly
+    gripper_position_controller:
+      type: forward_command_controller/ForwardCommandController
 
     fault_controller:
       type: picknik_reset_fault_controller/PicknikResetFaultController
@@ -72,3 +77,12 @@ gripper_velocity_controller:
     interface_name: velocity
     # Commands arrive on /gripper_velocity_controller/commands as a
     # std_msgs/Float64MultiArray of length 1 with a signed speed in [-1, 1].
+
+gripper_position_controller:
+  ros__parameters:
+    joints:
+      - robotiq_85_left_knuckle_joint
+    interface_name: position
+    # Commands arrive on /gripper_position_controller/commands as a
+    # std_msgs/Float64MultiArray of length 1 with a position in RADIANS
+    # (0.0 = open 0.81 = closed for the Robotiq 2F-85).

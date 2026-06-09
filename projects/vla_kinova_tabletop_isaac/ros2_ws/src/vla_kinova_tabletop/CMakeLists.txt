@@ -37,6 +37,7 @@ install(
 install(PROGRAMS
   scripts/home_robot.py
   scripts/servo_sine_test.py
+  scripts/gripper_sine_test.py
   scripts/twist_pose_tracking_node.py
   DESTINATION lib/${PROJECT_NAME}
 )

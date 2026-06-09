@@ -16,11 +16,15 @@ ros2_ws/src/ros2_controllers
 ros2_ws/src/ros2_kortex
 ros2_ws/src/ros2_robotiq_gripper
 ros2_ws/src/serial
+ros2_ws/src/ros2_kortex_vision 
 
 # Exclude Quest2ROS-related packages for now, will switch to our own fork in the future possibly to apply the needed patches
 ros2_ws/src/quest2ros  
 ros2_ws/src/Quest2ROS2
 ros2_ws/src/ROS-TCP-Endpoint
+
+# Exclude zed2 ros2 wrapper packages (not needed on remote server we can keep them local on the machine which runs the teleop/dataset collection)
+ros2_ws/src/zed-ros2-wrapper
 
 # Training output
 artifacts/
