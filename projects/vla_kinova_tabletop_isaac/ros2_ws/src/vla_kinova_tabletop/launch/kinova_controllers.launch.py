@@ -12,6 +12,8 @@ def launch_setup(context, *args, **kwargs):
     robot_ip   = LaunchConfiguration("robot_ip").perform(context)
     auto_home  = LaunchConfiguration("auto_home").perform(context)
     gripper_max_velocity = LaunchConfiguration("gripper_max_velocity").perform(context)
+    gripper_max_effort = LaunchConfiguration("gripper_max_effort").perform(context)
+    tf_publish_rate = LaunchConfiguration("tf_publish_rate").perform(context)
     is_sim     = use_sim.lower() == "true"
     use_sim_time = is_sim
 
@@ -20,6 +22,7 @@ def launch_setup(context, *args, **kwargs):
         f"sim_isaac:={use_sim} use_fake_hardware:=false "
         f"gripper_joint_name:=robotiq_85_left_knuckle_joint "
         f"gripper_max_velocity:={gripper_max_velocity} "
+        f"gripper_max_effort:={gripper_max_effort} "
         f"isaac_arm_joint_commands:=/isaac_arm_commands "
         f"isaac_gripper_joint_commands:=/isaac_gripper_commands"
     )
@@ -42,7 +45,7 @@ def launch_setup(context, *args, **kwargs):
         executable="robot_state_publisher",
         output="both",
         # Manually increase the frequency for /tf publishing so that quest2ros2 node can better read current end effector pose
-        parameters=[robot_description, {"use_sim_time": use_sim_time, "publish_frequency": 150.0}],
+        parameters=[robot_description, {"use_sim_time": use_sim_time, "publish_frequency": float(tf_publish_rate)}],
     )
 
     ros2_control_node = Node(
@@ -120,6 +123,17 @@ def generate_launch_description():
             default_value="100.0",
             description="Gripper go-to speed limit [0-100%] used in the low-level cyclic "
                         "frame. Lower it to smooth the discrete go-to stepping (slower gripper).",
+        ),
+        DeclareLaunchArgument(
+            "gripper_max_effort",
+            default_value="100.0",
+            description="Gripper grasp force limit [0-100%]. Lower it for delicate objects.",
+        ),
+        DeclareLaunchArgument(
+            "tf_publish_rate",
+            default_value="200.0",
+            description="robot_state_publisher /tf publish frequency [Hz]. Raise it for "
+                        "smoother end-effector pose tracking (e.g. quest teleop), lower it to save CPU.",
         ),
         DeclareLaunchArgument(
             "auto_home",

@@ -23,6 +23,8 @@ def launch_setup(context, *args, **kwargs):
     robot_ip  = LaunchConfiguration("robot_ip").perform(context)
     auto_home = LaunchConfiguration("auto_home").perform(context)
     launch_rviz = LaunchConfiguration("launch_rviz").perform(context)
+    gripper_max_velocity = LaunchConfiguration("gripper_max_velocity").perform(context)
+    tf_publish_rate = LaunchConfiguration("tf_publish_rate").perform(context)
     is_sim    = use_sim.lower() == "true"
     use_sim_time = is_sim
 
@@ -37,6 +39,8 @@ def launch_setup(context, *args, **kwargs):
             "use_sim": use_sim,
             "robot_ip": robot_ip,
             "auto_home": auto_home,
+            "gripper_max_velocity": gripper_max_velocity,
+            "tf_publish_rate": tf_publish_rate,
         }.items(),
     )
 
@@ -141,6 +145,16 @@ def generate_launch_description():
             "launch_rviz",
             default_value="true",
             description="Bring up RViz alongside the servo stack",
+        ),
+        DeclareLaunchArgument(
+            "gripper_max_velocity",
+            default_value="100.0",
+            description="Gripper go-to speed limit [0-100%], forwarded to kinova_controllers.launch.py",
+        ),
+        DeclareLaunchArgument(
+            "tf_publish_rate",
+            default_value="200.0",
+            description="robot_state_publisher /tf publish frequency [Hz], forwarded to kinova_controllers.launch.py",
         ),
         OpaqueFunction(function=launch_setup),
     ])

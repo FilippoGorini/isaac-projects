@@ -25,6 +25,7 @@ def launch_setup(context, *args, **kwargs):
     my_package = "vla_kinova_tabletop"
     robot_ip = LaunchConfiguration("robot_ip").perform(context)
     launch_rviz = LaunchConfiguration("launch_rviz").perform(context)
+    tf_publish_rate = LaunchConfiguration("tf_publish_rate").perform(context)
 
     # Suppress Cyclone DDS multicast-write warnings to avoid flooding terminal
     # The ros2 control node sometimes crashes but real errors were lost in the dds warnings 
@@ -47,6 +48,7 @@ def launch_setup(context, *args, **kwargs):
             "use_sim": "false",
             "robot_ip": robot_ip,
             "auto_home": "false",
+            "tf_publish_rate": tf_publish_rate,
         }.items(),
     )
 
@@ -98,6 +100,11 @@ def generate_launch_description():
             "launch_rviz",
             default_value="true",
             description="Bring up RViz alongside the twist tracking stack",
+        ),
+        DeclareLaunchArgument(
+            "tf_publish_rate",
+            default_value="200.0",
+            description="robot_state_publisher /tf publish frequency [Hz], forwarded to kinova_controllers.launch.py",
         ),
         OpaqueFunction(function=launch_setup),
     ])
