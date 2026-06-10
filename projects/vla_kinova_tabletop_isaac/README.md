@@ -311,7 +311,11 @@ Twist-based end-effector pose tracking for the real Kinova Gen3, driven by a Met
 - **`config/twist_pose_tracking.yaml`**: PID gains, saturation limits, stale-target handling.
 - **`scripts/gripper_sine_test.py`**, **`scripts/servo_sine_test.py`**: Dev / diagnostic scripts.
 
-### Launch File
+### Launch Files
+
+#### `kinova_pose_tracking_twist.launch.py`
+
+Brings up the robot side of the teleop loop.
 
 | Argument | Default | Description |
 |----------|---------|-------------|
@@ -324,6 +328,21 @@ ros2 launch vla_kinova_teleop kinova_pose_tracking_twist.launch.py robot_ip:=192
 ```
 
 Includes `vla_kinova_bringup`'s `kinova_controllers.launch.py` (with `use_sim:=false`), switches the active controllers from `joint_trajectory_controller` + `robotiq_gripper_controller` to `twist_controller` + `gripper_velocity_controller`, and starts `twist_pose_tracking_node`. **Real robot only.**
+
+#### `quest_bringup.launch.py`
+
+Brings up the Quest side of the teleop loop: the ROS-TCP endpoint that the Quest VR app connects to, plus the `q2r2_bringup` right-arm controller node that converts Quest controller poses into the `/target_frame` topic consumed by `twist_pose_tracking_node`.
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `ros_ip` | `0.0.0.0` | Address the ROS-TCP endpoint binds to (`0.0.0.0` accepts any client). |
+| `ros_tcp_port` | `10000` | TCP port the Quest VR app connects to. |
+
+```bash
+ros2 launch vla_kinova_teleop quest_bringup.launch.py
+```
+
+Replaces the manual two-terminal workflow (`ros2 launch ros_tcp_endpoint endpoint.py` + `ros2 run q2r2_bringup right_arm_controller`). Run alongside `kinova_pose_tracking_twist.launch.py` to get the full teleop stack.
 
 ---
 
