@@ -31,8 +31,11 @@ projects/vla_kinova_tabletop_isaac/
     ├── bootstrap_kinova_ws.sh    # One-shot workspace bootstrap script
     ├── deps.repos                # vcstool manifest for ros2_kortex and deps
     └── src/
-        ├── vla_kinova_tabletop/  # Robot description and controller config
-        └── vla_policy_client/    # ROS 2 WebSocket client for the VLA policy server
+        ├── vla_kinova_description/  # Customized URDF/Xacro robot description
+        ├── vla_kinova_bringup/      # ros2_control + MoveIt 2 launches and configs
+        ├── vla_kinova_sensors/      # ZED 2 + Kinova wrist camera bringup
+        ├── vla_kinova_teleop/       # Quest 3 twist-based EE pose tracking
+        └── vla_policy_client/       # ROS 2 WebSocket client for the VLA policy server
 ```
 
 ---
@@ -133,21 +136,17 @@ the terminal inside the VNC desktop:
 
 | Package | Description |
 |---------|-------------|
-| [`vla_kinova_tabletop`](#vla_kinova_tabletop) | Custom wrapper over the upstream `kortex_description` and `robotiq_description` packages, providing a project-specific robot description and controller setup for Isaac Sim. |
+| [`vla_kinova_description`](#vla_kinova_description) | Project-specific description package wrapping the upstream `kortex_description` and `robotiq_description` packages, with separate `ros2_control` command topics for the arm and gripper. |
+| [`vla_kinova_bringup`](#vla_kinova_bringup) | ros2_control + MoveIt 2 controller configuration and launch files. Brings up the robot in either Isaac Sim or on real hardware. |
+| [`vla_kinova_sensors`](#vla_kinova_sensors) | Camera bringup to launch the upstream `kinova_vision` and `zed_wrapper` launches (RGB only). |
+| [`vla_kinova_teleop`](#vla_kinova_teleop) | Twist-based teleoperation that subscribes to a target EE pose (from the Quest right-arm controller) and drives the Kortex twist controller. |
 | [`vla_policy_client`](#vla_policy_client) | ROS 2 node that connects to the $\pi_0$ VLA policy server over WebSocket, subscribes to joint states and camera images, and publishes joint trajectories and gripper commands at inference rate. |
 
 ---
 
-## `vla_kinova_tabletop`
+## `vla_kinova_description`
 
-This package is a customized wrapper over the upstream `ros2_kortex` packages from Kinova Robotics. Rather than modifying those packages directly, it provides its own xacro files and configuration to expose separate `ros2_control` command topics for the arm (`/isaac_arm_commands`) and gripper (`/isaac_gripper_commands`), instead of the single `/isaac_joint_commands` topic used by the upstream packages. It also ships the controller and MoveIt 2 configuration specific to this project.
-
-### Package Files
-
-- **`urdf/`**: Project-specific xacro files wrapping the upstream robot description. See [URDF Files](#urdf-files-urdf) below.
-- **`config/ros2_controllers.yaml`**: Controller configuration for `joint_trajectory_controller`, `robotiq_gripper_controller`, and `joint_state_broadcaster`.
-- **`config/moveit_controllers.yaml`**: MoveIt 2 controller config.
-- **`config/moveit.rviz`**: RViz preset for MoveIt 2 motion planning.
+Hosts the URDF / xacro stack for the Kinova Gen3 6-DoF arm + Robotiq 2F-85 gripper. Wraps the upstream `kortex_description` and `robotiq_description` packages without modifying them, exposing separate `ros2_control` command topics for the arm (`/isaac_arm_commands`) and gripper (`/isaac_gripper_commands`) instead of the single `/isaac_joint_commands` used upstream.
 
 ### URDF Files (`urdf/`)
 
@@ -164,6 +163,21 @@ The xacro files are layered: `gen3.xacro` is the entry point referenced by the l
 | `2f_85.ros2_control.xacro` | `ros2_control` hardware block for the gripper. The actuated joint is `robotiq_85_left_knuckle_joint`; in simulation all dependent mimic joints are registered as well. Uses `topic_based_ros2_control/TopicBasedSystem` for Isaac Sim or `robotiq_driver/RobotiqGripperHardwareInterface` for the real gripper. |
 | `kinova_gen3_6dof_2f85.urdf` | Static URDF export of the full robot. Not used by the launch files, which process `gen3.xacro` directly: this is just the URDF which was imported into Isaac Sim. |
 
+---
+
+## `vla_kinova_bringup`
+
+Brings up `ros2_control`, the controllers, and optionally MoveIt 2. Depends on `vla_kinova_description` for the URDF. Also ships the `home_robot.py` script (auto-run after JTC spawn in sim, optional on real robot) and the abandoned MoveIt-Servo `pose_tracking_node` (not used anymore, the teleop now uses the Kortex twist controller via `vla_kinova_teleop`).
+
+### Package Files
+
+- **`config/ros2_controllers.yaml`**: Controller setup for `joint_trajectory_controller`, `robotiq_gripper_controller`, `joint_state_broadcaster`, plus the real-robot-only `twist_controller`, `gripper_velocity_controller`, `gripper_position_controller`, and `fault_controller`.
+- **`config/moveit_controllers.yaml`**: MoveIt 2 controller config.
+- **`config/moveit.rviz`**, **`config/servo.rviz`**: RViz presets for MoveIt motion planning and for Servo/Twist Teleop.
+- **`config/joint_limits.yaml`**, **`config/servo.yaml`**, **`config/pose_tracking_settings.yaml`**: MoveIt Servo parameters.
+- **`scripts/home_robot.py`**: Sends a single `JointTrajectory` to the home pose.
+- **`src/pose_tracking_node.cpp`**: MoveIt-Servo PoseTracking wrapper (abandoned, kept as reference).
+
 ### Launch Files
 
 Source the project environment in every new terminal before running any launch file:
@@ -172,51 +186,144 @@ Source the project environment in every new terminal before running any launch f
 source ~/isaac-projects/projects/vla_kinova_tabletop_isaac/setup.bash
 ```
 
-Both launch files accept the same arguments:
+The three bringup launchers share this set of arguments:
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `use_sim` | `true` | Set to `true` for Isaac Sim, `false` for the real robot. Controls the hardware interface, `use_sim_time`, and whether `robot_ip` is forwarded to the driver. |
-| `robot_ip` | `192.168.11.11` | IP address of the real Kinova arm. Ignored when `use_sim:=true`. |
-| `auto_home` | `false` | Run the homing script after the controllers come up. Always enabled in simulation; opt-in on the real robot. |
+| `use_sim` | `true` | `true` for Isaac Sim, `false` for the real robot. Controls the hardware interface, `use_sim_time`, and whether `robot_ip` is forwarded to the driver. |
+| `robot_ip` | `192.168.50.12` | IP address of the real Kinova arm. Ignored when `use_sim:=true`. |
+| `auto_home` | `false` | Run the homing script after the controllers come up. Always enabled in sim; optional on real robot. |
+| `gripper_max_velocity` | `100.0` | Gripper go-to speed [0–100%]. Lowering helps smoothing the discrete go-to stepping of the gripper when using the forward position controller. |
+| `gripper_max_effort` | `100.0` | Gripper grasp force [0–100%]. Lower it for delicate objects. |
+| `tf_publish_rate` | `200.0` | `robot_state_publisher` /tf publish frequency [Hz]. |
+
+The MoveIt, MoveIt-Servo and Twist Pose Tracking launchers additionally accept `launch_rviz` (default `true`).
 
 ---
 
-*Basic joint control — Isaac Sim (no motion planning):*
+*Basic joint control, Isaac Sim (no motion planning):*
 
 ```bash
-ros2 launch vla_kinova_tabletop kinova_controllers.launch.py
+ros2 launch vla_kinova_bringup kinova_controllers.launch.py
 ```
 
-*Basic joint control — real robot:*
+*Basic joint control, real robot:*
 
 ```bash
-ros2 launch vla_kinova_tabletop kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.11.11
+ros2 launch vla_kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12
 ```
 
-Starts `robot_state_publisher` and `ros2_control_node`, then spawns `joint_state_broadcaster`, `joint_trajectory_controller`, and `robotiq_gripper_controller`. Use this when you only need to send joint trajectories or test the `ros2_control` bridge without motion planning.
+Starts `robot_state_publisher` and `ros2_control_node`, then spawns `joint_state_broadcaster`, `joint_trajectory_controller`, and `robotiq_gripper_controller`. On the real robot, the inactive `twist_controller`, `gripper_velocity_controller`, `gripper_position_controller`, and `fault_controller` are also pre-loaded so they can be switched in later (e.g. by the teleop stack).
 
 ---
 
 *MoveIt 2 + RViz — Isaac Sim:*
 
 ```bash
-ros2 launch vla_kinova_tabletop kinova_controllers_moveit.launch.py
+ros2 launch vla_kinova_bringup kinova_controllers_moveit.launch.py
 ```
 
 *MoveIt 2 + RViz — real robot:*
 
 ```bash
-ros2 launch vla_kinova_tabletop kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.11.11
+ros2 launch vla_kinova_bringup kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.50.12
 ```
 
-Starts everything above, plus MoveIt 2 `move_group` and RViz with the project motion-planning preset. Use this when you need full motion planning through MoveIt 2.
+Same as the basic launcher plus MoveIt 2 `move_group` and RViz with the project motion-planning preset.
 
 To also run the homing script when connecting to the real robot:
 
 ```bash
-ros2 launch vla_kinova_tabletop kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.11.11 auto_home:=true
+ros2 launch vla_kinova_bringup kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.50.12 auto_home:=true
 ```
+
+---
+
+*Legacy MoveIt Servo path (abandoned for now due to jerky movement and singularity handling issues):*
+
+```bash
+ros2 launch vla_kinova_bringup kinova_controllers_moveit_servo.launch.py
+```
+
+Brings up MoveIt Servo and the C++ `pose_tracking_node`. **Not used in the live teleop loop** — the twist-controller path under `vla_kinova_teleop` superseded it.
+
+---
+
+## `vla_kinova_sensors`
+
+Camera bringup for the RGB feeds consumed by the VLA policy and by the data-recording pipeline. Composes the upstream `kinova_vision` (wrist camera) and `zed_wrapper` (external camera) launches. Depth is disabled by default on both cameras as the VLA doesn't need it.
+
+### Launch File
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `launch_wrist` | `true` | Bring up the Kinova wrist camera (RGB only, depth disabled). |
+| `launch_zed` | `true` | Bring up the ZED 2 camera. |
+| `zed_camera_model` | `zed2` | ZED model passed to `zed_wrapper`. |
+| `kinova_ip` | `192.168.50.12` | IPv4 address of the Kinova arm; forwarded to `kinova_vision` as `device`. |
+| `zed_disable_depth` | `true` | Sets `depth.depth_mode:=NONE` on the ZED, which also disables point cloud, positional tracking and every other module that depends on depth extraction. |
+| `zed_resolution` | `HD720` | ZED resolution. One of `HD2K`, `HD1080`, `HD720`, `VGA`, `AUTO`. |
+| `zed_grab_fps` | `30` | ZED internal grab frame rate in Hz. Allowed values depend on the resolution: `HD2K@15`, `HD1080@15/30`, `HD720@15/30/60`, `VGA@15/30/60/100`. |
+| `zed_pub_fps` | `0.0` | ZED image publish rate in Hz. `0` = no limit (matches the grab rate). |
+
+The ZED-specific arguments above are bundled into a single `param_overrides` string and forwarded to the upstream `zed_camera.launch.py`.
+
+*Both cameras:*
+
+```bash
+ros2 launch vla_kinova_sensors cameras.launch.py
+```
+
+*Wrist only / ZED only:*
+
+```bash
+ros2 launch vla_kinova_sensors cameras.launch.py launch_zed:=false
+ros2 launch vla_kinova_sensors cameras.launch.py launch_wrist:=false
+```
+
+*Higher-resolution ZED RGB:*
+
+```bash
+ros2 launch vla_kinova_sensors cameras.launch.py zed_resolution:=HD1080 zed_grab_fps:=30
+```
+
+*Throttle the ZED publish rate (e.g. for dataset recording):*
+
+```bash
+ros2 launch vla_kinova_sensors cameras.launch.py zed_pub_fps:=10.0
+```
+
+*Re-enable depth on the ZED:*
+
+```bash
+ros2 launch vla_kinova_sensors cameras.launch.py zed_disable_depth:=false
+```
+
+---
+
+## `vla_kinova_teleop`
+
+Twist-based end-effector pose tracking for the real Kinova Gen3, driven by a Meta Quest 3 (the `quest2ros2` right-arm controller publishes the desired EE pose on `/target_frame`). The `twist_pose_tracking_node` runs a per-axis PID on the 6D pose error in `base_link`, saturates the resulting twist, rotates it into the tool frame (`end_effector_link`), and publishes on the Kortex `twist_controller` command topic. Supersedes the MoveIt-Servo path that lives in `vla_kinova_bringup`.
+
+### Package Files
+
+- **`scripts/twist_pose_tracking_node.py`**: The teleop tracking node.
+- **`config/twist_pose_tracking.yaml`**: PID gains, saturation limits, stale-target handling.
+- **`scripts/gripper_sine_test.py`**, **`scripts/servo_sine_test.py`**: Dev / diagnostic scripts.
+
+### Launch File
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `robot_ip` | `192.168.50.12` | IP address of the real Kinova arm. |
+| `launch_rviz` | `true` | Bring up RViz alongside the teleop stack. |
+| `tf_publish_rate` | `200.0` | Forwarded to `kinova_controllers.launch.py`. |
+
+```bash
+ros2 launch vla_kinova_teleop kinova_pose_tracking_twist.launch.py robot_ip:=192.168.50.12
+```
+
+Includes `vla_kinova_bringup`'s `kinova_controllers.launch.py` (with `use_sim:=false`), switches the active controllers from `joint_trajectory_controller` + `robotiq_gripper_controller` to `twist_controller` + `gripper_velocity_controller`, and starts `twist_pose_tracking_node`. **Real robot only.**
 
 ---
 

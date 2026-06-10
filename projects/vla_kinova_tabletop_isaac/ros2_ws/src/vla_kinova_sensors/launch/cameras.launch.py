@@ -13,6 +13,11 @@ def launch_setup(context, *args, **kwargs):
     zed_camera_model = LaunchConfiguration("zed_camera_model").perform(context)
     kinova_ip = LaunchConfiguration("kinova_ip").perform(context)
 
+    zed_disable_depth = LaunchConfiguration("zed_disable_depth").perform(context).lower() == "true"
+    zed_resolution = LaunchConfiguration("zed_resolution").perform(context)
+    zed_grab_fps = LaunchConfiguration("zed_grab_fps").perform(context)
+    zed_pub_fps = LaunchConfiguration("zed_pub_fps").perform(context)
+
     actions = []
 
     if launch_wrist:
@@ -28,12 +33,24 @@ def launch_setup(context, *args, **kwargs):
         ))
 
     if launch_zed:
+        overrides = [
+            f"general.grab_resolution:={zed_resolution}",
+            f"general.grab_frame_rate:={zed_grab_fps}",
+            f"general.pub_frame_rate:={zed_pub_fps}",
+        ]
+        if zed_disable_depth:
+            # 'NONE' disables every module that needs depth (point cloud, pos tracking, ...).
+            overrides.append("depth.depth_mode:=NONE")
+
         actions.append(IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(
                 get_package_share_directory("zed_wrapper"),
                 "launch", "zed_camera.launch.py",
             )),
-            launch_arguments={"camera_model": zed_camera_model}.items(),
+            launch_arguments={
+                "camera_model": zed_camera_model,
+                "param_overrides": ";".join(overrides),
+            }.items(),
         ))
 
     return actions
@@ -60,6 +77,26 @@ def generate_launch_description():
             "kinova_ip",
             default_value="192.168.50.12",
             description="IPv4 address of the Kinova arm; forwarded to kinova_vision as 'device'",
+        ),
+        DeclareLaunchArgument(
+            "zed_disable_depth",
+            default_value="true",
+            description="Disable depth on the ZED (sets depth.depth_mode:=NONE, which also disables point cloud / pos tracking)",
+        ),
+        DeclareLaunchArgument(
+            "zed_resolution",
+            default_value="HD720",
+            description="ZED grab resolution: 'HD2K', 'HD1080', 'HD720', 'VGA', 'AUTO'",
+        ),
+        DeclareLaunchArgument(
+            "zed_grab_fps",
+            default_value="30",
+            description="ZED internal grab frame rate (Hz). Allowed values depend on resolution",
+        ),
+        DeclareLaunchArgument(
+            "zed_pub_fps",
+            default_value="0.0",
+            description="ZED image publish rate (Hz). 0 = no limit (matches grab rate)",
         ),
         OpaqueFunction(function=launch_setup),
     ])
