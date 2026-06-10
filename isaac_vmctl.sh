@@ -45,7 +45,7 @@ TIGERVNC_PORT="${TIGERVNC_PORT:-5901}"
 TIGERVNC_GEOMETRY="${TIGERVNC_GEOMETRY:-1920x1080}"
 TIGERVNC_DEPTH="${TIGERVNC_DEPTH:-24}"
 TIGERVNC_LOCALHOST="${TIGERVNC_LOCALHOST:-0}"
-TIGERVNC_DESKTOP="${TIGERVNC_DESKTOP:-xfce}"
+TIGERVNC_DESKTOP="${TIGERVNC_DESKTOP:-gnome}"
 TIGERVNC_TERMINAL="${TIGERVNC_TERMINAL:-gnome-terminal}"
 TIGERVNC_PASSWORD="${TIGERVNC_PASSWORD:-}"
 VERBOSE=0
@@ -554,7 +554,7 @@ Optional environment variables:
   TIGERVNC_GEOMETRY=1920x1080
   TIGERVNC_DEPTH=24
   TIGERVNC_LOCALHOST=0|1               # 0 listens on all interfaces; 1 binds localhost only
-  TIGERVNC_DESKTOP=xfce|gnome-flashback
+  TIGERVNC_DESKTOP=gnome|gnome-flashback|xfce
   TIGERVNC_TERMINAL=gnome-terminal
   TIGERVNC_PASSWORD=<8-char-password>  # optional; generated once when unset
   PRIVACY_USERID=<email>
@@ -1438,13 +1438,14 @@ validate_tigervnc_config() {
   [[ "$TIGERVNC_DEPTH" =~ ^[0-9]+$ ]] || error "TIGERVNC_DEPTH must be a number."
 
   case "$TIGERVNC_DESKTOP" in
-    xfce|gnome-flashback) ;;
-    *) error "TIGERVNC_DESKTOP must be 'xfce' or 'gnome-flashback'." ;;
+    gnome|ubuntu|ubuntu-gnome|gnome-flashback|xfce) ;;
+    *) error "TIGERVNC_DESKTOP must be 'gnome', 'gnome-flashback', or 'xfce'." ;;
   esac
 }
 
 tigervnc_desktop_label() {
   case "$TIGERVNC_DESKTOP" in
+    gnome|ubuntu|ubuntu-gnome) printf 'Ubuntu GNOME desktop with Yaru theme' ;;
     xfce) printf 'XFCE desktop with GNOME Terminal and Ubuntu Yaru theme' ;;
     gnome-flashback) printf 'GNOME Flashback with Ubuntu Yaru theme' ;;
     *) printf '%s' "$TIGERVNC_DESKTOP" ;;
@@ -1456,22 +1457,51 @@ ensure_tigervnc_desktop_installed() {
   packages=(
     tigervnc-standalone-server
     tigervnc-common
-    xfce4
-    xfce4-goodies
-    xfce4-terminal
-    gnome-session-flashback
-    metacity
+    gnome-terminal
+    nautilus
+    dconf-cli
+    gsettings-desktop-schemas
     dbus-x11
     xauth
     x11-xserver-utils
     xterm
-    gnome-terminal
-    nautilus
-    thunar
     adwaita-icon-theme
     yaru-theme-gtk
     yaru-theme-icon
   )
+
+  case "$TIGERVNC_DESKTOP" in
+    gnome|ubuntu|ubuntu-gnome)
+      packages+=(
+        ubuntu-session
+        gnome-session
+        gnome-shell
+        gnome-shell-extension-appindicator
+        gnome-shell-extension-desktop-icons-ng
+        gnome-shell-extension-ubuntu-dock
+        gnome-control-center
+        gnome-keyring
+        xdg-desktop-portal
+        xdg-desktop-portal-gnome
+        yaru-theme-gnome-shell
+        ubuntu-wallpapers
+      )
+      ;;
+    gnome-flashback)
+      packages+=(
+        gnome-session-flashback
+        metacity
+      )
+      ;;
+    xfce)
+      packages+=(
+        xfce4
+        xfce4-goodies
+        xfce4-terminal
+        thunar
+      )
+      ;;
+  esac
   missing=()
 
   local pkg
@@ -1516,7 +1546,7 @@ ensure_tigervnc_user_files() {
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
 
-TIGERVNC_DESKTOP="${TIGERVNC_DESKTOP:-xfce}"
+TIGERVNC_DESKTOP="${TIGERVNC_DESKTOP:-gnome}"
 TIGERVNC_TERMINAL="${TIGERVNC_TERMINAL:-gnome-terminal}"
 TIGERVNC_GTK_THEME="${TIGERVNC_GTK_THEME:-Yaru}"
 TIGERVNC_ICON_THEME="${TIGERVNC_ICON_THEME:-Yaru}"
@@ -1524,13 +1554,58 @@ TIGERVNC_ICON_THEME="${TIGERVNC_ICON_THEME:-Yaru}"
 export TIGERVNC_DESKTOP TIGERVNC_TERMINAL TIGERVNC_GTK_THEME TIGERVNC_ICON_THEME
 export XDG_SESSION_TYPE=x11
 export GTK_THEME="$TIGERVNC_GTK_THEME"
+export GDK_BACKEND=x11
+export QT_QPA_PLATFORM=xcb
+export NO_AT_BRIDGE=1
+
+display_id="${DISPLAY#:}"
+display_id="${display_id%%.*}"
+if [[ -z "${XDG_RUNTIME_DIR:-}" || ! -d "${XDG_RUNTIME_DIR:-}" || ! -w "${XDG_RUNTIME_DIR:-}" ]]; then
+  export XDG_RUNTIME_DIR="/tmp/runtime-${USER:-$(id -un)}-vnc-${display_id:-0}"
+  mkdir -p "$XDG_RUNTIME_DIR"
+  chmod 700 "$XDG_RUNTIME_DIR"
+fi
+
+start_vnc_clipboard() {
+  if command -v tigervncconfig >/dev/null 2>&1; then
+    tigervncconfig -iconic >/dev/null 2>&1 &
+  elif command -v vncconfig >/dev/null 2>&1; then
+    vncconfig -iconic >/dev/null 2>&1 &
+  fi
+}
 
 if [[ -r "$HOME/.profile" ]]; then
   # shellcheck source=/dev/null
   source "$HOME/.profile"
 fi
 
+start_vnc_clipboard
+
 case "$TIGERVNC_DESKTOP" in
+  gnome|ubuntu|ubuntu-gnome)
+    export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+    export XDG_SESSION_DESKTOP=ubuntu
+    export DESKTOP_SESSION=ubuntu
+    export GNOME_SHELL_SESSION_MODE=ubuntu
+    export XDG_MENU_PREFIX=gnome-
+    if command -v gnome-session >/dev/null 2>&1; then
+      exec dbus-run-session -- bash -lc '
+        run_gnome_settings() {
+          gsettings set org.gnome.desktop.interface gtk-theme "${TIGERVNC_GTK_THEME:-Yaru}" >/dev/null 2>&1 || true
+          gsettings set org.gnome.desktop.interface icon-theme "${TIGERVNC_ICON_THEME:-Yaru}" >/dev/null 2>&1 || true
+          gsettings set org.gnome.desktop.interface cursor-theme "Yaru" >/dev/null 2>&1 || true
+          gsettings set org.gnome.desktop.interface monospace-font-name "Ubuntu Mono 12" >/dev/null 2>&1 || true
+          gsettings set org.gnome.desktop.interface color-scheme "prefer-light" >/dev/null 2>&1 || true
+          gsettings set org.gnome.desktop.session idle-delay 0 >/dev/null 2>&1 || true
+          gsettings set org.gnome.desktop.screensaver lock-enabled false >/dev/null 2>&1 || true
+          gsettings set org.gnome.desktop.screensaver ubuntu-lock-on-suspend false >/dev/null 2>&1 || true
+          gsettings set org.gnome.desktop.lockdown disable-lock-screen true >/dev/null 2>&1 || true
+        }
+        run_gnome_settings
+        exec gnome-session --session=ubuntu
+      '
+    fi
+    ;;
   xfce)
     export XDG_CURRENT_DESKTOP=XFCE
     export XDG_SESSION_DESKTOP=xfce
@@ -1554,7 +1629,15 @@ case "$TIGERVNC_DESKTOP" in
     export XDG_SESSION_DESKTOP=gnome-flashback-metacity
     export DESKTOP_SESSION=gnome-flashback-metacity
     if command -v gnome-session >/dev/null 2>&1; then
-      exec dbus-run-session -- gnome-session --session=gnome-flashback-metacity
+      exec dbus-run-session -- bash -lc '
+        gsettings set org.gnome.desktop.interface gtk-theme "${TIGERVNC_GTK_THEME:-Yaru}" >/dev/null 2>&1 || true
+        gsettings set org.gnome.desktop.interface icon-theme "${TIGERVNC_ICON_THEME:-Yaru}" >/dev/null 2>&1 || true
+        gsettings set org.gnome.desktop.session idle-delay 0 >/dev/null 2>&1 || true
+        gsettings set org.gnome.desktop.screensaver lock-enabled false >/dev/null 2>&1 || true
+        gsettings set org.gnome.desktop.screensaver ubuntu-lock-on-suspend false >/dev/null 2>&1 || true
+        gsettings set org.gnome.desktop.lockdown disable-lock-screen true >/dev/null 2>&1 || true
+        exec gnome-session --session=gnome-flashback-metacity
+      '
     fi
     ;;
 esac
@@ -1742,7 +1825,12 @@ start_tigervnc_server() {
   fi
 
   info "Starting TigerVNC desktop on ${display} (${TIGERVNC_PORT}/tcp, ${TIGERVNC_GEOMETRY})..."
-  as_current_user vncserver "$display" \
+  as_current_user env \
+    TIGERVNC_DESKTOP="$TIGERVNC_DESKTOP" \
+    TIGERVNC_TERMINAL="$TIGERVNC_TERMINAL" \
+    TIGERVNC_GTK_THEME="${TIGERVNC_GTK_THEME:-Yaru}" \
+    TIGERVNC_ICON_THEME="${TIGERVNC_ICON_THEME:-Yaru}" \
+    vncserver "$display" \
     -geometry "$TIGERVNC_GEOMETRY" \
     -depth "$TIGERVNC_DEPTH" \
     -rfbport "$TIGERVNC_PORT" \

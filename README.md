@@ -231,8 +231,9 @@ source configs/simplepod-tigervnc.env
 ./isaac_vmctl.sh check
 ```
 
-Bootstrap installs TigerVNC and starts an XFCE desktop with GNOME Terminal,
-Ubuntu Yaru theming, and a Full HD `1920x1080` display on `:1`. If
+Bootstrap installs TigerVNC and starts an Ubuntu GNOME desktop with GNOME
+Terminal, Ubuntu Yaru theming, disabled screen lock, VNC clipboard support, and
+a Full HD `1920x1080` display on `:1`. If
 `TIGERVNC_PASSWORD` is empty, the helper generates one and saves it on the VM:
 
 ```bash
@@ -674,7 +675,7 @@ matching inbound ports are available:
 |---|---|
 | TCP `49100` | WebRTC signaling |
 | UDP `47998` | WebRTC video stream |
-| TCP `5901` | Optional TigerVNC XFCE desktop |
+| TCP `5901` | Optional TigerVNC Ubuntu GNOME desktop |
 
 For Isaac Lab, use `./isaac_vmctl.sh run isaaclab '...'`. Keep `--headless`
 for non-interactive runs. When you want to see the viewport, omit

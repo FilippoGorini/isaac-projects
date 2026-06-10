@@ -226,7 +226,7 @@ Restore on a fresh server:
 | `TIGERVNC_ENABLE` | `0` |
 | `TIGERVNC_PORT` | `5901` |
 | `TIGERVNC_GEOMETRY` | `1920x1080` |
-| `TIGERVNC_DESKTOP` | `xfce` |
+| `TIGERVNC_DESKTOP` | `gnome` |
 | `ISAAC_EXTRA_ARGS` | _(none)_ |
 
 ---
