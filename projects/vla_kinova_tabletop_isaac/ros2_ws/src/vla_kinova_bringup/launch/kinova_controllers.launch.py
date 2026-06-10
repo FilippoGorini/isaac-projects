@@ -7,7 +7,8 @@ from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
 def launch_setup(context, *args, **kwargs):
-    my_package = "vla_kinova_tabletop"
+    my_package = "vla_kinova_bringup"
+    description_pkg = "vla_kinova_description"
     use_sim    = LaunchConfiguration("use_sim").perform(context)
     robot_ip   = LaunchConfiguration("robot_ip").perform(context)
     auto_home  = LaunchConfiguration("auto_home").perform(context)
@@ -34,7 +35,7 @@ def launch_setup(context, *args, **kwargs):
     robot_description_content = Command(
         [
             FindExecutable(name="xacro"), " ",
-            os.path.join(get_package_share_directory(my_package), "urdf", "gen3.xacro"), " ",
+            os.path.join(get_package_share_directory(description_pkg), "urdf", "gen3.xacro"), " ",
             xacro_args,
         ]
     )
@@ -96,7 +97,7 @@ def launch_setup(context, *args, **kwargs):
     run_home = is_sim or auto_home.lower() == "true"
     if run_home:
         home_node = Node(
-            package="vla_kinova_tabletop",
+            package=my_package,
             executable="home_robot.py",
             output="screen",
         )

@@ -16,7 +16,8 @@ def _load_yaml(path):
 
 
 def launch_setup(context, *args, **kwargs):
-    my_package = "vla_kinova_tabletop"
+    my_package = "vla_kinova_bringup"
+    description_pkg = "vla_kinova_description"
     kortex_moveit_package = "kinova_gen3_6dof_robotiq_2f_85_moveit_config"
 
     use_sim   = LaunchConfiguration("use_sim").perform(context)
@@ -64,7 +65,7 @@ def launch_setup(context, *args, **kwargs):
     moveit_config = (
         MoveItConfigsBuilder("gen3", package_name=kortex_moveit_package)
         .robot_description(
-            file_path=os.path.join(get_package_share_directory(my_package), "urdf", "gen3.xacro"),
+            file_path=os.path.join(get_package_share_directory(description_pkg), "urdf", "gen3.xacro"),
             mappings=moveit_mappings,
         )
         # Servo reads joint vel/accel limits from the RobotModel. URDF typically has
