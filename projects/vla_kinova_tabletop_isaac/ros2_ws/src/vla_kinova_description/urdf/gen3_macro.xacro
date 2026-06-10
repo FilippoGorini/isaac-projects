@@ -35,7 +35,7 @@
     moveit_active:=false">
 
     <!-- ros2 control include -->
-    <xacro:include filename="$(find vla_kinova_tabletop)/urdf/kortex.ros2_control.xacro" />
+    <xacro:include filename="$(find vla_kinova_description)/urdf/kortex.ros2_control.xacro" />
     <xacro:kortex_ros2_control
       name="${prefix}KortexMultiInterfaceHardware" prefix="${prefix}"
       use_fake_hardware="${use_fake_hardware}"

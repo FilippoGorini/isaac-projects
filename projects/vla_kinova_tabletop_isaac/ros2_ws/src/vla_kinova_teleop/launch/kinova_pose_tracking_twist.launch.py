@@ -22,25 +22,27 @@ from launch_ros.actions import Node
 
 
 def launch_setup(context, *args, **kwargs):
-    my_package = "vla_kinova_tabletop"
+    my_package = "vla_kinova_teleop"
+    bringup_pkg = "vla_kinova_bringup"
     robot_ip = LaunchConfiguration("robot_ip").perform(context)
     launch_rviz = LaunchConfiguration("launch_rviz").perform(context)
     tf_publish_rate = LaunchConfiguration("tf_publish_rate").perform(context)
 
     # Suppress Cyclone DDS multicast-write warnings to avoid flooding terminal
-    # The ros2 control node sometimes crashes but real errors were lost in the dds warnings 
+    # The ros2 control node sometimes crashes but real errors were lost in the dds warnings
     quiet_dds = SetEnvironmentVariable(
         name="CYCLONEDDS_URI",
         value="<CycloneDDS><Domain><Tracing><Verbosity>severe</Verbosity></Tracing></Domain></CycloneDDS>",
     )
 
-    config_dir = os.path.join(get_package_share_directory(my_package), "config")
-    twist_pid_yaml = os.path.join(config_dir, "twist_pose_tracking.yaml")
+    twist_pid_yaml = os.path.join(
+        get_package_share_directory(my_package), "config", "twist_pose_tracking.yaml"
+    )
 
-    # We reuse the existing launch file to bringup the kinova controllers (twist controller starts inactive)
+    # Reuse the bringup launch file to bring up the kinova controllers (twist controller starts inactive)
     controllers_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(
-            get_package_share_directory(my_package),
+            get_package_share_directory(bringup_pkg),
             "launch",
             "kinova_controllers.launch.py",
         )),
@@ -78,11 +80,14 @@ def launch_setup(context, *args, **kwargs):
         )],
     )
 
-    # We keep the same rviz config we used with MoveIt Servo
+    # Reuse the rviz config from bringup (originally written for MoveIt Servo)
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
-        arguments=["-d", os.path.join(config_dir, "servo.rviz")],
+        arguments=[
+            "-d",
+            os.path.join(get_package_share_directory(bringup_pkg), "config", "servo.rviz"),
+        ],
         condition=IfCondition(launch_rviz),
     )
 
