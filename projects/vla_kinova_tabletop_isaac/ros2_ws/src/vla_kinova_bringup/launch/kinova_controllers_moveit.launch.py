@@ -17,7 +17,7 @@ def launch_setup(context, *args, **kwargs):
     auto_home   = LaunchConfiguration("auto_home").perform(context)
     launch_rviz = LaunchConfiguration("launch_rviz").perform(context)
     gripper_max_velocity = LaunchConfiguration("gripper_max_velocity").perform(context)
-    gripper_max_effort = LaunchConfiguration("gripper_max_effort").perform(context)
+    gripper_max_force = LaunchConfiguration("gripper_max_force").perform(context)
     tf_publish_rate = LaunchConfiguration("tf_publish_rate").perform(context)
     is_sim    = use_sim.lower() == "true"
     use_sim_time = is_sim
@@ -34,7 +34,7 @@ def launch_setup(context, *args, **kwargs):
             "robot_ip": robot_ip,
             "auto_home": auto_home,
             "gripper_max_velocity": gripper_max_velocity,
-            "gripper_max_effort": gripper_max_effort,
+            "gripper_max_force": gripper_max_force,
             "tf_publish_rate": tf_publish_rate,
         }.items(),
     )
@@ -117,7 +117,7 @@ def generate_launch_description():
             description="Gripper go-to speed limit [0-100%], forwarded to kinova_controllers.launch.py",
         ),
         DeclareLaunchArgument(
-            "gripper_max_effort",
+            "gripper_max_force",
             default_value="100.0",
             description="Gripper grasp force limit [0-100%], forwarded to kinova_controllers.launch.py",
         ),

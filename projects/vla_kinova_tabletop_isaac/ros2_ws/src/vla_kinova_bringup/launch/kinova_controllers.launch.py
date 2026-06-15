@@ -13,7 +13,7 @@ def launch_setup(context, *args, **kwargs):
     robot_ip   = LaunchConfiguration("robot_ip").perform(context)
     auto_home  = LaunchConfiguration("auto_home").perform(context)
     gripper_max_velocity = LaunchConfiguration("gripper_max_velocity").perform(context)
-    gripper_max_effort = LaunchConfiguration("gripper_max_effort").perform(context)
+    gripper_max_force = LaunchConfiguration("gripper_max_force").perform(context)
     tf_publish_rate = LaunchConfiguration("tf_publish_rate").perform(context)
     is_sim     = use_sim.lower() == "true"
     use_sim_time = is_sim
@@ -23,7 +23,7 @@ def launch_setup(context, *args, **kwargs):
         f"sim_isaac:={use_sim} use_fake_hardware:=false "
         f"gripper_joint_name:=robotiq_85_left_knuckle_joint "
         f"gripper_max_velocity:={gripper_max_velocity} "
-        f"gripper_max_effort:={gripper_max_effort} "
+        f"gripper_max_force:={gripper_max_force} "
         f"isaac_arm_joint_commands:=/isaac_arm_commands "
         f"isaac_gripper_joint_commands:=/isaac_gripper_commands"
     )
@@ -126,9 +126,10 @@ def generate_launch_description():
                         "frame. Lower it to smooth the discrete go-to stepping (slower gripper).",
         ),
         DeclareLaunchArgument(
-            "gripper_max_effort",
+            "gripper_max_force",
             default_value="100.0",
-            description="Gripper grasp force limit [0-100%]. Lower it for delicate objects.",
+            description="Gripper grasp force limit [0-100%]. Lower it for delicate objects. "
+                        "Note: only applied in low-level cyclic mode; high-level twist teleop ignores it.",
         ),
         DeclareLaunchArgument(
             "tf_publish_rate",

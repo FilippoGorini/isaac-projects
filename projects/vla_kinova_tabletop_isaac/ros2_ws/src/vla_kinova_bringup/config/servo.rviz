@@ -10,7 +10,7 @@ Panels:
         - /TF1/Frames1
         - /Pose1
       Splitter Ratio: 0.5
-    Tree Height: 488
+    Tree Height: 779
   - Class: rviz_common/Views
     Expanded:
       - /Current View1
@@ -284,35 +284,35 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 1.1191736459732056
+      Distance: 1.5274004936218262
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.18874339759349823
-        Y: -0.22775806486606598
-        Z: 0.01396082155406475
+        X: 0.37086033821105957
+        Y: -0.05194195732474327
+        Z: 0.061728689819574356
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7350001931190491
+      Pitch: 0.6600002646446228
       Target Frame: base_link
       Value: Orbit (rviz_default_plugins)
-      Yaw: 2.51001238822937
+      Yaw: 2.5050137042999268
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1043
+  Height: 1529
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd000000010000000000000210000003abfc0200000002fb000000100044006900730070006c00610079007301000000470000022f000000f100fffffffb0000000a00560069006500770073010000027d00000175000000c200ffffff00000569000003ab00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000001000000000000021000000591fc0200000002fb000000100044006900730070006c006100790073010000004700000352000000f100fffffffb0000000a0056006900650077007301000003a000000238000000c200ffffff000007950000059100000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Views:
     collapsed: false
-  Width: 1920
-  X: 2560
-  Y: 0
+  Width: 2476
+  X: 84
+  Y: 34
