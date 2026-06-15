@@ -27,6 +27,7 @@ def launch_setup(context, *args, **kwargs):
     robot_ip = LaunchConfiguration("robot_ip").perform(context)
     launch_rviz = LaunchConfiguration("launch_rviz").perform(context)
     tf_publish_rate = LaunchConfiguration("tf_publish_rate").perform(context)
+    gripper_max_force = LaunchConfiguration("gripper_max_force").perform(context)
 
     # Suppress Cyclone DDS multicast-write warnings to avoid flooding terminal
     # The ros2 control node sometimes crashes but real errors were lost in the dds warnings
@@ -51,18 +52,19 @@ def launch_setup(context, *args, **kwargs):
             "robot_ip": robot_ip,
             "auto_home": "false",
             "tf_publish_rate": tf_publish_rate,
+            "gripper_max_force": gripper_max_force,
         }.items(),
     )
 
     # Deactivate JTC and activate twist controller (we wait a bit to ensure the kinova_controllers launch is done)
-    # Also swap the gripper controller
+    # Also swap the gripper controller by uncommenting the arguments if you want to use velocity gripper mode
     switch_to_twist = TimerAction(
         period=4.0,
         actions=[ExecuteProcess(
             cmd=[
                 "ros2", "control", "switch_controllers",
-                "--activate", "twist_controller", "gripper_velocity_controller",
-                "--deactivate", "joint_trajectory_controller", "robotiq_gripper_controller",
+                "--activate", "twist_controller", #"gripper_velocity_controller",
+                "--deactivate", "joint_trajectory_controller", #"robotiq_gripper_controller",
             ],
             output="screen",
         )],
@@ -110,6 +112,12 @@ def generate_launch_description():
             "tf_publish_rate",
             default_value="200.0",
             description="robot_state_publisher /tf publish frequency [Hz], forwarded to kinova_controllers.launch.py",
+        ),
+        DeclareLaunchArgument(
+            "gripper_max_force",
+            default_value="100.0",
+            description="Gripper grasp force limit [0-100%], forwarded to kinova_controllers.launch.py. "
+                        "Note: only applied in low-level cyclic mode; high-level twist teleop ignores it.",
         ),
         OpaqueFunction(function=launch_setup),
     ])
