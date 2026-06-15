@@ -2,12 +2,22 @@
 
 """
 Twist-based pose tracking node for the real Kinova Gen3 6/7 DoF.
-Subscribes to a target PoseStamped on /target_frame, looks up the current EE pose from TF, runs
-a per-axis PID on the 6D error in base_link, saturates the twist, then rotates
-it into the tool frame (end_effector_link) and publishes geometry_msgs/Twist
-on the picknik_twist_controller command topic. kortex_driver interprets the
-twist in CARTESIAN_REFERENCE_FRAME_TOOL, so the rotation into the EE frame is
-mandatory
+Subscribes to a target PoseStamped on /target_frame, looks up the current pose of
+the control frame from TF, runs a per-axis PID on the 6D error in base_link,
+saturates the twist, then rotates it into the tool frame (end_effector_link) and
+publishes geometry_msgs/Twist on the picknik_twist_controller command topic.
+kortex_driver interprets the twist in CARTESIAN_REFERENCE_FRAME_TOOL, so the
+rotation into the EE frame is mandatory.
+
+The control frame (control_frame param) is the frame the PID regulates against the
+target. By default it is end_effector_link. It can instead be set to tool_frame
+(a frame between the gripper fingers, defined in the URDF as a pure +z translation
+of end_effector_link) so that orientation commands pivot about the fingertips,
+which is more intuitive to teleoperate. Because the firmware always actuates
+end_effector_link, when the control frame is offset from it the commanded linear
+velocity is corrected for the lever arm: the angular velocity is unchanged but
+v_ee = v_control - w x t, where t is the control frame origin expressed in EE axes
+(looked up once from TF).
 """
 
 
@@ -55,7 +65,11 @@ class TwistPoseTrackingNode(Node):
         # Static parameters
         self.loop_rate_hz = self._declare("loop_rate_hz", 100.0)
         self.base_frame = self._declare("base_frame", "base_link")
+        # ee_frame is the firmware tool frame that kortex_driver actuates.
         self.ee_frame = self._declare("ee_frame", "end_effector_link")
+        # control_frame is the frame the PID regulates; set to e.g. tool_frame to
+        # control a point between the fingers. Defaults to the firmware tool frame.
+        self.control_frame = self._declare("control_frame", "end_effector_link")
         target_topic = self._declare("target_topic", "/target_frame")
         twist_command_topic = self._declare("twist_command_topic", "/twist_controller/commands")
 
@@ -74,6 +88,10 @@ class TwistPoseTrackingNode(Node):
         # State
         self.latest_target = None
         self.latest_target_stamp = None
+        # Lever arm: control_frame origin expressed in ee_frame axes (cached from
+        # TF on first successful lookup). None until known; stays unused when the
+        # control frame coincides with the firmware tool frame.
+        self.control_offset = None
         self.integral_lin = np.zeros(3)
         self.integral_ang = np.zeros(3)
         self.prev_error_lin = None
@@ -108,6 +126,33 @@ class TwistPoseTrackingNode(Node):
         self.latest_target = msg
         self.latest_target_stamp = self.get_clock().now()
 
+    def _control_offset(self):
+        """Lever arm t = control_frame origin in ee_frame axes, or None if the
+        control frame is the firmware tool frame (no correction needed). The
+        transform is static, so it is looked up once and cached."""
+        if self.control_frame == self.ee_frame:
+            return None
+        if self.control_offset is None:
+            try:
+                tf = self.tf_buffer.lookup_transform(self.ee_frame, self.control_frame, Time())
+            except (LookupException, ExtrapolationException, ConnectivityException) as e:
+                self.get_logger().warn(
+                    f"control-frame offset lookup failed ({self.ee_frame} -> {self.control_frame}): {e}; "
+                    f"commanding twist without lever-arm correction",
+                    throttle_duration_sec=5.0,
+                )
+                return None
+            self.control_offset = np.array([
+                tf.transform.translation.x,
+                tf.transform.translation.y,
+                tf.transform.translation.z,
+            ])
+            self.get_logger().info(
+                f"Controlling frame '{self.control_frame}' with lever arm "
+                f"t={self.control_offset.tolist()} m in '{self.ee_frame}' axes."
+            )
+        return self.control_offset
+
     def _reset_integrators(self):
         self.integral_lin[:] = 0.0
         self.integral_ang[:] = 0.0
@@ -134,11 +179,11 @@ class TwistPoseTrackingNode(Node):
             self._reset_integrators()
             return
 
-        # Current EE pose from TF (latest available, not exact-time)
+        # Current control-frame pose from TF (latest available, not exact-time)
         try:
-            tf_msg = self.tf_buffer.lookup_transform(self.base_frame, self.ee_frame, Time())
+            tf_msg = self.tf_buffer.lookup_transform(self.base_frame, self.control_frame, Time())
         except (LookupException, ExtrapolationException, ConnectivityException) as e:
-            self.get_logger().warn(f"TF lookup failed ({self.base_frame} -> {self.ee_frame}): {e}",
+            self.get_logger().warn(f"TF lookup failed ({self.base_frame} -> {self.control_frame}): {e}",
                                    throttle_duration_sec=1.0)
             self._publish_zero_twist()
             return
@@ -209,9 +254,20 @@ class TwistPoseTrackingNode(Node):
 
         # Rotate base_frame twist into end effector one
         # R_base_to_tool = R_ee_from_base = (R_base_from_ee)^T
+        # q_current is the control_frame orientation, which equals the EE orientation
+        # because tool_frame is a pure translation of end_effector_link.
         R_base_to_tool = t3dq.quat2mat(q_current).T
         v_tool = R_base_to_tool @ v_base
         w_tool = R_base_to_tool @ w_base
+
+        # The PID twist above regulates the control frame, but kortex_driver
+        # actuates the EE origin. Convert the rigid-body twist from the control
+        # point to the EE origin: angular velocity is unchanged, linear velocity
+        # picks up the lever-arm term. In EE axes the control origin sits at +t,
+        # so v_ee = v_control + w x (p_ee - p_control) = v_tool - w_tool x t.
+        offset = self._control_offset()
+        if offset is not None:
+            v_tool = v_tool - np.cross(w_tool, offset)
 
         # Prepare and publish message
         msg = Twist()

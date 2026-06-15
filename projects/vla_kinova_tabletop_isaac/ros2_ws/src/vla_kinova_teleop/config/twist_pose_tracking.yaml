@@ -24,7 +24,12 @@ twist_pose_tracking_node:
     target_decel_window_s: 0.085         # time window over which the twist is scaled down to 0 linearly after grace period has elapsed
 
     base_frame: base_link
-    ee_frame: end_effector_link
+    ee_frame: end_effector_link        # firmware tool frame that kortex_driver actuates (twist reference)
+    # Frame the PID regulates against the target. Set to tool_frame (defined in the
+    # URDF, between the gripper fingers) so orientation commands pivot about the
+    # fingertips; the node corrects the commanded twist for the lever arm to ee_frame.
+    # Leave as end_effector_link for the original behaviour.
+    control_frame: tool_frame
     target_topic: /target_frame
     twist_command_topic: /twist_controller/commands   # Topic on which the kinova twist controller listens for twist commands
 
@@ -40,14 +45,14 @@ twist_pose_tracking_node:
     x_proportional_gain: 2.5
     y_proportional_gain: 2.5
     z_proportional_gain: 2.5
-    x_integral_gain: 0.3
-    y_integral_gain: 0.3
-    z_integral_gain: 0.3
+    x_integral_gain: 0.2
+    y_integral_gain: 0.2
+    z_integral_gain: 0.2
     x_derivative_gain: 0.07        
     y_derivative_gain: 0.07
     z_derivative_gain: 0.07
 
     # Angular PID gains, applied on error computed in base frame (shared between roll pitch yaw)
-    angular_proportional_gain: 2.5
-    angular_integral_gain: 0.2
+    angular_proportional_gain: 1.8
+    angular_integral_gain: 0.1
     angular_derivative_gain: 0.04

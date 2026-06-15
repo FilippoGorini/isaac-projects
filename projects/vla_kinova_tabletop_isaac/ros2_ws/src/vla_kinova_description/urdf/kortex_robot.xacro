@@ -94,6 +94,17 @@
         com_port="${gripper_com_port}"
         use_internal_bus_gripper_comm="${use_internal_bus_gripper_comm}"
         moveit_active="${moveit_active}"/>
+
+      <!-- We added a new tool_frame, so that when we teleoperate we control this frame 
+            instead of the end effector one, which is more intuitive in particular regarding orientation -->
+      <xacro:property name="grasp_offset" value="0.14"/>
+      <link name="${prefix}tool_frame"/>
+      <joint name="${prefix}tool_frame_joint" type="fixed">
+        <origin xyz="0 0 ${grasp_offset}" rpy="0 0 0" />
+        <parent link="${prefix}${last_arm_link}" />
+        <child link="${prefix}tool_frame" />
+        <axis xyz="0 0 0" />
+      </joint>
     </xacro:unless>
 
   </xacro:macro>
