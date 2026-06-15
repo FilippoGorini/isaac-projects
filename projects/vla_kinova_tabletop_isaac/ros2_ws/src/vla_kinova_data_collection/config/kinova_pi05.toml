@@ -1,0 +1,108 @@
+# lerobot_ros recording config for the Kinova Gen3 + Robotiq 2F-85 setup.
+#
+# Schema is defined by upstream lerobot_ros (see config.py / convert/*.py). The
+# recorder builds a LeRobot v3.0 dataset with columns keyed by topic tag:
+#   - tag = "observation" (default) -> observation.state (joints concatenated)
+#   - tag = "action"                -> action            (joints concatenated)
+#   - tag = "meta"                  -> meta.<key>
+#   - ImageTopic                    -> observation.images.<key>
+#
+# Layout (both columns are 7-D, joint order matches):
+#   observation.state = [j1..j6 from /joint_states, robotiq knuckle from /joint_states]
+#   action            = [j1..j6 from /joint_states, robotiq knuckle from /gripper_command/state]
+#
+# The arm dims of `action` still mirror `observation.state` at the same index t
+# (we shift them by one in post-processing: action[t] = state[t+1] so JTC can
+# replay them as next-state targets). The gripper dim of `action` is the latched
+# binary command (0.0 open / 0.8 closed) the teleop sends to the
+# robotiq_gripper_controller action server — not the lagging joint position —
+# so the VLA learns to emit a clean discrete signal that the client thresholds
+# back into a GripperCommand goal at inference.
+
+fps = 30
+dataset_root = "/home/filippo/datasets/kinova_pi05"  # NOTE: absolute path; lerobot_ros doesn't expand ~
+robot_type = "kinova_gen3_robotiq_2f85"
+
+visualize = false
+# rerun_remote = "rerun+http://127.0.0.1:9876/proxy"  # uncomment to stream to a Rerun viewer
+
+[topics]
+
+# ---- proprioception ----
+
+[topics.joint_state_obs]
+topic_name = "/joint_states"
+msg_type = "JointState"
+qos = { history = "keep_last", depth = 10, reliability = "reliable", durability = "volatile" }
+# default tag = "observation" -> observation.state column
+joints = [
+    "joint_1",
+    "joint_2",
+    "joint_3",
+    "joint_4",
+    "joint_5",
+    "joint_6",
+    "robotiq_85_left_knuckle_joint",
+]
+position = true
+velocity = false
+effort = false
+
+# ---- action: arm joints from /joint_states + gripper command from teleop ----
+
+[topics.joint_state_act]
+topic_name = "/joint_states"
+msg_type = "JointState"
+qos = { history = "keep_last", depth = 10, reliability = "reliable", durability = "volatile" }
+tag = "action"
+joints = [
+    "joint_1",
+    "joint_2",
+    "joint_3",
+    "joint_4",
+    "joint_5",
+    "joint_6",
+]
+position = true
+velocity = false
+effort = false
+
+# Gripper action dim. The teleop publishes the most recently commanded position
+# (0.0 / gripper_closed_position) as a latched JointState here; transient_local
+# QoS so the recorder sees the last value on connect even if no toggle has
+# happened yet.
+[topics.gripper_act]
+topic_name = "/gripper_command/state"
+msg_type = "JointState"
+qos = { history = "keep_last", depth = 1, reliability = "reliable", durability = "transient_local" }
+tag = "action"
+joints = [
+    "robotiq_85_left_knuckle_joint",
+]
+position = true
+velocity = false
+effort = false
+
+# ---- cameras (resolutions are best-guess natives; lerobot_ros silently resizes if topic differs) ----
+
+# ZED 2 — RGB rectified, VGA = 672x376 (depth disabled in cameras.launch.py).
+# Launch cameras with: zed_resolution:=VGA to match these dims (no resize).
+[topics."/zed/zed_node/rgb/color/rect/image"]
+msg_type = "Image"
+qos = { reliability = "reliable", durability = "volatile", depth = 10, history = "keep_last" }
+height = 376
+width = 672
+channels = 3
+key = "external"
+
+# Kinova wrist (Kortex color) — already publishes at 320x240.
+[topics."/camera/color/image_raw"]
+msg_type = "Image"
+qos = { reliability = "reliable", durability = "volatile", depth = 10, history = "keep_last" }
+height = 240
+width = 320
+channels = 3
+key = "wrist"
+
+[policies]
+# No policies yet; will be filled once we have a finetuned pi0.5 checkpoint.

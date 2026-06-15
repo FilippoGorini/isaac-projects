@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>vla_kinova_data_collection</name>
+  <version>0.0.0</version>
+  <description>Recording pipeline for Kinova Gen3 + Robotiq 2F-85 LeRobot datasets via lerobot_ros.</description>
+  <maintainer email="filippogorini7@gmail.com">filippo</maintainer>
+  <license>TODO: License declaration</license>
+
+  <exec_depend>vla_kinova_sensors</exec_depend>
+  <exec_depend>vla_kinova_bringup</exec_depend>
+  <exec_depend>vla_kinova_teleop</exec_depend>
+  <exec_depend>lerobot_ros</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
