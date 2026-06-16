@@ -69,11 +69,11 @@
 
     <!-- If no gripper, define tool frame here -->
     <xacro:if value="${not gripper}">
-      <link name="${prefix}tool_frame"/>
-      <joint name="${prefix}tool_frame_joint" type="fixed">
+      <link name="${prefix}fingertips_frame"/>
+      <joint name="${prefix}fingertips_frame_joint" type="fixed">
         <origin xyz="0 0 0" rpy="0 0 0" />
         <parent link="${prefix}${last_arm_link}" />
-        <child link="${prefix}tool_frame" />
+        <child link="${prefix}fingertips_frame" />
         <axis xyz="0 0 0" />
       </joint>
     </xacro:if>
@@ -95,14 +95,14 @@
         use_internal_bus_gripper_comm="${use_internal_bus_gripper_comm}"
         moveit_active="${moveit_active}"/>
 
-      <!-- We added a new tool_frame, so that when we teleoperate we control this frame 
+      <!-- We added a new fingertips_frame, so that when we teleoperate we control this frame 
             instead of the end effector one, which is more intuitive in particular regarding orientation -->
       <xacro:property name="grasp_offset" value="0.14"/>
-      <link name="${prefix}tool_frame"/>
-      <joint name="${prefix}tool_frame_joint" type="fixed">
+      <link name="${prefix}fingertips_frame"/>
+      <joint name="${prefix}fingertips_frame_joint" type="fixed">
         <origin xyz="0 0 ${grasp_offset}" rpy="0 0 0" />
         <parent link="${prefix}${last_arm_link}" />
-        <child link="${prefix}tool_frame" />
+        <child link="${prefix}fingertips_frame" />
         <axis xyz="0 0 0" />
       </joint>
     </xacro:unless>

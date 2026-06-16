@@ -10,7 +10,7 @@ kortex_driver interprets the twist in CARTESIAN_REFERENCE_FRAME_TOOL, so the
 rotation into the EE frame is mandatory.
 
 The control frame (control_frame param) is the frame the PID regulates against the
-target. By default it is end_effector_link. It can instead be set to tool_frame
+target. By default it is end_effector_link. It can instead be set to fingertips_frame
 (a frame between the gripper fingers, defined in the URDF as a pure +z translation
 of end_effector_link) so that orientation commands pivot about the fingertips,
 which is more intuitive to teleoperate. Because the firmware always actuates
@@ -65,10 +65,10 @@ class TwistPoseTrackingNode(Node):
         # Static parameters
         self.loop_rate_hz = self._declare("loop_rate_hz", 100.0)
         self.base_frame = self._declare("base_frame", "base_link")
-        # ee_frame is the firmware tool frame that kortex_driver actuates.
+        # ee_frame is the firmware tool frame that kortex_driver actuates
         self.ee_frame = self._declare("ee_frame", "end_effector_link")
-        # control_frame is the frame the PID regulates; set to e.g. tool_frame to
-        # control a point between the fingers. Defaults to the firmware tool frame.
+        # control_frame is the frame the PID regulates for example we can set it to ginfertips_frame ...
+        # ... to control the frame between the fingertips, which is more intuitive/comfortable. Defaults to the firmware tool frame
         self.control_frame = self._declare("control_frame", "end_effector_link")
         target_topic = self._declare("target_topic", "/target_frame")
         twist_command_topic = self._declare("twist_command_topic", "/twist_controller/commands")
@@ -88,9 +88,9 @@ class TwistPoseTrackingNode(Node):
         # State
         self.latest_target = None
         self.latest_target_stamp = None
-        # Lever arm: control_frame origin expressed in ee_frame axes (cached from
-        # TF on first successful lookup). None until known; stays unused when the
-        # control frame coincides with the firmware tool frame.
+
+        # control_offset is used when we want to control a frame different from the end_effector_link (which is the frame in which the firmware expects twists to be expressed in)
+        # It is read from tf when available
         self.control_offset = None
         self.integral_lin = np.zeros(3)
         self.integral_ang = np.zeros(3)
@@ -255,15 +255,13 @@ class TwistPoseTrackingNode(Node):
         # Rotate base_frame twist into end effector one
         # R_base_to_tool = R_ee_from_base = (R_base_from_ee)^T
         # q_current is the control_frame orientation, which equals the EE orientation
-        # because tool_frame is a pure translation of end_effector_link.
+        # because fingertips_frame is a pure translation of end_effector_link.
         R_base_to_tool = t3dq.quat2mat(q_current).T
         v_tool = R_base_to_tool @ v_base
         w_tool = R_base_to_tool @ w_base
 
         # The PID twist above regulates the control frame, but kortex_driver
-        # actuates the EE origin. Convert the rigid-body twist from the control
-        # point to the EE origin: angular velocity is unchanged, linear velocity
-        # picks up the lever-arm term. In EE axes the control origin sits at +t,
+        # actuates the EE origin. In EE axes the control origin sits at +t,
         # so v_ee = v_control + w x (p_ee - p_control) = v_tool - w_tool x t.
         offset = self._control_offset()
         if offset is not None:
