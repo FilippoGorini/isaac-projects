@@ -11,16 +11,16 @@
 #   observation.state = [j1..j6 from /joint_states, robotiq knuckle from /joint_states]
 #   action            = [j1..j6 from /joint_states, robotiq knuckle from /gripper_command/state]
 #
-# The arm dims of `action` still mirror `observation.state` at the same index t
-# (we shift them by one in post-processing: action[t] = state[t+1] so JTC can
-# replay them as next-state targets). The gripper dim of `action` is the latched
+# The arm dims of `action` mirror `observation.state` exactly at each index t:
+# we record both columns from /joint_states with no temporal offset, so for the
+# arm joints action[t] == state[t]. The gripper dim of `action` is the latched
 # binary command (0.0 open / 0.8 closed) the teleop sends to the
-# robotiq_gripper_controller action server — not the lagging joint position —
-# so the VLA learns to emit a clean discrete signal that the client thresholds
+# robotiq_gripper_controller action server, not the lagging joint position, so
+# the VLA learns to emit a clean discrete signal that the client thresholds
 # back into a GripperCommand goal at inference.
 
 fps = 30
-dataset_root = "/home/filippo/datasets/kinova_pi05"  # NOTE: absolute path; lerobot_ros doesn't expand ~
+dataset_root = "/home/filippo/datasets"  # absolute path (lerobot_ros doesn't expand ~). Each session's dataset_name = "<hf_owner>/<repo>" lands at <dataset_root>/<hf_owner>/<repo>/
 robot_type = "kinova_gen3_robotiq_2f85"
 
 visualize = false

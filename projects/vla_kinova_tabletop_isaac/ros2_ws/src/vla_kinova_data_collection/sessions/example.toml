@@ -1,0 +1,16 @@
+# Example recording session for `ros2 run vla_kinova_data_collection record_session`.
+#
+# - dataset_name: passed verbatim to /new_dataset. Use the "<hf_owner>/<repo>"
+#   form so the on-disk path mirrors the HF dataset URL and `push_to_hub`
+#   needs no renaming. If the dataset already exists on disk, lerobot_ros
+#   appends to it as long as the feature shapes match.
+# - tasks: ordered list of {prompt, episodes}. Each entry expands to `episodes`
+#   recording slots with the same prompt. The recorder uses the prompt string
+#   to look up / create a task_index in the dataset's tasks.jsonl.
+
+dataset_name = "user_name/dataset_name"
+
+tasks = [
+    { prompt = "pick the object", episodes = 5 },
+    { prompt = "grab and move the object", episodes = 5 },
+]

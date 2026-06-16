@@ -14,6 +14,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'config'), glob('config/*.toml')),
+        (os.path.join('share', package_name, 'sessions'), glob('sessions/*.toml')),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -28,6 +30,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'record_session = vla_kinova_data_collection.record_session:main',
         ],
     },
 )

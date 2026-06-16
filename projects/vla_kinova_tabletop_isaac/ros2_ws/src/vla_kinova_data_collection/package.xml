@@ -12,6 +12,13 @@
   <exec_depend>vla_kinova_teleop</exec_depend>
   <exec_depend>lerobot_ros</exec_depend>
 
+  <!-- record_session script deps: rclpy + lerobot_ros service interfaces.
+       python3-toml is only needed on Python <3.11 (stdlib tomllib is preferred). -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>lerobot_interfaces</exec_depend>
+  <exec_depend>python3-toml</exec_depend>
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>

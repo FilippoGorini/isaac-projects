@@ -28,14 +28,16 @@ projects/vla_kinova_tabletop_isaac/
 │   ├── bootstrap_openpi.sh       # One-shot openpi bootstrap script
 │   └── src/                      # Policy server entry point and kinova policy definition
 └── ros2_ws/
-    ├── bootstrap_kinova_ws.sh    # One-shot workspace bootstrap script
-    ├── deps.repos                # vcstool manifest for ros2_kortex and deps
+    ├── bootstrap_kinova_ws.sh         # One-shot workspace bootstrap script
+    ├── bootstrap_lerobot_ros.sh       # Adds lerobot_ros (data recording) to the workspace
+    ├── deps.repos                     # vcstool manifest for ros2_kortex and deps
     └── src/
-        ├── vla_kinova_description/  # Customized URDF/Xacro robot description
-        ├── vla_kinova_bringup/      # ros2_control + MoveIt 2 launches and configs
-        ├── vla_kinova_sensors/      # ZED 2 + Kinova wrist camera bringup
-        ├── vla_kinova_teleop/       # Quest 3 twist-based EE pose tracking
-        └── vla_policy_client/       # ROS 2 WebSocket client for the VLA policy server
+        ├── vla_kinova_description/         # Customized URDF/Xacro robot description
+        ├── vla_kinova_bringup/              # ros2_control + MoveIt 2 launches and configs
+        ├── vla_kinova_sensors/              # ZED 2 + Kinova wrist camera bringup
+        ├── vla_kinova_teleop/               # Quest 3 twist-based EE pose tracking
+        ├── vla_kinova_data_collection/      # LeRobot dataset recording
+        └── vla_policy_client/                # ROS 2 WebSocket client for the VLA policy server
 ```
 
 ---
@@ -90,6 +92,24 @@ cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac/ros2_ws
 This imports `ros2_kortex` and all transitive dependencies via `vcstool`, installs
 system packages with `rosdep`, and builds the workspace with `colcon`.
 
+**6. Bootstrap the lerobot_ros data-recording layer (skip if you don't plan to record datasets):**
+
+```bash
+cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac/ros2_ws
+./bootstrap_lerobot_ros.sh
+```
+
+This clones the personal fork `FilippoGorini/lerobot_ros` on the `humble-patches`
+branch (Python 3.10 compatibility patches + a few bugfixes), installs `uv` and a
+Rust toolchain if missing, creates a `--system-site-packages` venv at
+`ros2_ws/src/lerobot_ros/.venv` (inherits Humble's `rclpy`), installs `lerobot`
+0.4.3 + `rust_py_timer`, builds `lerobot_interfaces` and `lerobot_ros` with
+`colcon`, and rewrites the entry-point shebangs to point at the venv's Python.
+
+Re-run the script after any `colcon build` that touches `lerobot_ros`, otherwise
+the entry-point shebangs get reset to `/usr/bin/python3` (which can't import
+`lerobot`) and `ros2 run lerobot_ros dataset_recorder` will crash on startup.
+
 ---
 
 ## Starting Isaac Sim
@@ -140,6 +160,7 @@ the terminal inside the VNC desktop:
 | [`vla_kinova_bringup`](#vla_kinova_bringup) | ros2_control + MoveIt 2 controller configuration and launch files. Brings up the robot in either Isaac Sim or on real hardware. |
 | [`vla_kinova_sensors`](#vla_kinova_sensors) | Camera bringup to launch the upstream `kinova_vision` and `zed_wrapper` launches (RGB only). |
 | [`vla_kinova_teleop`](#vla_kinova_teleop) | Twist-based teleoperation that subscribes to a target EE pose (from the Quest right-arm controller) and drives the Kortex twist controller. |
+| [`vla_kinova_data_collection`](#vla_kinova_data_collection) | TOML-driven dataset recording on top of `lerobot_ros`. Provides a launch file for the recorder node and a script to automate the data-collection process based on predefined TOML configuration files for each recording session (tasks, number of episodes etc) |
 | [`vla_policy_client`](#vla_policy_client) | ROS 2 node that connects to the $\pi_0$ VLA policy server over WebSocket, subscribes to joint states and camera images, and publishes joint trajectories and gripper commands at inference rate. |
 
 ---
@@ -194,7 +215,7 @@ The three bringup launchers share this set of arguments:
 | `robot_ip` | `192.168.50.12` | IP address of the real Kinova arm. Ignored when `use_sim:=true`. |
 | `auto_home` | `false` | Run the homing script after the controllers come up. Always enabled in sim; optional on real robot. |
 | `gripper_max_velocity` | `100.0` | Gripper go-to speed [0–100%]. Lowering helps smoothing the discrete go-to stepping of the gripper when using the forward position controller. |
-| `gripper_max_effort` | `100.0` | Gripper grasp force [0–100%]. Lower it for delicate objects. |
+| `gripper_max_force` | `100.0` | Gripper grasp force [0-100%]. Lower it for delicate objects. Only applied in low-level cyclic mode; high-level twist teleop ignores it. |
 | `tf_publish_rate` | `200.0` | `robot_state_publisher` /tf publish frequency [Hz]. |
 
 The MoveIt, MoveIt-Servo and Twist Pose Tracking launchers additionally accept `launch_rviz` (default `true`).
@@ -217,13 +238,13 @@ Starts `robot_state_publisher` and `ros2_control_node`, then spawns `joint_state
 
 ---
 
-*MoveIt 2 + RViz — Isaac Sim:*
+*MoveIt 2 + RViz, Isaac Sim:*
 
 ```bash
 ros2 launch vla_kinova_bringup kinova_controllers_moveit.launch.py
 ```
 
-*MoveIt 2 + RViz — real robot:*
+*MoveIt 2 + RViz, real robot:*
 
 ```bash
 ros2 launch vla_kinova_bringup kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.50.12
@@ -245,7 +266,7 @@ ros2 launch vla_kinova_bringup kinova_controllers_moveit.launch.py use_sim:=fals
 ros2 launch vla_kinova_bringup kinova_controllers_moveit_servo.launch.py
 ```
 
-Brings up MoveIt Servo and the C++ `pose_tracking_node`. **Not used in the live teleop loop** — the twist-controller path under `vla_kinova_teleop` superseded it.
+Brings up MoveIt Servo and the C++ `pose_tracking_node`. **Not used anymore due to singularity and vibration issues**
 
 ---
 
@@ -287,12 +308,6 @@ ros2 launch vla_kinova_sensors cameras.launch.py launch_wrist:=false
 ros2 launch vla_kinova_sensors cameras.launch.py zed_resolution:=HD1080 zed_grab_fps:=30
 ```
 
-*Throttle the ZED publish rate (e.g. for dataset recording):*
-
-```bash
-ros2 launch vla_kinova_sensors cameras.launch.py zed_pub_fps:=10.0
-```
-
 *Re-enable depth on the ZED:*
 
 ```bash
@@ -303,13 +318,20 @@ ros2 launch vla_kinova_sensors cameras.launch.py zed_disable_depth:=false
 
 ## `vla_kinova_teleop`
 
-Twist-based end-effector pose tracking for the real Kinova Gen3, driven by a Meta Quest 3 (the `quest2ros2` right-arm controller publishes the desired EE pose on `/target_frame`). The `twist_pose_tracking_node` runs a per-axis PID on the 6D pose error in `base_link`, saturates the resulting twist, rotates it into the tool frame (`end_effector_link`), and publishes on the Kortex `twist_controller` command topic. Supersedes the MoveIt-Servo path that lives in `vla_kinova_bringup`.
+Twist-based end-effector pose tracking for the real Kinova Gen3, driven by a Meta Quest 3 (the `quest2ros2` right-arm controller publishes the desired EE pose on `/target_frame`). The `twist_pose_tracking_node` runs a per-axis PID on the 6D pose error (with respect to the control frame (`fingertips_frame`), which can be offset from the end effector one) in `base_link`, saturates the resulting twist, rotates it into the firmware TOOL frame, and publishes on the Kortex `twist_controller` command topic.
+
+The Quest controller (in the `FilippoGorini/Quest2ROS2` fork) supports two gripper modes selected via the `gripper_mode` parameter:
+
+- `binary`: each squeeze of the index/middle trigger sends a single discrete open/close goal to the `robotiq_gripper_controller` action server.
+- `velocity`: hold-to-move continuous teleop via `gripper_velocity_controller`.
+
+In either mode the Quest controller also publishes a latched `JointState` on `/gripper_command/state` with the most recently commanded position (0.0 open / 0.8 closed), which the recorder uses as the gripper dimension of the `action` column.
 
 ### Package Files
 
 - **`scripts/twist_pose_tracking_node.py`**: The teleop tracking node.
 - **`config/twist_pose_tracking.yaml`**: PID gains, saturation limits, stale-target handling.
-- **`scripts/gripper_sine_test.py`**, **`scripts/servo_sine_test.py`**: Dev / diagnostic scripts.
+- **`scripts/gripper_sine_test.py`**, **`scripts/servo_sine_test.py`**: helper diagnostic scripts.
 
 ### Launch Files
 
@@ -384,6 +406,155 @@ Make sure the policy server is already running (`serve_kinova.sh`) and Isaac Sim
 ```bash
 ros2 launch vla_policy_client policy_client.launch.py prompt:="Pick up the green cube"
 ```
+
+---
+
+## `vla_kinova_data_collection`
+
+Project-specific dataset-recording layer that sits on top of `lerobot_ros`. Holds the Kinova-specific recorder TOML (`config/kinova_pi05.toml`), one or more "session" TOMLs describing what to record (`sessions/*.toml`), a convenience launch file for the recorder, and a single-keystroke driver that automates the recorder's service calls during teleoperation.
+
+The lerobot_ros recorder itself (the `dataset_recorder` node) lives in `ros2_ws/src/lerobot_ros/` and is installed by `bootstrap_lerobot_ros.sh`. This package is the thin Kinova wrapper around it.
+
+### Package Files
+
+- **`config/kinova_pi05.toml`**: Recorder configuration. Sets `fps=30`, `robot_type=kinova_gen3_robotiq_2f85`, `dataset_root`, and topic subscriptions. Two `/joint_states` subscriptions (one tagged `observation`, one tagged `action` for the arm joints), plus `/gripper_command/state` as the gripper dimension of the action, plus the ZED VGA RGB feed (672x376) and the Kinova wrist RGB feed (320x240) as image topics.
+- **`sessions/example.toml`**: Example recording session: `dataset_name`, plus an ordered list of `{prompt, episodes}` tasks. 
+- **`launch/lerobot_recorder.launch.py`**: Wraps `ros2 run lerobot_ros dataset_recorder` so you don't have to expand the config path each time; also sets `HF_HUB_OFFLINE=1` so reopening an existing dataset doesn't try to fetch it from Hugging Face.
+- **`vla_kinova_data_collection/record_session.py`**: Script to automate data-collection given a TOML plan for the recording session. Connects to the recorder's services (`/new_dataset`, `/start_episode`, `/end_episode`, `/store_episodes`), walks through the slots in a session TOML, and handles keep/discard/skip/quit from the keyboard.
+
+### Launch File
+
+#### `lerobot_recorder.launch.py`
+
+Starts the lerobot_ros recorder (kinova TOML is loaded by default).
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `config` | `kinova_pi05.toml` from this package's `share/config/` | Path to the recorder TOML. Override to point at a different config. |
+
+```bash
+ros2 launch vla_kinova_data_collection lerobot_recorder.launch.py
+```
+
+### Console Script
+
+#### `record_session`
+
+Interactive driver. Reads a session TOML, opens the recorder's services, and walks through `{task, episode}` slots while you teleoperate. Keys (no Enter needed): `SPACE`/`Enter` start, `k` keep, `d` discard (retries the slot), `s` skip, `q` quit. During an in-progress recording, `q` discards the in-flight episode and exits cleanly.
+
+The `--session` value can be a bare name (looked up in CWD first, then in `share/vla_kinova_data_collection/sessions/`) or a relative/absolute path:
+
+```bash
+ros2 run vla_kinova_data_collection record_session --session example
+ros2 run vla_kinova_data_collection record_session -s ~/my_thesis_session.toml
+```
+
+The script does NOT finalize the dataset on exit. Once the session ends, Ctrl-C the recorder process (which then runs `dataset.finalize()`).
+
+### Recording a Dataset (full terminal sequence)
+
+Open each command in its own terminal; source the project setup in every new terminal first.
+
+1. Robot bringup:
+   ```bash
+   ros2 launch vla_kinova_bringup kinova_controllers.launch.py
+   ```
+2. Cameras (ZED at VGA + Kinova wrist):
+   ```bash
+   ros2 launch vla_kinova_sensors cameras.launch.py zed_resolution:=VGA
+   ```
+3. Quest teleop:
+   ```bash
+   ros2 launch vla_kinova_teleop kinova_pose_tracking_twist.launch.py
+   ```
+4. Recorder:
+   ```bash
+   ros2 launch vla_kinova_data_collection lerobot_recorder.launch.py
+   ```
+5. Session driver (kicks off the actual recording loop):
+   ```bash
+   ros2 run vla_kinova_data_collection record_session --session example
+   ```
+
+Finalize: when the driver exits, wait until the recorder logs `Stored episode with N frames.` for every kept episode, then Ctrl-C the recorder. On Ctrl-C it runs `finalize()` which writes `info.json` + per-episode stats.
+
+---
+
+## Dataset Workflow
+
+Datasets land on disk in a layout that mirrors Hugging Face's `<owner>/<name>` repo IDs, so the same string is both the local path leaf and the HF repo URL:
+
+```
+~/datasets/
+└── FilippoGorini/
+    ├── kinova_pick_v1/                  # v3 recording, push to FilippoGorini/kinova_pick_v1 (main)
+    └── kinova_pick_v1@v2.1/             # v2.1 conversion, push to same repo's v2.1 branch
+```
+
+Make sure `dataset_root = "/home/filippo/datasets"` is set in `config/kinova_pi05.toml`, and each session TOML uses `dataset_name = "FilippoGorini/<name>"` (note the `FilippoGorini/` prefix). The recorder writes to `<dataset_root>/<dataset_name>/` automatically.
+
+### One-time setup: Hugging Face tokens
+
+1. Create two access tokens at https://huggingface.co/settings/tokens:
+   - **Write** token (`kinova-laptop-write`) for the recording laptop.
+   - **Read** token (`kinova-training-server-read`) for the remote training machine.
+2. Log in from a terminal with the lerobot_ros venv active:
+   ```bash
+   source ~/isaac-projects/projects/vla_kinova_tabletop_isaac/ros2_ws/src/lerobot_ros/.venv/bin/activate
+   huggingface-cli login         # paste the write token
+   huggingface-cli whoami        # should print FilippoGorini
+   ```
+
+The token is cached at `~/.cache/huggingface/stored_tokens` and is shared across venvs, so you only need to log in once per machine.
+
+### Converting v3 to v2.1 (for openpi finetuning)
+
+openpi consumes LeRobot **v2.1** datasets while the recorder produces **v3.0**. Conversion is done in lerobot studio:
+
+1. Open lerobot studio and load `~/datasets/FilippoGorini/<name>/`.
+2. `Export → v2.1 format`, output path `~/datasets/FilippoGorini/<name>@v2.1/`.
+3. Sanity check that the converted dataset still points at the same HF repo:
+   ```bash
+   python3 -c "import json; d=json.load(open('/home/filippo/datasets/FilippoGorini/<name>@v2.1/meta/info.json')); print('repo_id:', d.get('repo_id')); print('codebase_version:', d.get('codebase_version'))"
+   ```
+   `repo_id` should equal `FilippoGorini/<name>` (same as the v3 dataset; both are branches of the same HF repo). `codebase_version` should be `v2.1`. If `repo_id` is wrong:
+   ```bash
+   python3 -c "import json; p='/home/filippo/datasets/FilippoGorini/<name>@v2.1/meta/info.json'; d=json.load(open(p)); d['repo_id']='FilippoGorini/<name>'; json.dump(d, open(p,'w'), indent=2); print('done')"
+   ```
+
+### Pushing to Hugging Face (v3 to main, v2.1 to a branch)
+
+After recording (and before / after the v2.1 conversion):
+
+```bash
+# 1. Make sure the v3 dataset's repo_id is set correctly on disk
+python3 -c "import json; p='/home/filippo/datasets/FilippoGorini/<name>/meta/info.json'; d=json.load(open(p)); d['repo_id']='FilippoGorini/<name>'; json.dump(d, open(p,'w'), indent=2); print('done')"
+
+# 2. Create the HF repo (private; flip to public from the web UI when ready)
+hf repo create FilippoGorini/<name> --repo-type dataset --private
+
+# 3. Push v3 to the main branch
+hf upload FilippoGorini/<name> ~/datasets/FilippoGorini/<name> --repo-type=dataset
+
+# 4. Create the v2.1 branch on the same repo (no `hf branch` subcommand; use the Python API)
+python -c "from huggingface_hub import create_branch; create_branch('FilippoGorini/<name>', branch='v2.1', repo_type='dataset')"
+
+# 5. Push the v2.1 content to that branch
+hf upload FilippoGorini/<name> ~/datasets/FilippoGorini/<name>@v2.1 --repo-type=dataset --revision v2.1
+```
+
+Verify by visiting `https://huggingface.co/datasets/FilippoGorini/<name>`: the branch selector should list both `main` and `v2.1`. Files differ in format between the two branches.
+
+### Pulling on the training server
+
+With the read-only token logged in on the training machine, load by `revision`:
+
+```python
+from lerobot.datasets.lerobot_dataset import LeRobotDataset
+ds = LeRobotDataset("FilippoGorini/<name>", revision="v2.1")
+```
+
+`huggingface_hub` downloads only the v2.1 branch into the local HF cache (`~/.cache/huggingface/datasets/`). For repeated pulls / very large datasets, export `HF_HUB_ENABLE_HF_TRANSFER=1` (the `hf_transfer` Rust uploader is already installed in both venvs as a `lerobot` dep).
 
 ---
 
