@@ -8,4 +8,4 @@ repositories:
   Quest2ROS2:
     type: git
     url: https://github.com/FilippoGorini/Quest2ROS2.git
-    version: 6303ab5ec887fcddba795f4e9df1057859b1acb1
+    version: 3a732a77dd4ca3983bb382e2d9f4a284785169f8
