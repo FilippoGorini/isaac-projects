@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# This bash script pulls the ros2_kortex package and all of its dependencies into the workspace and then builds it
-# Run once for server
+# This bash script pulls the ros2_kortex packages (ros2_kortex_vision as well) and all of its dependencies into the workspace and then builds it
+# Run once per machine
 
 set -e
 
@@ -13,8 +13,8 @@ cd "$SCRIPT_DIR"
 
 # Imports the ros2_kortex package
 echo ""
-echo "==> Importing top-level deps from deps.repos..."
-vcs import src --skip-existing --input deps.repos
+echo "==> Importing top-level deps from kinova_deps.repos..."
+vcs import src --skip-existing --input kinova_deps.repos
 echo ""
 
 # Imports the ros2_kortex package dependencies
@@ -26,10 +26,24 @@ echo ""
 
 
 echo ""
-echo "==> Installing system dependencies via rosdep..."
+echo "==> Installing apt system packages (control + cameras)..."
+sudo apt-get update
 # Explicitly install topic-based-ros2-control plugin for isaac, as it is not handled by rosdep (not present in the manifests of the kortex packages)
-sudo apt-get update && sudo apt-get install -y ros-$ROS_DISTRO-topic-based-ros2-control
-# Imports system dependencies
+sudo apt-get install -y ros-$ROS_DISTRO-topic-based-ros2-control
+
+# apt install the realsense ros2 libraries for RealSense D435
+sudo apt-get install -y "ros-$ROS_DISTRO-librealsense2*"
+sudo apt-get install -y "ros-$ROS_DISTRO-realsense2-*"
+
+# Explicitly install the GStreamer runtime for the kinova vision package to work (not declared in the package.xml)
+sudo apt-get install -y \
+  gstreamer1.0-tools gstreamer1.0-libav \
+  gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-good1.0-dev
+echo ""
+
+echo ""
+echo "==> Installing remaining system dependencies via rosdep..."
 rosdep install --from-paths src --ignore-src -r -y
 echo ""
 

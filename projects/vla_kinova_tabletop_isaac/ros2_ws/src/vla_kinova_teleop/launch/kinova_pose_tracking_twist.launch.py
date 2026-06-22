@@ -105,7 +105,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "launch_rviz",
-            default_value="true",
+            default_value="false",
             description="Bring up RViz alongside the twist tracking stack",
         ),
         DeclareLaunchArgument(

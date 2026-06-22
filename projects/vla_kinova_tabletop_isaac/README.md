@@ -28,13 +28,15 @@ projects/vla_kinova_tabletop_isaac/
 │   ├── bootstrap_openpi.sh       # One-shot openpi bootstrap script
 │   └── src/                      # Policy server entry point and kinova policy definition
 └── ros2_ws/
-    ├── bootstrap_kinova_ws.sh         # One-shot workspace bootstrap script
+    ├── bootstrap_kinova_ws.sh         # Robot + cameras: ros2_kortex, kinova_vision, RealSense
+    ├── bootstrap_quest_teleop.sh      # Quest 3 teleop stack (ROS-TCP-Endpoint + Quest2ROS2)
     ├── bootstrap_lerobot_ros.sh       # Adds lerobot_ros (data recording) to the workspace
-    ├── deps.repos                     # vcstool manifest for ros2_kortex and deps
+    ├── kinova_deps.repos              # vcstool manifest for ros2_kortex + kinova_vision
+    ├── teleop_deps.repos              # vcstool manifest for the Quest teleop packages
     └── src/
         ├── vla_kinova_description/         # Customized URDF/Xacro robot description
         ├── vla_kinova_bringup/              # ros2_control + MoveIt 2 launches and configs
-        ├── vla_kinova_sensors/              # ZED 2 + Kinova wrist camera bringup
+        ├── vla_kinova_sensors/              # RealSense D435 + Kinova wrist camera bringup
         ├── vla_kinova_teleop/               # Quest 3 twist-based EE pose tracking
         ├── vla_kinova_data_collection/      # LeRobot dataset recording
         └── vla_policy_client/                # ROS 2 WebSocket client for the VLA policy server
@@ -42,9 +44,16 @@ projects/vla_kinova_tabletop_isaac/
 
 ---
 
-## Bootstrap Procedure (fresh server)
+## Bootstrap Procedure (fresh machine)
 
-Run this once on each new cloud server.
+Run this once on each new machine, either a cloud GPU server or a local Ubuntu 22.04
+desktop wired to the real robot. Not every step is needed for every use case:
+
+- **Steps 1–3** set up the remote host with ROS2 Humble, Docker, IsaacSim etc (can be skipped otherwise).
+- **Step 4** (openpi) is only for running the $\pi_0/\pi_{0.5}$ policy server.
+- **Steps 5–7** are the real-robot stack (arm + cameras, Quest teleop, dataset
+  recorder). They run natively and don't require Isaac Sim. For pure real-hardware
+  use on a local desktop you still need ROS 2 Humble.
 
 **1. Clone your fork and enter the repo:**
 
@@ -89,10 +98,36 @@ cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac/ros2_ws
 ./bootstrap_kinova_ws.sh
 ```
 
-This imports `ros2_kortex` and all transitive dependencies via `vcstool`, installs
-system packages with `rosdep`, and builds the workspace with `colcon`.
+This imports `ros2_kortex` (arm + gripper) and the Kinova wrist camera
+(`kinova_vision`) plus all transitive dependencies via `vcstool`, apt-installs
+the Intel RealSense stack (`librealsense2` SDK + `realsense2` ROS 2 wrapper) and
+the GStreamer runtime the wrist camera needs, resolves the rest with `rosdep`,
+and builds the workspace with `colcon`. After this step the robot and both
+cameras (RealSense external + Kinova wrist) are ready.
 
-**6. Bootstrap the lerobot_ros data-recording layer (skip if you don't plan to record datasets):**
+> [!NOTE]
+> The ZED 2 is supported as an optional alternative external camera but is **not**
+> installed by the bootstrap, because its `zed_wrapper` needs the proprietary ZED
+> SDK (v5.2) and CUDA. Install those manually from
+> [stereolabs.com](https://www.stereolabs.com/developers/release/latest/), then
+> `git clone https://github.com/stereolabs/zed-ros2-wrapper.git` into
+> `ros2_ws/src/` and rebuild. Only needed if you launch with `launch_zed:=true`.
+
+**6. Bootstrap the Quest 3 teleoperation stack (skip if you don't teleoperate the real robot):**
+
+```bash
+source /opt/ros/humble/setup.bash   # if not already sourced
+cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac/ros2_ws
+./bootstrap_quest_teleop.sh
+```
+
+This imports the Unity `ROS-TCP-Endpoint` and the `FilippoGorini/Quest2ROS2` fork
+(pinned in `teleop_deps.repos`), generates the `quest2ros` message package the Quest
+app expects (created locally from `Quest2ROS2/Files_for_msg_pkg`), installs
+`tf_transformations`, and rebuilds the workspace. Required for the
+`vla_kinova_teleop` launch files.
+
+**7. Bootstrap the lerobot_ros data-recording layer (skip if you don't plan to record datasets):**
 
 ```bash
 cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac/ros2_ws
@@ -158,7 +193,7 @@ the terminal inside the VNC desktop:
 |---------|-------------|
 | [`vla_kinova_description`](#vla_kinova_description) | Project-specific description package wrapping the upstream `kortex_description` and `robotiq_description` packages, with separate `ros2_control` command topics for the arm and gripper. |
 | [`vla_kinova_bringup`](#vla_kinova_bringup) | ros2_control + MoveIt 2 controller configuration and launch files. Brings up the robot in either Isaac Sim or on real hardware. |
-| [`vla_kinova_sensors`](#vla_kinova_sensors) | Camera bringup to launch the upstream `kinova_vision` and `zed_wrapper` launches (RGB only). |
+| [`vla_kinova_sensors`](#vla_kinova_sensors) | Camera bringup for the Intel RealSense D435 (external) and the Kinova wrist camera via `kinova_vision` (RGB only); ZED 2 supported as an optional alternative external camera. |
 | [`vla_kinova_teleop`](#vla_kinova_teleop) | Twist-based teleoperation that subscribes to a target EE pose (from the Quest right-arm controller) and drives the Kortex twist controller. |
 | [`vla_kinova_data_collection`](#vla_kinova_data_collection) | TOML-driven dataset recording on top of `lerobot_ros`. Provides a launch file for the recorder node and a script to automate the data-collection process based on predefined TOML configuration files for each recording session (tasks, number of episodes etc) |
 | [`vla_policy_client`](#vla_policy_client) | ROS 2 node that connects to the $\pi_0$ VLA policy server over WebSocket, subscribes to joint states and camera images, and publishes joint trajectories and gripper commands at inference rate. |
@@ -272,16 +307,23 @@ Brings up MoveIt Servo and the C++ `pose_tracking_node`. **Not used anymore due 
 
 ## `vla_kinova_sensors`
 
-Camera bringup for the RGB feeds consumed by the VLA policy and by the data-recording pipeline. Composes the upstream `kinova_vision` (wrist camera) and `zed_wrapper` (external camera) launches. Depth is disabled by default on both cameras as the VLA doesn't need it.
+Camera bringup for the RGB feeds consumed by the VLA policy and by the data-recording pipeline. By default it brings up two cameras, both RGB-only (depth disabled — the VLA doesn't need it) and both publishing **raw** (the compressed/theora transports are turned off to save CPU, since we only ever record raw):
+
+- **External camera:** Intel RealSense D435, run directly via `realsense2_camera` on `/realsense/d435/color/image_raw`.
+- **Wrist camera:** Kinova Vision module via our trimmed `wrist_camera.launch.py` (the upstream `kinova_vision` color path with the compressed/theora encoders disabled) on `/camera/color/image_raw`.
+
+The ZED 2 is supported as an **optional alternative external camera** (`launch_zed:=true launch_realsense:=false`) but requires the manually-installed ZED SDK (see the bootstrap notes).
 
 ### Launch File
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `launch_wrist` | `true` | Bring up the Kinova wrist camera (RGB only, depth disabled). |
-| `launch_zed` | `true` | Bring up the ZED 2 camera. |
+| `launch_wrist` | `true` | Bring up the Kinova wrist camera (RGB only, raw, depth disabled). |
+| `launch_realsense` | `true` | Bring up the Intel RealSense D435 (RGB only; recorded as `observation.images.external`). |
+| `realsense_color_profile` | `640x480x30` | RealSense color profile `WIDTHxHEIGHTxFPS`. Valid combos depend on the USB link (`rs-enumerate-devices -c`). |
+| `launch_zed` | `false` | Bring up the ZED 2 instead of / alongside the RealSense (needs the ZED SDK). |
 | `zed_camera_model` | `zed2` | ZED model passed to `zed_wrapper`. |
-| `kinova_ip` | `192.168.50.12` | IPv4 address of the Kinova arm; forwarded to `kinova_vision` as `device`. |
+| `kinova_ip` | `192.168.50.12` | IPv4 address of the Kinova arm; forwarded to the wrist camera as `device`. |
 | `zed_disable_depth` | `true` | Sets `depth.depth_mode:=NONE` on the ZED, which also disables point cloud, positional tracking and every other module that depends on depth extraction. |
 | `zed_resolution` | `HD720` | ZED resolution. One of `HD2K`, `HD1080`, `HD720`, `VGA`, `AUTO`. |
 | `zed_grab_fps` | `30` | ZED internal grab frame rate in Hz. Allowed values depend on the resolution: `HD2K@15`, `HD1080@15/30`, `HD720@15/30/60`, `VGA@15/30/60/100`. |
@@ -289,29 +331,29 @@ Camera bringup for the RGB feeds consumed by the VLA policy and by the data-reco
 
 The ZED-specific arguments above are bundled into a single `param_overrides` string and forwarded to the upstream `zed_camera.launch.py`.
 
-*Both cameras:*
+*Default (RealSense external + Kinova wrist):*
 
 ```bash
 ros2 launch vla_kinova_sensors cameras.launch.py
 ```
 
-*Wrist only / ZED only:*
+*Wrist only / external only:*
 
 ```bash
-ros2 launch vla_kinova_sensors cameras.launch.py launch_zed:=false
+ros2 launch vla_kinova_sensors cameras.launch.py launch_realsense:=false
 ros2 launch vla_kinova_sensors cameras.launch.py launch_wrist:=false
 ```
 
-*Higher-resolution ZED RGB:*
+*Higher-resolution RealSense RGB:*
 
 ```bash
-ros2 launch vla_kinova_sensors cameras.launch.py zed_resolution:=HD1080 zed_grab_fps:=30
+ros2 launch vla_kinova_sensors cameras.launch.py realsense_color_profile:=1280x720x30
 ```
 
-*Re-enable depth on the ZED:*
+*Use the ZED instead of the RealSense as the external camera:*
 
 ```bash
-ros2 launch vla_kinova_sensors cameras.launch.py zed_disable_depth:=false
+ros2 launch vla_kinova_sensors cameras.launch.py launch_zed:=true launch_realsense:=false
 ```
 
 ---
@@ -342,7 +384,7 @@ Brings up the robot side of the teleop loop.
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `robot_ip` | `192.168.50.12` | IP address of the real Kinova arm. |
-| `launch_rviz` | `true` | Bring up RViz alongside the teleop stack. |
+| `launch_rviz` | `false` | Bring up RViz alongside the teleop stack. |
 | `tf_publish_rate` | `200.0` | Forwarded to `kinova_controllers.launch.py`. |
 
 ```bash
@@ -417,10 +459,10 @@ The lerobot_ros recorder itself (the `dataset_recorder` node) lives in `ros2_ws/
 
 ### Package Files
 
-- **`config/kinova_pi05.toml`**: Recorder configuration. Sets `fps=30`, `robot_type=kinova_gen3_robotiq_2f85`, `dataset_root`, and topic subscriptions. Two `/joint_states` subscriptions (one tagged `observation`, one tagged `action` for the arm joints), plus `/gripper_command/state` as the gripper dimension of the action, plus the ZED VGA RGB feed (672x376) and the Kinova wrist RGB feed (320x240) as image topics.
+- **`config/kinova_pi05.toml`**: Recorder configuration. Sets `fps=30`, `robot_type=kinova_gen3_6dof_2f85`, `dataset_root`, and topic subscriptions. Two `/joint_states` subscriptions (one tagged `observation`, one tagged `action` for the arm joints), plus `/gripper_command/state` as the gripper dimension of the action, plus the RealSense D435 RGB feed (640x480) and the Kinova wrist RGB feed (320x240) as image topics. The recorded image dimensions match the published topics exactly, so lerobot_ros records them verbatim (no resize, no JPEG round-trip).
 - **`sessions/example.toml`**: Example recording session: `dataset_name`, plus an ordered list of `{prompt, episodes}` tasks. 
 - **`launch/lerobot_recorder.launch.py`**: Wraps `ros2 run lerobot_ros dataset_recorder` so you don't have to expand the config path each time; also sets `HF_HUB_OFFLINE=1` so reopening an existing dataset doesn't try to fetch it from Hugging Face.
-- **`vla_kinova_data_collection/record_session.py`**: Script to automate data-collection given a TOML plan for the recording session. Connects to the recorder's services (`/new_dataset`, `/start_episode`, `/end_episode`, `/store_episodes`), walks through the slots in a session TOML, and handles keep/discard/skip/quit from the keyboard.
+- **`vla_kinova_data_collection/record_session.py`**: Script to automate data-collection given a TOML plan for the recording session. Connects to the recorder's services (`/new_dataset`, `/start_episode`, `/end_episode`, `/store_episodes`, `/finalize_dataset`), walks through the slots in a session TOML, and handles keep/discard/skip/quit from the keyboard.
 
 ### Launch File
 
@@ -449,23 +491,23 @@ ros2 run vla_kinova_data_collection record_session --session example
 ros2 run vla_kinova_data_collection record_session -s ~/my_thesis_session.toml
 ```
 
-The script does NOT finalize the dataset on exit. Once the session ends, Ctrl-C the recorder process (which then runs `dataset.finalize()`).
+When the session ends (or you quit after keeping episodes), the script calls `/finalize_dataset`, which waits for the background encoding to finish and writes the dataset metadata before returning. You do **not** need to Ctrl-C the recorder to persist the dataset.
 
 ### Recording a Dataset (full terminal sequence)
 
 Open each command in its own terminal; source the project setup in every new terminal first.
 
-1. Robot bringup:
-   ```bash
-   ros2 launch vla_kinova_bringup kinova_controllers.launch.py
-   ```
-2. Cameras (ZED at VGA + Kinova wrist):
-   ```bash
-   ros2 launch vla_kinova_sensors cameras.launch.py zed_resolution:=VGA
-   ```
-3. Quest teleop:
+1. Robot + teleop (this already includes `kinova_controllers.launch.py`, so no separate bringup is needed):
    ```bash
    ros2 launch vla_kinova_teleop kinova_pose_tracking_twist.launch.py
+   ```
+2. Quest bridge (ROS-TCP endpoint + Quest controller):
+   ```bash
+   ros2 launch vla_kinova_teleop quest_bringup.launch.py
+   ```
+3. Cameras (RealSense D435 external + Kinova wrist):
+   ```bash
+   ros2 launch vla_kinova_sensors cameras.launch.py
    ```
 4. Recorder:
    ```bash
@@ -476,7 +518,7 @@ Open each command in its own terminal; source the project setup in every new ter
    ros2 run vla_kinova_data_collection record_session --session example
    ```
 
-Finalize: when the driver exits, wait until the recorder logs `Stored episode with N frames.` for every kept episode, then Ctrl-C the recorder. On Ctrl-C it runs `finalize()` which writes `info.json` + per-episode stats.
+Finalize: the driver calls `/finalize_dataset` automatically when it exits after keeping episodes, so it blocks until the encoding finishes and the metadata (`info.json` + per-episode stats) is written. Once it prints that the dataset is finalized, the recorder can be safely Ctrl-C'd.
 
 ---
 
