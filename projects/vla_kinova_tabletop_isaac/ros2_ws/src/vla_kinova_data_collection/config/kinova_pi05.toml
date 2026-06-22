@@ -1,7 +1,6 @@
 # lerobot_ros recording config for the Kinova Gen3 + Robotiq 2F-85 setup.
 #
-# Schema is defined by upstream lerobot_ros (see config.py / convert/*.py). The
-# recorder builds a LeRobot v3.0 dataset with columns keyed by topic tag:
+# The recorder builds a LeRobot v3.0 dataset with columns keyed by topic tag:
 #   - tag = "observation" (default) -> observation.state (joints concatenated)
 #   - tag = "action"                -> action            (joints concatenated)
 #   - tag = "meta"                  -> meta.<key>
@@ -20,8 +19,8 @@
 # back into a GripperCommand goal at inference.
 
 fps = 30
-dataset_root = "/home/filippo/datasets"  # absolute path (lerobot_ros doesn't expand ~). Each session's dataset_name = "<hf_owner>/<repo>" lands at <dataset_root>/<hf_owner>/<repo>/
-robot_type = "kinova_gen3_robotiq_2f85"
+dataset_root = "/home/filippo/datasets"
+robot_type = "kinova_gen3_6dof_2f85" 
 
 visualize = false
 # rerun_remote = "rerun+http://127.0.0.1:9876/proxy"  # uncomment to stream to a Rerun viewer
@@ -83,19 +82,20 @@ position = true
 velocity = false
 effort = false
 
-# ---- cameras (resolutions are best-guess natives; lerobot_ros silently resizes if topic differs) ----
+# ---- cameras (both recorded raw, the dimensions below match the published ones so that lerobot_ros doesn't resize/scale them) ----
 
-# ZED 2 — RGB rectified, VGA = 672x376 (depth disabled in cameras.launch.py).
-# Launch cameras with: zed_resolution:=VGA to match these dims (no resize).
-[topics."/zed/zed_node/rgb/color/rect/image"]
+# External camera: realsense d435, RGB only at 640x480 (max resolution at 30 fps with USB 2.1, and also allows for fast encoding)
+[topics."/realsense/d435/color/image_raw"]
 msg_type = "Image"
 qos = { reliability = "reliable", durability = "volatile", depth = 10, history = "keep_last" }
-height = 376
-width = 672
+height = 480
+width = 640
 channels = 3
 key = "external"
 
-# Kinova wrist (Kortex color) — already publishes at 320x240.
+# Kinova wrist (Kortex color) — raw rgb8 at 320x240, sensor resolution set via
+# the Kinova web app (kinova_vision streams it through; no software resize).
+# Kinova wrist camera, currently publishes at 320x240@30fps
 [topics."/camera/color/image_raw"]
 msg_type = "Image"
 qos = { reliability = "reliable", durability = "volatile", depth = 10, history = "keep_last" }
@@ -103,6 +103,3 @@ height = 240
 width = 320
 channels = 3
 key = "wrist"
-
-[policies]
-# No policies yet; will be filled once we have a finetuned pi0.5 checkpoint.
