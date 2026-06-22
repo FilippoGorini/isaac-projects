@@ -12,8 +12,10 @@ The `--session` value can be:
       then in the package's share/sessions/ dir).
     - a relative or absolute path to a TOML file.
 
-The lerobot_ros recorder must already be running. This script does NOT finalize
-the dataset on exit: Ctrl-C the recorder when done so it writes info.json/meta.
+The lerobot_ros recorder must already be running. When the session completes
+(or you quit after keeping episodes) this script calls /finalize_dataset, which
+consolidates the parquet + writes meta/info before returning. You do NOT need to
+Ctrl-C the recorder to persist the dataset.
 
 Keybindings (no Enter required):
     SPACE / Enter   start the current episode
@@ -91,11 +93,13 @@ class SessionDriver(Node):
         self.start_cli = self.create_client(StartEpisode, "/start_episode")
         self.end_cli = self.create_client(EndEpisode, "/end_episode")
         self.store_cli = self.create_client(Trigger, "/store_episodes")
+        self.finalize_cli = self.create_client(Trigger, "/finalize_dataset")
         self._cli_table = [
             ("/new_dataset", self.new_ds_cli),
             ("/start_episode", self.start_cli),
             ("/end_episode", self.end_cli),
             ("/store_episodes", self.store_cli),
+            ("/finalize_dataset", self.finalize_cli),
         ]
 
     def wait_for_services(self, timeout_per_service: float = 10.0):
@@ -137,6 +141,12 @@ class SessionDriver(Node):
         res = self._call(self.store_cli, Trigger.Request())
         if not res.success:
             raise RuntimeError(f"/store_episodes failed: {res.message}")
+
+    def finalize_dataset(self):
+        # Joins pending encode threads + consolidates the parquet/meta, so we give it a long timeout for safety
+        res = self._call(self.finalize_cli, Trigger.Request(), timeout_sec=600.0)
+        if not res.success:
+            raise RuntimeError(f"/finalize_dataset failed: {res.message}")
 
 
 def build_slots(tasks: list) -> List[Slot]:
@@ -264,9 +274,14 @@ def run_session(driver: SessionDriver, dataset_name: str, slots: List[Slot]) -> 
 
     print()
     print(f"Done. kept={stored}  discarded={discarded}  skipped={skipped}")
-    print("NOTE: encoding runs in a background thread inside the recorder.")
-    print("Wait until the recorder logs 'Stored episode with N frames.' for ALL kept")
-    print("episodes BEFORE Ctrl-C'ing the recorder, otherwise the last ones will be lost.")
+
+    if stored > 0:
+        print("Finalizing dataset: waiting for encoding + writing parquet/meta...", flush=True)
+        driver.finalize_dataset()
+        print("Dataset finalized and safe to use. The recorder can now be Ctrl-C'd.", flush=True)
+    else:
+        print("No episodes kept; nothing to finalize.", flush=True)
+
     return 1 if quit_early else 0
 
 
