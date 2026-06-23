@@ -32,7 +32,9 @@ echo ""
 echo ""
 echo "==> Installing teleop system dependencies..."
 sudo apt-get update && sudo apt-get install -y ros-$ROS_DISTRO-tf-transformations
-rosdep install --from-paths src --ignore-src -r -y
+
+# as for the kinova bootstrap script, we skip gazebo_ros2_control to avoid conflicts with newer versions of gazebo (such as harmonic) installed on the lab's workstation
+rosdep install --from-paths src --ignore-src -r -y --skip-keys gazebo_ros2_control
 echo ""
 
 echo ""

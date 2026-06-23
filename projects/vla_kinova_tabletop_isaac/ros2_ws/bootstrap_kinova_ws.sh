@@ -44,7 +44,9 @@ echo ""
 
 echo ""
 echo "==> Installing remaining system dependencies via rosdep..."
-rosdep install --from-paths src --ignore-src -r -y
+
+# For simplicity we skip gazebo_ros2_control as on the lab's workstation this leads to apt level conflicts, and in this project we only care about isaacsim anyways
+rosdep install --from-paths src --ignore-src -r -y --skip-keys gazebo_ros2_control
 echo ""
 
 # Build workspace
