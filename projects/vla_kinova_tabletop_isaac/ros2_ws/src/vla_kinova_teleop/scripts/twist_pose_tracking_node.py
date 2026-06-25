@@ -83,7 +83,7 @@ class TwistPoseTrackingNode(Node):
         self.target_sub = self.create_subscription(
             PoseStamped, target_topic, self._target_callback, qos_profile_sensor_data
         )
-        self.twist_pub = self.create_publisher(Twist, twist_command_topic, 10)
+        self.twist_pub = self.create_publisher(Twist, twist_command_topic, 1)
 
         # State
         self.latest_target = None

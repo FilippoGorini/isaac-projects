@@ -20,6 +20,8 @@ projects/vla_kinova_tabletop_isaac/
 ├── .env.example                  # Template environment file; copy to .env
 ├── .env                          # Local config (never committed)
 ├── setup.bash                    # Source in every new terminal
+├── set_dds_udp_buffers.sh         # Re-run after every reboot: raises kernel UDP buffers for reliable camera topics
+├── set_quest_adp_connection.sh    # Re-run after replugging the Quest's USB cable: tunnels the teleop link over USB instead of WiFi
 ├── isaacsim/
 │   ├── worlds/                   # Isaac Sim USD scenes (see below)
 │   ├── rl_scenes/                # RL scene configs (empty for now)
@@ -356,6 +358,18 @@ ros2 launch vla_kinova_sensors cameras.launch.py realsense_color_profile:=1280x7
 ros2 launch vla_kinova_sensors cameras.launch.py launch_zed:=true launch_realsense:=false
 ```
 
+### Reliable camera topic rates (run after every reboot)
+
+On machines without enlarged kernel UDP buffers, DDS drops fragments of large messages
+like raw camera frames under load, causing low/unstable rates on `/realsense/d435/color/image_raw` (for example).
+Fix by raising `net.core.rmem_max`/`wmem_max` for the session:
+
+```bash
+./set_dds_udp_buffers.sh
+```
+
+This is intentionally **not** persisted to `/etc/sysctl.d` as the lab's workstation is shared with others, remember to re-run after every reboot.
+
 ---
 
 ## `vla_kinova_teleop`
@@ -407,6 +421,18 @@ ros2 launch vla_kinova_teleop quest_bringup.launch.py
 ```
 
 Replaces the manual two-terminal workflow (`ros2 launch ros_tcp_endpoint endpoint.py` + `ros2 run q2r2_bringup right_arm_controller`). Run alongside `kinova_pose_tracking_twist.launch.py` to get the full teleop stack.
+
+### Reliable Quest connection (if WiFi causes hiccups)
+
+Lab WiFi can be too unreliable for teleop (we measured 100-300ms+ delivery stalls), causing the arm to
+freeze briefly then snap to the target. Fix by tethering the Quest over USB instead:
+
+```bash
+./set_quest_adp_connection.sh
+```
+
+Then, in the Quest2ROS app on the headset, set the server IP to `127.0.0.1`. Re-run the script every
+time you unplug/replug the USB cable.
 
 ---
 
@@ -814,6 +840,16 @@ Restore on a fresh server:
 ---
 
 ## Troubleshooting
+
+- **RealSense camera topic is slow/empty in ROS 2, even though `realsense-viewer` shows a smooth 30 fps.**
+  Linux's default network buffers are too small for camera-sized messages, so data gets dropped. Fix:
+  1. Run `./set_dds_udp_buffers.sh` once after every reboot, before launching the cameras.
+  2. Check `.env` has `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` set.
+
+- **Quest teleop is jerky, or the arm freezes briefly then snaps forward.** If WiFi is too unreliable to provide a smooth data stream, 
+you can fix it by connecting the Quest with a USB-C cable instead:
+  1. Run `./set_quest_adp_connection.sh` (re-run every time you unplug/replug the cable).
+  2. In the Quest2ROS app on the headset, set the server IP to `127.0.0.1`.
 
 <!-- Add project-specific troubleshooting notes here. -->
 
