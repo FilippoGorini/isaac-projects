@@ -19,7 +19,8 @@
 # back into a GripperCommand goal at inference.
 
 fps = 30
-dataset_root = "/home/filippo/datasets"
+# dataset_root = "/home/filippo/datasets"
+dataset_root = "/home/students/work/filippo/datasets"
 robot_type = "kinova_gen3_6dof_2f85" 
 
 visualize = false
