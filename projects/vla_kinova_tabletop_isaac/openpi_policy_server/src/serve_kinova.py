@@ -2,22 +2,16 @@
 """Serve pi0_base for Kinova Gen3 6-DoF + Robotiq 2F-85."""
 import dataclasses
 import logging
-import pathlib
 import socket
-import sys
 
 import tyro
-
-# Make kinova_policy importable alongside this script
-sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 from openpi import transforms as _transforms
 from openpi.models import pi0_config
 from openpi.policies import policy_config as _policy_config
+from openpi.policies.kinova_policy import KinovaInputs, KinovaOutputs
 from openpi.serving import websocket_policy_server
 from openpi.training.config import AssetsConfig, SimpleDataConfig, TrainConfig
-
-from kinova_policy import KinovaInputs, KinovaOutputs
 
 PI0_BASE_CHECKPOINT = "gs://openpi-assets/checkpoints/pi0_base"
 
