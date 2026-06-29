@@ -32,12 +32,20 @@ cd "$OPENPI_DIR"
 GIT_LFS_SKIP_SMUDGE=1 uv sync
 GIT_LFS_SKIP_SMUDGE=1 uv pip install -e .
 
+# System packages:
+#   - python3-pip: to install openpi-client into system Python 
+#   - ffmpeg: torchcodec (lerobot's video decoder) needs the FFmpeg libs to decode dataset videos at training time
+#   - gsutil: faster checkpoint downloads from gs://openpi-assets (openpi falls back to gcsfs without it)
+echo "==> Installing system dependencies (python3-pip, ffmpeg, gsutil)..."
+sudo apt-get update -y
+sudo apt-get install -y python3-pip ffmpeg gsutil
+
 # Install the openpi WebSocket client into system Python so that the ROS 2
 # policy_client node (which runs under /usr/bin/python3, not the uv venv) can
 # import it.  typing-extensions is a required transitive dep that openpi-client
 # omits from its metadata on Python <3.12.
 echo "==> Installing openpi-client into system Python..."
-pip install openpi-client typing-extensions
+python3 -m pip install openpi-client typing-extensions
 
 echo ""
 echo "==> openpi ready at $OPENPI_DIR"
