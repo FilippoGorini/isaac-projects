@@ -4,8 +4,7 @@ set -e
 # Server-side bootstrap script for the machine which either trains or deploy the model (remote server or lab's one)
 # Not needed for machines which only runs the ROS2 client side using openpi-client
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPENPI_DIR="$PROJECT_DIR/external/openpi"
 
 FORK_URL="https://github.com/FilippoGorini/openpi.git"

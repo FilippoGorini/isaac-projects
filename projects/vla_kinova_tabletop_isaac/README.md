@@ -22,13 +22,15 @@ projects/vla_kinova_tabletop_isaac/
 ├── setup.bash                    # Source in every new terminal
 ├── set_dds_udp_buffers.sh         # Re-run after every reboot: raises kernel UDP buffers for reliable camera topics
 ├── set_quest_adp_connection.sh    # Re-run after replugging the Quest's USB cable: tunnels the teleop link over USB instead of WiFi
+├── bootstrap_openpi.sh            # Server-side openpi bootstrap: clones the fork into external/openpi, uv sync
+├── bootstrap_openpi_client.sh     # Client-side bootstrap: installs openpi-client into system Python
+├── test_aloha_server.sh           # Smoke test: serve the stock pi0 ALOHA policy from the fork
+├── test_aloha_client.sh           # Smoke test: ping the policy server with ALOHA-shaped observations
 ├── isaacsim/
 │   ├── worlds/                   # Isaac Sim USD scenes (see below)
 │   ├── rl_scenes/                # RL scene configs (empty for now)
 │   └── startup_scenes/           # Lab startup scenes (empty for now)
-├── openpi_policy_server/
-│   ├── bootstrap_openpi.sh       # One-shot openpi bootstrap script
-│   └── src/                      # Policy server entry point and kinova policy definition
+├── external/                      # Cloned openpi fork (gitignored), created by bootstrap_openpi.sh
 └── ros2_ws/
     ├── bootstrap_kinova_ws.sh         # Robot + cameras: ros2_kortex, kinova_vision, RealSense
     ├── bootstrap_quest_teleop.sh      # Quest 3 teleop stack (ROS-TCP-Endpoint + Quest2ROS2)
@@ -77,16 +79,26 @@ source projects/vla_kinova_tabletop_isaac/.env
 ./isaac_vmctl.sh bootstrap
 ```
 
-**4. Bootstrap the openpi policy server (you can skip this if you don't want to run the $\pi_0/\pi_{0.5}$ VLA models) :**
+**4. Bootstrap openpi (you can skip this if you don't want to run the $\pi_0/\pi_{0.5}$ VLA models) :**
 
 ```bash
-cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac/openpi_policy_server
+cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac
+```
+
+On the machine that **serves** the policy (cloud GPU server or the lab's
+workstation), run the server bootstrap. It clones the `openpi` fork into
+`external/openpi`, creates a `uv`-managed virtual environment, and installs the
+system dependencies (ffmpeg, gsutil, the `hf` CLI) used for training/inference:
+
+```bash
 ./bootstrap_openpi.sh
 ```
 
-This clones the `openpi` repository into `external/openpi`, creates a `uv`-managed
-virtual environment for the policy server, and installs `openpi-client` plus its
-dependencies into system Python so the ROS 2 policy client node can import them.
+On the machine that runs the **ROS 2 client**, run the client bootstrap instead. It only installs `openpi-client` into system Python so the policy client node can import it:
+
+```bash
+./bootstrap_openpi_client.sh
+```
 
 **5. Bootstrap the Kinova ROS 2 workspace:**
 
@@ -438,7 +450,17 @@ time you unplug/replug the USB cable.
 
 ## `vla_policy_client`
 
-This package implements the ROS 2 side of the VLA inference loop. It connects to the $\pi_0$ policy server (started via `openpi_policy_server/scripts/serve_kinova.sh`) over a WebSocket using `openpi-client`, and drives the robot at inference rate by publishing joint trajectories and gripper commands.
+This package implements the ROS 2 side of the VLA inference loop. It connects to the policy server over a WebSocket using `openpi-client`, and drives the robot at inference rate by publishing joint trajectories and gripper commands.
+
+The server is started from the openpi fork with `scripts/serve_policy.py`, pointing it at the registered `pi05_kinova_finetune` config and the finetuned checkpoint on HuggingFace:
+
+```bash
+cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac/external/openpi
+uv run scripts/serve_policy.py --port 8000 \
+    policy:checkpoint \
+    --policy.config pi05_kinova_finetune \
+    --policy.dir hf://FilippoGorini/<repo>/<checkpoint_folder>
+```
 
 ### Node: `policy_client`
 
@@ -469,7 +491,7 @@ This package implements the ROS 2 side of the VLA inference loop. It connects to
 
 ### Launch File
 
-Make sure the policy server is already running (`serve_kinova.sh`) and Isaac Sim is streaming joint states and camera images before launching the client.
+Make sure the policy server is already running (see the `serve_policy.py` command above) and Isaac Sim is streaming joint states and camera images before launching the client.
 
 ```bash
 ros2 launch vla_policy_client policy_client.launch.py prompt:="Pick up the green cube"
@@ -566,14 +588,11 @@ Make sure `dataset_root = "/home/filippo/datasets"` is set in `config/kinova_pi0
 1. Create two access tokens at https://huggingface.co/settings/tokens:
    - **Write** token (`kinova-laptop-write`) for the recording laptop.
    - **Read** token (`kinova-training-server-read`) for the remote training machine.
-2. Log in from a terminal with the lerobot_ros venv active:
+2. From any terminal (the `hf` CLI is installed system-wide by both the openpi and lerobot_ros bootstraps) login into HF:
    ```bash
-   source ~/isaac-projects/projects/vla_kinova_tabletop_isaac/ros2_ws/src/lerobot_ros/.venv/bin/activate
-   huggingface-cli login         # paste the write token
-   huggingface-cli whoami        # should print FilippoGorini
+   hf auth login          # paste the write token
+   hf auth whoami         # should print FilippoGorini
    ```
-
-The token is cached at `~/.cache/huggingface/stored_tokens` and is shared across venvs, so you only need to log in once per machine.
 
 ### Converting v3 to v2.1 (for openpi finetuning)
 
@@ -581,34 +600,24 @@ openpi consumes LeRobot **v2.1** datasets while the recorder produces **v3.0**. 
 
 1. Open lerobot studio and load `~/datasets/FilippoGorini/<name>/`.
 2. `Export → v2.1 format`, output path `~/datasets/FilippoGorini/<name>@v2.1/`.
-3. Sanity check that the converted dataset still points at the same HF repo:
-   ```bash
-   python3 -c "import json; d=json.load(open('/home/filippo/datasets/FilippoGorini/<name>@v2.1/meta/info.json')); print('repo_id:', d.get('repo_id')); print('codebase_version:', d.get('codebase_version'))"
-   ```
-   `repo_id` should equal `FilippoGorini/<name>` (same as the v3 dataset; both are branches of the same HF repo). `codebase_version` should be `v2.1`. If `repo_id` is wrong:
-   ```bash
-   python3 -c "import json; p='/home/filippo/datasets/FilippoGorini/<name>@v2.1/meta/info.json'; d=json.load(open(p)); d['repo_id']='FilippoGorini/<name>'; json.dump(d, open(p,'w'), indent=2); print('done')"
-   ```
+3. Sanity check that the exported `meta/info.json` still has `repo_id: FilippoGorini/<name>` (same repo as the v3 dataset; both are branches of it) and `codebase_version: v2.1`.
 
 ### Pushing to Hugging Face (v3 to main, v2.1 to a branch)
 
 After recording (and before / after the v2.1 conversion):
 
 ```bash
-# 1. Make sure the v3 dataset's repo_id is set correctly on disk
-python3 -c "import json; p='/home/filippo/datasets/FilippoGorini/<name>/meta/info.json'; d=json.load(open(p)); d['repo_id']='FilippoGorini/<name>'; json.dump(d, open(p,'w'), indent=2); print('done')"
+# 1. Create the HF repo (private; flip to public from the web UI when ready)
+hf repos create FilippoGorini/<name> --repo-type dataset --private
 
-# 2. Create the HF repo (private; flip to public from the web UI when ready)
-hf repo create FilippoGorini/<name> --repo-type dataset --private
+# 2. Push v3 to the main branch
+hf upload FilippoGorini/<name> ~/datasets/FilippoGorini/<name> --repo-type dataset
 
-# 3. Push v3 to the main branch
-hf upload FilippoGorini/<name> ~/datasets/FilippoGorini/<name> --repo-type=dataset
+# 3. Create the v2.1 branch on the same repo
+hf repos branch create FilippoGorini/<name> v2.1 --repo-type dataset
 
-# 4. Create the v2.1 branch on the same repo (no `hf branch` subcommand; use the Python API)
-python -c "from huggingface_hub import create_branch; create_branch('FilippoGorini/<name>', branch='v2.1', repo_type='dataset')"
-
-# 5. Push the v2.1 content to that branch
-hf upload FilippoGorini/<name> ~/datasets/FilippoGorini/<name>@v2.1 --repo-type=dataset --revision v2.1
+# 4. Push the v2.1 content to that branch
+hf upload FilippoGorini/<name> ~/datasets/FilippoGorini/<name>@v2.1 --repo-type dataset --revision v2.1
 ```
 
 Verify by visiting `https://huggingface.co/datasets/FilippoGorini/<name>`: the branch selector should list both `main` and `v2.1`. Files differ in format between the two branches.
@@ -622,7 +631,7 @@ from lerobot.datasets.lerobot_dataset import LeRobotDataset
 ds = LeRobotDataset("FilippoGorini/<name>", revision="v2.1")
 ```
 
-`huggingface_hub` downloads only the v2.1 branch into the local HF cache (`~/.cache/huggingface/datasets/`). For repeated pulls / very large datasets, export `HF_HUB_ENABLE_HF_TRANSFER=1` (the `hf_transfer` Rust uploader is already installed in both venvs as a `lerobot` dep).
+`huggingface_hub` downloads only the v2.1 branch into the local HF cache (`~/.cache/huggingface/datasets/`).
 
 ---
 

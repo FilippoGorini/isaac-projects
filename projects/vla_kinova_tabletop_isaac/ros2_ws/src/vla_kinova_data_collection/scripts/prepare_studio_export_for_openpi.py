@@ -24,7 +24,7 @@ Usage
 Run with any Python 3 interpreter. pyarrow must be available (it is in both
 the lerobot_ros and openpi venvs):
 
-    python generate_episodes_stats.py /path/to/dataset@v2.1
+    python prepare_studio_export_for_openpi.py /path/to/dataset@v2.1
 
 Then push the whole folder to HF using the lerobot_ros venv as usual:
 
