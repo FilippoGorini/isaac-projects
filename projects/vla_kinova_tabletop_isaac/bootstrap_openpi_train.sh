@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e
 
-# base openpi bootstrap for the lab's server which will run the inference: it clones the fork and builds its uv venv
-# HF installation is not needed, it's already handled inside of the uv venv and is automatically used to download checkpoints with hf://...
+# Server-side bootstrap script for the machine which trains the model.
+# This is the same as bootstrap_openpi.sh but adds the system dependencies needed for training.
+# To run inference on the lab's server use the bare bootstrap_openpi.sh instead of this.
 # Not needed on machines that only run the ROS 2 client (use bootstrap_openpi_client.sh).
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,5 +36,17 @@ cd "$OPENPI_DIR"
 GIT_LFS_SKIP_SMUDGE=1 uv sync
 GIT_LFS_SKIP_SMUDGE=1 uv pip install -e .
 
+# Additional system packages needed for training:
+# - ffmpeg: torchcodec needs it to decode dataset videos at training time
+# - gsutil: not strictly needed (falls back to gsutils) but recommended for better download speed of checkpoints from gs://....
+# - python3-pip: to install the huggingface_hub CLI into system Python
+echo "==> Installing system dependencies (ffmpeg, gsutil, python3-pip)..."
+sudo apt-get update -y
+sudo apt-get install -y ffmpeg gsutil python3-pip
+
+# Also install huggingface hub so that we can pull/push checkpoints
+echo "==> Installing huggingface_hub CLI into system Python..."
+python3 -m pip install "huggingface_hub[cli,hf_xet]"
+
 echo ""
-echo "==> openpi base ready at $OPENPI_DIR"
+echo "==> openpi ready at $OPENPI_DIR"
