@@ -18,6 +18,8 @@
 #   5. Builds lerobot_interfaces and lerobot_ros with colcon
 #   6. Rewrites the entry-point shebangs to point at the venv's Python so
 #      that `ros2 run lerobot_ros dataset_recorder` actually uses the venv
+#   7. Installs the HuggingFace CLI (`hf`) into user Python for pushing the
+#      datasets recorded here to the Hub
 
 set -e
 
@@ -99,6 +101,15 @@ for f in "$SCRIPT_DIR/install/lerobot_ros/lib/lerobot_ros"/*; do
         sed -i "1s|^#!.*|#!${VENV_PYTHON}|" "$f"
     fi
 done
+
+# Install huggingface hub so that we can push the recorded datasets manually without worrying about venvs
+# (we don't bother with the lerobot_ros' push_to_hub service for now for simplicity, maybe we can check it in the future)
+if ! python3 -m pip --version &>/dev/null; then
+    echo "==> Installing python3-pip (needed for the hf CLI)..."
+    sudo apt-get update -y && sudo apt-get install -y python3-pip
+fi
+echo "==> Installing huggingface_hub CLI (for dataset push) into user Python..."
+python3 -m pip install "huggingface_hub[cli,hf_xet]"
 
 echo ""
 echo "==> lerobot_ros ready at $LEROBOT_ROS_DIR"

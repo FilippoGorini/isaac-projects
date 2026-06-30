@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Server-side bootstrap script for the machine which either trains or deploy the model (remote server or lab's one)
+# Not needed for machines which only runs the ROS2 client side using openpi-client
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 OPENPI_DIR="$PROJECT_DIR/external/openpi"
@@ -32,20 +35,17 @@ cd "$OPENPI_DIR"
 GIT_LFS_SKIP_SMUDGE=1 uv sync
 GIT_LFS_SKIP_SMUDGE=1 uv pip install -e .
 
-# System packages:
-#   - python3-pip: to install openpi-client into system Python 
-#   - ffmpeg: torchcodec (lerobot's video decoder) needs the FFmpeg libs to decode dataset videos at training time
-#   - gsutil: faster checkpoint downloads from gs://openpi-assets (openpi falls back to gcsfs without it)
-echo "==> Installing system dependencies (python3-pip, ffmpeg, gsutil)..."
+# Additional system packages needed for training:
+# - ffmpeg: torchcodec needs it to decode dataset videos at training time
+# - gsutil: not strictly needed (falls back to gsutils) but recommended for better download speed of checkpoints from gs://.... 
+# - python3-pip: to install the huggingface_hub CLI into system Python
+echo "==> Installing system dependencies (ffmpeg, gsutil, python3-pip)..."
 sudo apt-get update -y
-sudo apt-get install -y python3-pip ffmpeg gsutil
+sudo apt-get install -y ffmpeg gsutil python3-pip
 
-# Install the openpi WebSocket client into system Python so that the ROS 2
-# policy_client node (which runs under /usr/bin/python3, not the uv venv) can
-# import it.  typing-extensions is a required transitive dep that openpi-client
-# omits from its metadata on Python <3.12.
-echo "==> Installing openpi-client into system Python..."
-python3 -m pip install openpi-client typing-extensions
+# Also install huggingface hub so that we can pull/push checkpoints
+echo "==> Installing huggingface_hub CLI into system Python..."
+python3 -m pip install "huggingface_hub[cli,hf_xet]"
 
 echo ""
 echo "==> openpi ready at $OPENPI_DIR"
