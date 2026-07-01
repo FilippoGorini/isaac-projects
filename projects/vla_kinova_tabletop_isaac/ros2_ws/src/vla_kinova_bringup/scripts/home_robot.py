@@ -14,7 +14,8 @@ class HomeRobot(Node):
         prefix = prefix.strip('"\'')
 
         if positions is None:
-            self.positions = [0.0, 0.418879, -1.8675, 0.0, 0.750492, 1.5708]
+            self.positions = [0.0, -0.281186, -2.169146, 0.0, -1.197100, 1.5708]        # average starting position in the dataset approximated to be centered
+            # self.positions = [0.0, 0.418879, -1.8675, 0.0, 0.750492, 1.5708]        # looking forward position
         else:
             self.positions = positions
 
