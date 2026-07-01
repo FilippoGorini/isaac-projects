@@ -29,6 +29,7 @@ setup(
     entry_points={
         'console_scripts': [
             'policy_client = vla_policy_client.policy_client_node:main',
+            'policy_client_synchronous = vla_policy_client.policy_client_synchronous_node:main',
         ],
     },
 )
