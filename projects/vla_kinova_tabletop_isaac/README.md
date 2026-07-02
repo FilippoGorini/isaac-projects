@@ -22,7 +22,8 @@ projects/vla_kinova_tabletop_isaac/
 ├── setup.bash                    # Source in every new terminal
 ├── set_dds_udp_buffers.sh         # Re-run after every reboot: raises kernel UDP buffers for reliable camera topics
 ├── set_quest_adp_connection.sh    # Re-run after replugging the Quest's USB cable: tunnels the teleop link over USB instead of WiFi
-├── bootstrap_openpi.sh            # Server-side openpi bootstrap: clones the fork into external/openpi, uv sync
+├── bootstrap_openpi.sh            # Inference server: clones the fork into external/openpi, uv sync
+├── bootstrap_openpi_train.sh      # Training server: bootstrap_openpi.sh + ffmpeg/gsutil/pip + hf CLI
 ├── bootstrap_openpi_client.sh     # Client-side bootstrap: installs openpi-client into system Python
 ├── test_aloha_server.sh           # Smoke test: serve the stock pi0 ALOHA policy from the fork
 ├── test_aloha_client.sh           # Smoke test: ping the policy server with ALOHA-shaped observations
@@ -85,16 +86,25 @@ source projects/vla_kinova_tabletop_isaac/.env
 cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac
 ```
 
-On the machine that **serves** the policy (cloud GPU server or the lab's
-workstation), run the server bootstrap. It clones the `openpi` fork into
-`external/openpi`, creates a `uv`-managed virtual environment, and installs the
-system dependencies (ffmpeg, gsutil, the `hf` CLI) used for training/inference:
+There are three variants depending on the machine's role:
+
+On the machine that **serves** the policy for inference (either the lab's server or a cloud GPU one), run the base bootstrap. It clones the `openpi` fork into
+`external/openpi` and creates a `uv`-managed virtual environment:
 
 ```bash
 ./bootstrap_openpi.sh
 ```
 
-On the machine that runs the **ROS 2 client**, run the client bootstrap instead. It only installs `openpi-client` into system Python so the policy client node can import it:
+On the machine used to **train** the model run the training variant instead. It does everything the base script does, plus
+apt-installs the system dependencies training needs (ffmpeg, gsutil, python3-pip)
+and the `hf` CLI into system Python for pulling/pushing checkpoints:
+
+```bash
+./bootstrap_openpi_train.sh
+```
+
+On the machine that runs the **ROS 2 client**, run the client bootstrap. It only
+installs `openpi-client` into system Python so the policy client node can import it:
 
 ```bash
 ./bootstrap_openpi_client.sh
@@ -210,7 +220,7 @@ the terminal inside the VNC desktop:
 | [`vla_kinova_sensors`](#vla_kinova_sensors) | Camera bringup for the Intel RealSense D435 (external) and the Kinova wrist camera via `kinova_vision` (RGB only); ZED 2 supported as an optional alternative external camera. |
 | [`vla_kinova_teleop`](#vla_kinova_teleop) | Twist-based teleoperation that subscribes to a target EE pose (from the Quest right-arm controller) and drives the Kortex twist controller. |
 | [`vla_kinova_data_collection`](#vla_kinova_data_collection) | TOML-driven dataset recording on top of `lerobot_ros`. Provides a launch file for the recorder node and a script to automate the data-collection process based on predefined TOML configuration files for each recording session (tasks, number of episodes etc) |
-| [`vla_policy_client`](#vla_policy_client) | ROS 2 node that connects to the $\pi_0$ VLA policy server over WebSocket, subscribes to joint states and camera images, and publishes joint trajectories and gripper commands at inference rate. |
+| [`vla_policy_client`](#vla_policy_client) | Synchronous ROS 2 client that connects to the $\pi_{0.5}$ VLA policy server over WebSocket, subscribes to joint states and camera images, and drives the arm and gripper one action chunk per cycle. |
 
 ---
 
@@ -450,52 +460,125 @@ time you unplug/replug the USB cable.
 
 ## `vla_policy_client`
 
-This package implements the ROS 2 side of the VLA inference loop. It connects to the policy server over a WebSocket using `openpi-client`, and drives the robot at inference rate by publishing joint trajectories and gripper commands.
+This package implements the ROS 2 side of the VLA inference loop. The synchronous
+client (`policy_client_synchronous`) runs **one blocking cycle per action chunk**:
+it captures the current joint states and both camera frames, sends the observation over
+WebSocket (`openpi-client`), waits for the action chunk, sends it to the arm as a single `FollowJointTrajectory` goal while also stepping the
+per-timestep gripper output through a hysteresis gate. Images are sent at **native resolution** (openpi's server-side transforms handle the resize). The node can control both the real and the simulated robot based on the value of the `use_sim` parameter.
 
-The server is started from the openpi fork with `scripts/serve_policy.py`, pointing it at the registered `pi05_kinova_finetune` config and the finetuned checkpoint on HuggingFace:
+The server is started from the openpi fork with `scripts/serve_policy.py`, pointing
+it at the `pi05_kinova_finetune` config and the finetuned checkpoint on
+Hugging Face.
 
-```bash
-cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac/external/openpi
-uv run scripts/serve_policy.py --port 8000 \
-    policy:checkpoint \
-    --policy.config pi05_kinova_finetune \
-    --policy.dir hf://FilippoGorini/<repo>/<checkpoint_folder>
-```
+### Deploy on the RICE lab server (shared, Docker)
 
-### Node: `policy_client`
+The lab's server is shared and the container does not have an open port, so use an SSH tunnel to expose it to the client:
 
-**Subscriptions:**
+1. Enter the container:
+   ```bash
+   ssh ricestudents@<lab-server-ip>
+   docker start rice_container_3             # If not started already
+   docker exec -it rice_container_3 bash     # Open a terminal inside the container
+   ```
+2. Load the env (HF/openpi caches and GPU select) and serve (run inside `tmux` so it
+   can survive disconnects):
+   ```bash
+   source /workspace/filippo/.env
+   cd /workspace/filippo/isaac-projects/projects/vla_kinova_tabletop_isaac/external/openpi
+   uv run scripts/serve_policy.py --port 8000 \
+       policy:checkpoint \
+       --policy.config pi05_kinova_finetune \
+       --policy.dir hf://FilippoGorini/pi05_kinova_finetune_run01/3000
+   ```
+3. Wait for `server listening on 0.0.0.0:8000` and note the container IP it logs
+   (e.g. `ip: 172.17.0.7`) as that is the tunnel target used from the client machine.
+
+### Deploy on a rented cloud GPU server (port 8000 open)
+
+On a fresh cloud GPU server (assuming open 8000 port):
+
+1. Bootstrap openpi once (see step 4): `./bootstrap_openpi.sh`.
+2. Serve:
+   ```bash
+   export HF_TOKEN=hf_<read token>             # If checkpoint repo is private
+   cd ~/isaac-projects/projects/vla_kinova_tabletop_isaac/external/openpi
+   uv run scripts/serve_policy.py --port 8000 \
+       policy:checkpoint \
+       --policy.config pi05_kinova_finetune \
+       --policy.dir hf://FilippoGorini/pi05_kinova_finetune_run01/3000
+   ```
+
+`huggingface_hub` inside the uv venv picks up `HF_TOKEN` from the environment, so no
+`hf auth login` is needed for a private checkpoint.
+
+### Node: `policy_client_synchronous`
+
+**Subscriptions** (the base/wrist pair is chosen by `use_sim`):
 
 | Topic | Type | Description |
 |-------|------|-------------|
-| `/joint_states` | `sensor_msgs/JointState` | Current arm and gripper joint positions. |
-| `/isaac_external_camera/color/image_raw` | `sensor_msgs/Image` | Base/scene RGB camera feed. |
-| `/isaac_wrist_camera/color/image_raw` | `sensor_msgs/Image` | Wrist RGB camera feed. |
+| `/joint_states` | `sensor_msgs/JointState` | Arm + gripper joint positions (read by name). |
+| `/isaac_external_camera/color/image_raw` *(sim)* / `/realsense/d435/color/image_raw` *(real)* | `sensor_msgs/Image` | Base/scene RGB feed. |
+| `/isaac_wrist_camera/color/image_raw` *(sim)* / `/camera/color/image_raw` *(real)* | `sensor_msgs/Image` | Wrist RGB feed. |
 
-**Publications:**
+**Action clients:**
 
-| Topic | Type | Description |
-|-------|------|-------------|
-| `/joint_trajectory_controller/joint_trajectory` | `trajectory_msgs/JointTrajectory` | 50-step arm trajectory chunk (absolute joint positions). |
-| `/robotiq_gripper_controller/gripper_cmd` | `control_msgs/GripperCommand` (action) | Gripper position goal derived from the last action in the chunk. |
+| Action | Type | Description |
+|--------|------|-------------|
+| `/joint_trajectory_controller/follow_joint_trajectory` | `control_msgs/FollowJointTrajectory` | Whole 30-step chunk sent as one multi-point goal; its result gates the next cycle. |
+| `/robotiq_gripper_controller/gripper_cmd` | `control_msgs/GripperCommand` | Open/close goal, fired only on a hysteresis state change. |
 
-**Parameters** (set in `config/client.yaml`):
+**Parameters** (set in `config/client_synchronous.yaml`):
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `policy_host` | `localhost` | Hostname or IP of the policy server. |
 | `policy_port` | `8000` | WebSocket port of the policy server. |
-| `prompt` | `pick up the object` | Language instruction passed to the VLA model. |
-| `control_hz` | `50.0` | Control frequency; determines per-step time delta. |
-| `chunk_size` | `50` | Number of action steps per inference call. |
+| `prompt` | `lift the blue cube` | Language instruction passed to the VLA model. |
+| `control_hz` | `30.0` | Rate at which each chunk's steps are executed. |
+| `use_sim` | `true` | `true` => Isaac Sim camera topics + `use_sim_time`; `false` => real-robot topics. |
+| `gripper_close_threshold` / `gripper_open_threshold` | `0.55` / `0.30` | Two-threshold hysteresis on the model's gripper output. |
+| `gripper_closed_position` / `gripper_open_position` | `0.8` / `0.0` | Positions commanded on close / open. |
+| `gripper_max_effort` | `50.0` | Grasp force sent with the gripper goal (actually ignored by the real position controller). |
 
-### Launch File
+### Running the client (on the client machine)
 
-Make sure the policy server is already running (see the `serve_policy.py` command above) and Isaac Sim is streaming joint states and camera images before launching the client.
+Source the project env in every terminal:
 
 ```bash
-ros2 launch vla_policy_client policy_client.launch.py prompt:="Pick up the green cube"
+source ~/isaac-projects/projects/vla_kinova_tabletop_isaac/setup.bash
 ```
+
+**SSH tunnel** When the server is not directly reachable
+(e.g. the RICE lab container), map its port onto `localhost:8000`:
+
+```bash
+ssh -N -L 8000:172.17.0.7:8000 ricestudents@<lab-server-ip>
+nc -vz localhost 8000    # verify, then the client's default localhost:8000 works
+```
+
+For a cloud server with port 8000 open, skip the tunnel and pass
+`policy_host:=<server-ip>` to the launch below instead.
+
+**Real robot:**
+
+```bash
+./set_dds_udp_buffers.sh                                   # once after every reboot, helps with publishing smooth ros2 camera topics
+ros2 launch vla_kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12
+ros2 launch vla_kinova_sensors cameras.launch.py
+ros2 launch vla_policy_client policy_client_synchronous.launch.py use_sim:=false prompt:="lift the blue cube"
+```
+
+**Isaac Sim** (the scene publishes the camera topics itself):
+
+```bash
+# start Isaac Sim and open the tabletop scene first
+ros2 launch vla_kinova_bringup kinova_controllers.launch.py            
+ros2 launch vla_policy_client policy_client_synchronous.launch.py 
+```
+
+The first inference cycle stalls a few seconds while the server JIT-compiles for
+the Kinova observation shape, this is expected.
 
 ---
 
@@ -588,7 +671,7 @@ Make sure `dataset_root = "/home/filippo/datasets"` is set in `config/kinova_pi0
 1. Create two access tokens at https://huggingface.co/settings/tokens:
    - **Write** token (`kinova-laptop-write`) for the recording laptop.
    - **Read** token (`kinova-training-server-read`) for the remote training machine.
-2. From any terminal (the `hf` CLI is installed system-wide by both the openpi and lerobot_ros bootstraps) login into HF:
+2. From any terminal (the `hf` CLI is installed system-wide by both the openpi training and lerobot_ros bootstraps) login into HF:
    ```bash
    hf auth login          # paste the write token
    hf auth whoami         # should print FilippoGorini
