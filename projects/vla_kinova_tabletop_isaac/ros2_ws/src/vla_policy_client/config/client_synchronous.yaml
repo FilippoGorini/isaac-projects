@@ -6,6 +6,12 @@ policy_client_synchronous:
     control_hz: 30.0          # rate at which each action chunk's step is executed
     use_sim: true             # false => real-robot camera topics + use_sim_time off
 
+    # Use the resize_images parameter to either send native resolution camera frames or pre-resize them (with padding)
+    # on the client side to make a lighter websocket payload. The server resizes anyways but behaviour is unchanged if 
+    # the incoming frames are already the correct res
+    resize_images: true
+    image_resolution: 224   
+
     # Gripper hysteresis (model output is near-binary 0 open / ~0.8 closed)
     gripper_close_threshold: 0.55
     gripper_open_threshold: 0.30

@@ -26,6 +26,15 @@ def generate_launch_description():
             description="true => Isaac Sim camera topics + use_sim_time; "
                         "false => real-robot camera topics. Match the controllers bringup.",
         ),
+        DeclareLaunchArgument(
+            "resize_images", default_value="true",
+            description="Resize-with-pad frames client-side (PIL) before sending, "
+                        "to shrink the websocket payload",
+        ),
+        DeclareLaunchArgument(
+            "image_resolution", default_value="224",
+            description="Target square size for client-side resize, should match the server-side resize of the policy.",
+        ),
 
         Node(
             package=pkg,
@@ -40,6 +49,8 @@ def generate_launch_description():
                     "prompt": LaunchConfiguration("prompt"),
                     "use_sim": use_sim,
                     "use_sim_time": use_sim,
+                    "resize_images": LaunchConfiguration("resize_images"),
+                    "image_resolution": LaunchConfiguration("image_resolution"),
                 },
             ],
         ),

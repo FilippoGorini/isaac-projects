@@ -560,6 +560,17 @@ nc -vz localhost 8000    # verify, then the client's default localhost:8000 work
 For a cloud server with port 8000 open, skip the tunnel and pass
 `policy_host:=<server-ip>` to the launch below instead.
 
+**Low-latency tuning (remote inference server).** The synchronous client sends one observation, then spends ~1 s executing the returned action chunk before sending the next. This is long enough that Linux treats the TCP connection as idle and applies *slow-start-after-idle*. Each observation then re-ramps the congestion window from cold, costing several extra RTTs to upload and increasing latency. On the client machine, disable it with:
+
+```bash
+sysctl net.ipv4.tcp_slow_start_after_idle              # Look at current setting
+sudo sysctl -w net.ipv4.tcp_slow_start_after_idle=0    # Set to 0 until reboot
+
+# to make it permanent across reboots:
+echo 'net.ipv4.tcp_slow_start_after_idle=0' | sudo tee /etc/sysctl.d/99-vla-latency.conf
+sudo sysctl --system
+```
+
 **Real robot:**
 
 ```bash

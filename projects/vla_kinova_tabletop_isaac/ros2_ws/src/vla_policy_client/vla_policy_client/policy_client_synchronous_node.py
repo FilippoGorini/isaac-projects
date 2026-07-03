@@ -35,6 +35,7 @@ from sensor_msgs.msg import Image, JointState
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 try:
+    from openpi_client import image_tools
     from openpi_client.websocket_client_policy import WebsocketClientPolicy
 except ImportError as e:
     raise SystemExit(
@@ -50,9 +51,10 @@ GRIPPER_JOINT = "robotiq_85_left_knuckle_joint"
 
 # Camera topic defaults, picked by the `use_sim` parameter. Real-robot topics
 # come from the RealSense D435 (external, 640x480) and the Kinova wrist camera
-# (320x240); sim topics are published by Isaac Sim. Images are sent at native
-# resolution — openpi's server-side transforms handle the resize, so the client
-# stays specular to the training setup and does no resizing of its own.
+# (320x240) while sim topics are published by Isaac Sim
+#
+# To save websocket bandwidth, images are padded and resized client-side to `image_resolution` (default 224) using PIL
+# Notice that PIL bilinear interpolation is not byte for byte identical to JAX linear interpolation on the server side
 #
 # Both the sim and real topic names are exposed as parameters (defaults below);
 # `use_sim` only chooses which pair the node subscribes to. The joint-state and
@@ -111,6 +113,9 @@ class PolicyClientSynchronousNode(Node):
             "gripper_action", "/robotiq_gripper_controller/gripper_cmd"
         )
 
+        self.declare_parameter("resize_images", True)
+        self.declare_parameter("image_resolution", 224)
+
         gp = self.get_parameter
         host = gp("policy_host").get_parameter_value().string_value
         port = gp("policy_port").get_parameter_value().integer_value
@@ -128,6 +133,9 @@ class PolicyClientSynchronousNode(Node):
         arm_action = gp("arm_action").get_parameter_value().string_value
         gripper_action = gp("gripper_action").get_parameter_value().string_value
 
+        self._resize_images = gp("resize_images").get_parameter_value().bool_value
+        self._image_res = gp("image_resolution").get_parameter_value().integer_value
+
         if use_sim:
             base_topic = gp("sim_base_image_topic").get_parameter_value().string_value
             wrist_topic = gp("sim_wrist_image_topic").get_parameter_value().string_value
@@ -141,7 +149,8 @@ class PolicyClientSynchronousNode(Node):
 
         self.get_logger().info(
             f"Mode: {'SIM' if use_sim else 'REAL'} | "
-            f"base='{base_topic}' wrist='{wrist_topic}' js='{js_topic}'"
+            f"base='{base_topic}' wrist='{wrist_topic}' js='{js_topic}' | "
+            f"resize={'%dx%d (PIL)' % (self._image_res, self._image_res) if self._resize_images else 'off (native)'}"
         )
 
         # --- policy server connection ---
@@ -211,13 +220,21 @@ class PolicyClientSynchronousNode(Node):
             gripper = np.array(
                 [self._joint_positions[GRIPPER_JOINT]], dtype=np.float32
             )
-            return {
-                "joints": joints,
-                "gripper": gripper,
-                "base_rgb": self._base_image.copy(),
-                "wrist_rgb": self._wrist_image.copy(),
-                "prompt": self._prompt,
-            }
+            base_rgb = self._base_image
+            wrist_rgb = self._wrist_image
+
+        # Resize outside of the lock to keep the callbacks responsive
+        if self._resize_images:
+            base_rgb = image_tools.resize_with_pad(base_rgb, self._image_res, self._image_res)
+            wrist_rgb = image_tools.resize_with_pad(wrist_rgb, self._image_res, self._image_res)
+
+        return {
+            "joints": joints,
+            "gripper": gripper,
+            "base_rgb": np.ascontiguousarray(base_rgb),
+            "wrist_rgb": np.ascontiguousarray(wrist_rgb),
+            "prompt": self._prompt,
+        }
 
     # ------------------------------------------------------------------
     # Arm: whole chunk as one FollowJointTrajectory goal, result awaited
@@ -313,6 +330,9 @@ class PolicyClientSynchronousNode(Node):
                 continue
             t_infer = time.monotonic() - t0
 
+            # Get server inference time
+            server_ms = result.get("server_timing", {}).get("infer_ms")
+
             actions = np.asarray(result["actions"])
             if actions.ndim != 2 or actions.shape[1] < 7:
                 self.get_logger().error(f"Unexpected action shape: {actions.shape}")
@@ -337,8 +357,15 @@ class PolicyClientSynchronousNode(Node):
             if not self._arm_done.wait(timeout=max(2.0, horizon * self._dt + 1.0)):
                 self.get_logger().warn("Arm trajectory did not complete in time.")
 
+            if server_ms is not None:
+                timing = (
+                    f"round-trip latency {t_infer * 1e3:.1f} ms "
+                    f"(server latency {server_ms:.1f} ms + transport latency{t_infer * 1e3 - server_ms:.1f} ms)"
+                )
+            else:
+                timing = f"round-trip latency{t_infer * 1e3:.1f} ms"
             self.get_logger().info(
-                f"Cycle done | inference {t_infer * 1e3:.1f} ms | horizon {horizon} "
+                f"Cycle done | {timing} | horizon {horizon} "
                 f"({horizon * self._dt:.2f} s)"
             )
 
