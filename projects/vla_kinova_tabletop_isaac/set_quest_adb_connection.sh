@@ -4,7 +4,7 @@
 # Wifi connection resulted in lags and dropouts of the data stream from the quest which resulted in poor motion of the arm
 # Re-run this any time the USB cable is unplugged/replugged, since the port forward doesn't survive a disconnect
 #
-# Usage: ./connect_quest_usb.sh [ros_tcp_port]   (defaults to 10000, matching quest_bringup.launch.py's default)
+# Usage: ./set_quest_adb_connection.sh [ros_tcp_port]   (defaults to 10000, matching quest_bringup.launch.py's default)
 
 set -e
 
