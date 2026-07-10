@@ -38,11 +38,16 @@ GIT_LFS_SKIP_SMUDGE=1 uv pip install -e .
 
 # Additional system packages needed for training:
 # - ffmpeg: torchcodec needs it to decode dataset videos at training time
-# - gsutil: not strictly needed (falls back to gsutils) but recommended for better download speed of checkpoints from gs://....
-# - python3-pip: to install the huggingface_hub CLI into system Python
-echo "==> Installing system dependencies (ffmpeg, gsutil, python3-pip)..."
+# - python3-pip: to install the huggingface_hub CLI + gsutil into system Python
+echo "==> Installing system dependencies (ffmpeg, python3-pip)..."
 sudo apt-get update -y
-sudo apt-get install -y ffmpeg gsutil python3-pip
+sudo apt-get install -y ffmpeg python3-pip
+
+# gsutil: openpi pulls base checkpoints with `gsutil -m cp -r` from gs://openpi-assets.
+# NOTE: the apt `gsutil` package is an unrelated grid tool that rejects `-m`: install
+# Google's real gsutil from PyPI instead (public bucket, no credentials needed)
+echo "==> Installing gsutil into system Python..."
+python3 -m pip install -U gsutil
 
 # Also install huggingface hub so that we can pull/push checkpoints
 echo "==> Installing huggingface_hub CLI into system Python..."
