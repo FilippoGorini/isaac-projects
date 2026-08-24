@@ -1,0 +1,7 @@
+jtc_stream_node:
+  ros__parameters:
+    tick_hz: 300.0            # oversample/stream rate (Hz). 300 works; higher can fault the JTC.
+    jtc_horizon: 0.1          # JTC point time_from_start (s). Latency <-> smoothness knob.
+    control_hz: 30.0          # fallback plan knot spacing if the plan msg has <2 points
+    plan_topic: "/vla_arm_plan"
+    arm_trajectory_topic: "/joint_trajectory_controller/joint_trajectory"

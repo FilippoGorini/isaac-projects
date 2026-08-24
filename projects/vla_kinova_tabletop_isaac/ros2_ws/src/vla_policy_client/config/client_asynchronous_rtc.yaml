@@ -1,0 +1,46 @@
+policy_client_asynchronous_rtc:
+  ros__parameters:
+    policy_host: "localhost"
+    policy_port: 8000
+    prompt: "lift the blue cube"
+    control_hz: 30.0          # rate of incoming VLA actions (dt = 1/30) => 30 Hz plan spacing
+    inference_hz: 1.5         # target chunk-generation rate; 0.0 => free-running
+    use_sim: true             # false => real-robot camera topics + use_sim_time off
+
+    # This node only produces the 30 Hz plan (on plan_topic) + drives the gripper. The arm
+    # SHAPING (oversample / interp / stream to the JTC) is done by the C++
+    # vla_kinova_jtc_streamer/jtc_stream_node; set tick_hz / jtc_horizon on THAT node.
+    plan_topic: "/vla_arm_plan"
+    gripper_hz: 30.0          # gripper loop rate (default = the 30 Hz grid rate)
+
+    # ---- RTC (real-time chunking): ALWAYS on in this node ----
+    # Sends the committed action prefix (an integer slice of the active plan) + fixed delay d with
+    # each observation so the RTC-finetuned checkpoint (pi05_kinova_finetune_rtc) pins the new
+    # chunk's first d steps to what the arm is already executing (seamless). On time the chunk is
+    # swapped in cleanly; only a latency overrun (chunk later than d) crossfades over rtc_blend_steps.
+    rtc_delay_steps: 5        # d = round(latency/dt); ~140 ms @ 30 Hz => 5. Max 7 (trained randint(0,8)=0..7)
+    rtc_blend_steps: 5        # short safety cross-fade for latency overrun / imperfect pinning; 0 => pure RTC
+
+    # ---- gripper hysteresis (near-binary model output: 0 open / ~0.8 closed) ----
+    gripper_close_threshold: 0.55
+    gripper_open_threshold: 0.30
+    gripper_closed_position: 0.8
+    gripper_open_position: 0.0
+    gripper_max_effort: 50.0
+
+    # ---- camera topics (use_sim picks the pair) ----
+    sim_base_image_topic:  "/isaac_external_camera/color/image_raw"
+    sim_wrist_image_topic: "/isaac_wrist_camera/color/image_raw"
+    real_base_image_topic:  "/realsense/d435/color/image_raw"
+    real_wrist_image_topic: "/camera/color/image_raw"
+
+    joint_states_topic: "/joint_states"
+    gripper_action: "/robotiq_gripper_controller/gripper_cmd"
+
+    resize_images: true
+    image_resolution: 224
+
+    # ---- debug trace (append-only JSONL; "" => off). Load/plot with trace_io / plot_vla_trace.
+    debug_log_dir: ""
+    js_log_hz: 100.0          # measured-state trace rate (0 => every /joint_states sample)
+    rate_report_sec: 2.0      # period of the live [rate] inference readouts
