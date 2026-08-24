@@ -43,3 +43,7 @@ __pycache__/
 
 # Ignore external directory, which for now just holds the openpi repo
 external/
+
+notes/
+plots/
+data/
