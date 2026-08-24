@@ -17,21 +17,21 @@ This project provides an Isaac Sim simulation environment to test the use of VLA
 
 ```
 projects/vla_kinova_tabletop_isaac/
-├── .env.example                  # Template environment file; copy to .env
-├── .env                          # Local config (never committed)
-├── setup.bash                    # Source in every new terminal
-├── set_dds_udp_buffers.sh         # Re-run after every reboot: raises kernel UDP buffers for reliable camera topics
-├── set_quest_adp_connection.sh    # Re-run after replugging the Quest's USB cable: tunnels the teleop link over USB instead of WiFi
-├── bootstrap_openpi.sh            # Inference server: clones the fork into external/openpi, uv sync
-├── bootstrap_openpi_train.sh      # Training server: bootstrap_openpi.sh + ffmpeg/gsutil/pip + hf CLI
-├── bootstrap_openpi_client.sh     # Client-side bootstrap: installs openpi-client into system Python
-├── test_aloha_server.sh           # Smoke test: serve the stock pi0 ALOHA policy from the fork
-├── test_aloha_client.sh           # Smoke test: ping the policy server with ALOHA-shaped observations
+├── .env.example                    # Template environment file; copy to .env
+├── .env                            # Local config (never committed)
+├── setup.bash                      # Source in every new terminal
+├── set_dds_udp_buffers.sh          # Re-run after every reboot: raises kernel UDP buffers for reliable camera topics
+├── set_quest_adb_connection.sh     # Re-run after replugging the Quest's USB cable: tunnels the teleop link over USB instead of WiFi
+├── bootstrap_openpi.sh             # Inference server: clones the fork into external/openpi, uv sync
+├── bootstrap_openpi_train.sh       # Training server: bootstrap_openpi.sh + ffmpeg/gsutil/pip + hf CLI
+├── bootstrap_openpi_client.sh      # Client-side bootstrap: installs openpi-client into system Python
+├── test_aloha_server.sh            # Smoke test: serve the stock pi0 ALOHA policy from the fork
+├── test_aloha_client.sh            # Smoke test: ping the policy server with ALOHA-shaped observations
 ├── isaacsim/
-│   ├── worlds/                   # Isaac Sim USD scenes (see below)
-│   ├── rl_scenes/                # RL scene configs (empty for now)
-│   └── startup_scenes/           # Lab startup scenes (empty for now)
-├── external/                      # Cloned openpi fork (gitignored), created by bootstrap_openpi.sh
+│   ├── worlds/                     # Isaac Sim USD scenes (see below)
+│   ├── rl_scenes/                  # RL scene configs (empty for now)
+│   └── startup_scenes/             # Lab startup scenes (empty for now)
+├── external/                       # Cloned openpi fork (gitignored), created by bootstrap_openpi.sh
 └── ros2_ws/
     ├── bootstrap_kinova_ws.sh         # Robot + cameras: ros2_kortex, kinova_vision, RealSense
     ├── bootstrap_quest_teleop.sh      # Quest 3 teleop stack (ROS-TCP-Endpoint + Quest2ROS2)
@@ -39,12 +39,13 @@ projects/vla_kinova_tabletop_isaac/
     ├── kinova_deps.repos              # vcstool manifest for ros2_kortex + kinova_vision
     ├── teleop_deps.repos              # vcstool manifest for the Quest teleop packages
     └── src/
-        ├── vla_kinova_description/         # Customized URDF/Xacro robot description
+        ├── vla_kinova_description/          # Customized URDF/Xacro robot description
         ├── vla_kinova_bringup/              # ros2_control + MoveIt 2 launches and configs
         ├── vla_kinova_sensors/              # RealSense D435 + Kinova wrist camera bringup
         ├── vla_kinova_teleop/               # Quest 3 twist-based EE pose tracking
         ├── vla_kinova_data_collection/      # LeRobot dataset recording
-        └── vla_policy_client/                # ROS 2 WebSocket client for the VLA policy server
+        ├── vla_policy_client/               # ROS 2 WebSocket client for the VLA policy server
+        └── vla_kinova_jtc_streamer/         # C++ streamer to oversample the 30 hz VLA plan and smooth the arm's motion
 ```
 
 ---
@@ -208,6 +209,7 @@ the terminal inside the VNC desktop:
 | `kinova_gen3_6dof_2f85.usda` | Robot USDA imported from `kinova_gen3_6dof_2f85.urdf`. Mirrors the original URDF: all 6 gripper joints are driven. |
 | `kinova_gen3_6dof_2f85_ros2.usda` | References `kinova_gen3_6dof_2f85.usda` and adds the ActionGraph nodes that bridge to ROS 2 (joint states, joint commands, and camera feedback). To better emulate the real hardware, only `robotiq_85_left_knuckle_joint` and `robotiq_85_right_knuckle_joint` are assigned a joint drive; all other gripper joints are passive. Two additional passive joints close the parallel-gripper loop by connecting the `inner_knuckle` links to the `finger_tip` links, preventing the gripper from disassembling while grasping. To avoid articulation errors, `robotiq_85_left_inner_knuckle_joint` and `robotiq_85_right_inner_knuckle_joint` were excluded from the articulation and are therefore expected to show small position errors. |
 | `kinova_tabletop.usda` | Simple tabletop scenario built from Isaac assets, referencing the ROS 2-ready `kinova_gen3_6dof_2f85_ros2.usda`. |
+| `kinova_tabletop_cubelift.usda` | Tabletop scene for the blue-cube lift task (a blue cube on the table), with fixed camera positioning. Also references `kinova_gen3_6dof_2f85_ros2.usda`. |
 
 ---
 
@@ -220,7 +222,8 @@ the terminal inside the VNC desktop:
 | [`vla_kinova_sensors`](#vla_kinova_sensors) | Camera bringup for the Intel RealSense D435 (external) and the Kinova wrist camera via `kinova_vision` (RGB only); ZED 2 supported as an optional alternative external camera. |
 | [`vla_kinova_teleop`](#vla_kinova_teleop) | Twist-based teleoperation that subscribes to a target EE pose (from the Quest right-arm controller) and drives the Kortex twist controller. |
 | [`vla_kinova_data_collection`](#vla_kinova_data_collection) | TOML-driven dataset recording on top of `lerobot_ros`. Provides a launch file for the recorder node and a script to automate the data-collection process based on predefined TOML configuration files for each recording session (tasks, number of episodes etc) |
-| [`vla_policy_client`](#vla_policy_client) | Synchronous ROS 2 client that connects to the $\pi_{0.5}$ VLA policy server over WebSocket, subscribes to joint states and camera images, and drives the arm and gripper one action chunk per cycle. |
+| [`vla_policy_client`](#vla_policy_client) | ROS 2 clients that connect to the $\pi_{0.5}$ VLA policy server over WebSocket, subscribe to joint states and camera images, and drive the arm and gripper. Provides a **synchronous** client (one action chunk per blocking cycle) and an **asynchronous** streaming client (continuous 30 Hz plan + real-time chunking). |
+| [`vla_kinova_jtc_streamer`](#vla_kinova_jtc_streamer) | Minimal C++ streamer that oversamples the asynchronous client's 30 Hz arm plan and feeds short-horizon points to the Kinova JTC. |
 
 ---
 
@@ -293,7 +296,7 @@ ros2 launch vla_kinova_bringup kinova_controllers.launch.py
 ros2 launch vla_kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12
 ```
 
-Starts `robot_state_publisher` and `ros2_control_node`, then spawns `joint_state_broadcaster`, `joint_trajectory_controller`, and `robotiq_gripper_controller`. On the real robot, the inactive `twist_controller`, `gripper_velocity_controller`, `gripper_position_controller`, and `fault_controller` are also pre-loaded so they can be switched in later (e.g. by the teleop stack).
+Starts `robot_state_publisher` and `ros2_control_node`, then spawns `joint_state_broadcaster`, `joint_trajectory_controller`, and `robotiq_gripper_controller`. On the real robot, `twist_controller`, `gripper_velocity_controller`, and `gripper_position_controller` are also pre-loaded **inactive** (and `fault_controller` active) so they can be switched in later (e.g. by the teleop stack).
 
 ---
 
@@ -422,12 +425,13 @@ Brings up the robot side of the teleop loop.
 | `robot_ip` | `192.168.50.12` | IP address of the real Kinova arm. |
 | `launch_rviz` | `false` | Bring up RViz alongside the teleop stack. |
 | `tf_publish_rate` | `200.0` | Forwarded to `kinova_controllers.launch.py`. |
+| `gripper_max_force` | `100.0` | Gripper grasp force [0-100%], forwarded to `kinova_controllers.launch.py`. Only applied in low-level cyclic mode; twist teleop ignores it. |
 
 ```bash
 ros2 launch vla_kinova_teleop kinova_pose_tracking_twist.launch.py robot_ip:=192.168.50.12
 ```
 
-Includes `vla_kinova_bringup`'s `kinova_controllers.launch.py` (with `use_sim:=false`), switches the active controllers from `joint_trajectory_controller` + `robotiq_gripper_controller` to `twist_controller` + `gripper_velocity_controller`, and starts `twist_pose_tracking_node`. **Real robot only.**
+Includes `vla_kinova_bringup`'s `kinova_controllers.launch.py` (with `use_sim:=false`), switches the active arm controller from `joint_trajectory_controller` to `twist_controller`, and starts `twist_pose_tracking_node`. The gripper stays on `robotiq_gripper_controller` (the default `binary` mode); the swap to `gripper_velocity_controller` is present but commented out in the launch file. **Real robot only.**
 
 #### `quest_bringup.launch.py`
 
@@ -450,7 +454,7 @@ Lab WiFi can be too unreliable for teleop (we measured 100-300ms+ delivery stall
 freeze briefly then snap to the target. Fix by tethering the Quest over USB instead:
 
 ```bash
-./set_quest_adp_connection.sh
+./set_quest_adb_connection.sh
 ```
 
 Then, in the Quest2ROS app on the headset, set the server IP to `127.0.0.1`. Re-run the script every
@@ -460,11 +464,16 @@ time you unplug/replug the USB cable.
 
 ## `vla_policy_client`
 
-This package implements the ROS 2 side of the VLA inference loop. The synchronous
+This package implements the ROS 2 side of the VLA inference loop. It provides a
+**synchronous** client (documented first below) and an **asynchronous streaming**
+client (see [Node: `policy_client_asynchronous_rtc`](#node-policy_client_asynchronous_rtc));
+both connect to the same policy server, so the serve/deploy steps below apply to either.
+
+The synchronous
 client (`policy_client_synchronous`) runs **one blocking cycle per action chunk**:
 it captures the current joint states and both camera frames, sends the observation over
 WebSocket (`openpi-client`), waits for the action chunk, sends it to the arm as a single `FollowJointTrajectory` goal while also stepping the
-per-timestep gripper output through a hysteresis gate. Images are sent at **native resolution** (openpi's server-side transforms handle the resize). The node can control both the real and the simulated robot based on the value of the `use_sim` parameter.
+per-timestep gripper output through a hysteresis gate. By default images are resized-with-pad to `image_resolution` (default 224) **client-side** before sending, to shrink the WebSocket payload (set `resize_images:=false` to send them at native resolution and let the server resize instead; the server resizes either way, so the result is unchanged apart from PIL vs JAX interpolation). The node can control both the real and the simulated robot based on the value of the `use_sim` parameter.
 
 The server is started from the openpi fork with `scripts/serve_policy.py`, pointing
 it at the `pi05_kinova_finetune` config and the finetuned checkpoint on
@@ -540,6 +549,8 @@ On a fresh cloud GPU server (assuming open 8000 port):
 | `gripper_close_threshold` / `gripper_open_threshold` | `0.55` / `0.30` | Two-threshold hysteresis on the model's gripper output. |
 | `gripper_closed_position` / `gripper_open_position` | `0.8` / `0.0` | Positions commanded on close / open. |
 | `gripper_max_effort` | `50.0` | Grasp force sent with the gripper goal (actually ignored by the real position controller). |
+| `resize_images` | `true` | Resize-with-pad each camera frame client-side before sending. `false` => send at native resolution. |
+| `image_resolution` | `224` | Target square resolution (px) for the client-side resize. |
 
 ### Running the client (on the client machine)
 
@@ -590,6 +601,130 @@ ros2 launch vla_policy_client policy_client_synchronous.launch.py
 
 The first inference cycle stalls a few seconds while the server JIT-compiles for
 the Kinova observation shape, this is expected.
+
+### Node: `policy_client_asynchronous_rtc`
+
+Streaming alternative to the synchronous client that removes the per-chunk pauses (with the
+synchronous client the arm visibly steps once per inference). Instead of executing one chunk
+at a time, the inference loop maintains a continuously-updated **30 Hz "ideal" arm plan**,
+published as a `JointTrajectory` on `plan_topic` (`/vla_arm_plan`); a separate C++ node,
+[`vla_kinova_jtc_streamer`](#vla_kinova_jtc_streamer), oversamples that plan and streams
+short-horizon points to the JTC. This node does **not** command the JTC directly, so the
+arm-shaping knobs (`tick_hz`, `jtc_horizon`) live on **that** node. The gripper is driven here,
+through the same hysteresis gate as the synchronous client.
+
+It runs on a shared 30 Hz integer grid and uses **real-time chunking (RTC)**: with each
+observation it sends the committed action prefix plus a fixed delay `d`, and the RTC-finetuned
+checkpoint pins the new chunk's first `d` steps to what the arm is already executing, so
+successive chunks join seamlessly. This node is **RTC-only** and requires the RTC checkpoint
+(config `pi05_kinova_finetune_rtc`). A legacy wall-clock variant, `policy_client_asynchronous_walltime`,
+keeps the ACT-style temporal-ensemble and non-RTC paths for A/B comparison.
+
+**Subscriptions** (same as the synchronous client; the base/wrist pair is chosen by `use_sim`):
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/joint_states` | `sensor_msgs/JointState` | Arm + gripper joint positions (read by name). |
+| `/isaac_external_camera/color/image_raw` *(sim)* / `/realsense/d435/color/image_raw` *(real)* | `sensor_msgs/Image` | Base/scene RGB feed. |
+| `/isaac_wrist_camera/color/image_raw` *(sim)* / `/camera/color/image_raw` *(real)* | `sensor_msgs/Image` | Wrist RGB feed. |
+
+**Publisher:**
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/vla_arm_plan` *(`plan_topic`)* | `trajectory_msgs/JointTrajectory` | Continuously-updated 30 Hz arm plan; the C++ `jtc_stream_node` subscribes and streams it to the JTC. |
+
+**Action clients:**
+
+| Action | Type | Description |
+|--------|------|-------------|
+| `/robotiq_gripper_controller/gripper_cmd` | `control_msgs/GripperCommand` | Open/close goal, fired only on a hysteresis state change. |
+
+**Parameters** (set in `config/client_asynchronous_rtc.yaml`; the gripper-hysteresis, camera-topic and `resize_images` / `image_resolution` parameters are the same as the synchronous client):
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `policy_host` | `localhost` | Hostname or IP of the policy server. |
+| `policy_port` | `8000` | WebSocket port of the policy server. |
+| `prompt` | `lift the blue cube` | Language instruction passed to the VLA model. |
+| `control_hz` | `30.0` | Incoming VLA action rate = 30 Hz plan spacing. |
+| `inference_hz` | `1.5` | Target chunk-generation rate (`0.0` => free-running). |
+| `use_sim` | `true` | `true` => Isaac Sim camera topics + `use_sim_time`; `false` => real-robot topics. |
+| `plan_topic` | `/vla_arm_plan` | Topic the 30 Hz plan is published on (the C++ streamer subscribes here). |
+| `gripper_hz` | `30.0` | Gripper consumer loop rate. |
+| `rtc_delay_steps` | `5` | RTC committed-prefix length `d` (`round(latency/dt)`; ~140 ms @ 30 Hz => 5; max 7). |
+| `rtc_blend_steps` | `5` | Short safety cross-fade on a latency overrun; `0` => pure RTC. |
+| `debug_log_dir` | `""` | Directory for an optional append-only JSONL debug trace; `""` => off. |
+| `js_log_hz` | `100.0` | Measured-state trace rate (`0` => every `/joint_states` sample). |
+| `rate_report_sec` | `2.0` | Period of the live inference-rate log readouts. |
+
+### Running the asynchronous client
+
+Serve the policy first — same [deploy](#deploy-on-the-rice-lab-server-shared-docker) and
+[tunnel / low-latency](#running-the-client-on-the-client-machine) steps as the synchronous
+client, but serve the **RTC** checkpoint: swap `--policy.config` to `pi05_kinova_finetune_rtc`
+and point `--policy.dir` at the RTC-finetuned checkpoint.
+
+The client and the C++ streamer come up together via the combined launch file
+(`policy_client_asynchronous_jtc_streamer.launch.py`), which starts both and forwards the shared
+`plan_topic` / `control_hz` / `use_sim`.
+
+**Real robot:**
+
+```bash
+./set_dds_udp_buffers.sh                                   # once after every reboot, helps with publishing smooth ros2 camera topics
+ros2 launch vla_kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12
+ros2 launch vla_kinova_sensors cameras.launch.py
+ros2 launch vla_policy_client policy_client_asynchronous_jtc_streamer.launch.py use_sim:=false prompt:="lift the blue cube"
+```
+
+**Isaac Sim** (the scene publishes the camera topics itself):
+
+```bash
+# start Isaac Sim and open the tabletop scene first
+ros2 launch vla_kinova_bringup kinova_controllers.launch.py
+ros2 launch vla_policy_client policy_client_asynchronous_jtc_streamer.launch.py
+```
+
+To run the client and the streamer separately (e.g. to tune the streamer on its own):
+
+```bash
+ros2 launch vla_policy_client policy_client_asynchronous_rtc.launch.py
+ros2 launch vla_kinova_jtc_streamer jtc_stream_node.launch.py
+```
+
+---
+
+## `vla_kinova_jtc_streamer`
+
+Minimal, reliable-timing **C++** streamer that shapes the asynchronous client's 30 Hz arm plan
+onto the Kinova JTC. It subscribes to the 30 Hz `JointTrajectory` plan on `plan_topic`, and at
+`tick_hz` linearly interpolates the latest plan at the current time, streaming a single point to
+the JTC with `time_from_start = jtc_horizon`; the JTC's own 1 kHz interpolation fills in between.
+Running in C++ on its own thread gives deterministic timing with no Python GIL jitter. It is a
+pure passthrough (linear interpolation only — no jerk limiter or spline shaping).
+
+Two knobs matter: `tick_hz` (stream rate) and `jtc_horizon` (the latency ↔ smoothness trade-off).
+
+### Package Files
+
+- **`src/jtc_stream_node.cpp`**: the streamer node.
+- **`config/jtc_stream_node.yaml`**: default parameters.
+- **`launch/jtc_stream_node.launch.py`**: launches the node (every parameter is overridable from the CLI; empty => value from the yaml).
+
+### Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `tick_hz` | `300.0` | Oversample/stream rate to the JTC [Hz]. Higher can fault the JTC. |
+| `jtc_horizon` | `0.1` | `time_from_start` of each streamed point [s]. Latency ↔ smoothness knob. |
+| `control_hz` | `30.0` | Fallback plan knot spacing if the plan message has <2 points. |
+| `plan_topic` | `/vla_arm_plan` | 30 Hz plan topic from the Python VLA client. |
+| `arm_trajectory_topic` | `/joint_trajectory_controller/joint_trajectory` | JTC trajectory topic to stream to. |
+
+```bash
+ros2 launch vla_kinova_jtc_streamer jtc_stream_node.launch.py
+```
 
 ---
 
@@ -675,7 +810,7 @@ Datasets land on disk in a layout that mirrors Hugging Face's `<owner>/<name>` r
     └── kinova_pick_v1@v2.1/             # v2.1 conversion, push to same repo's v2.1 branch
 ```
 
-Make sure `dataset_root = "/home/filippo/datasets"` is set in `config/kinova_pi05.toml`, and each session TOML uses `dataset_name = "FilippoGorini/<name>"` (note the `FilippoGorini/` prefix). The recorder writes to `<dataset_root>/<dataset_name>/` automatically.
+Make sure `dataset_root = "/home/students/work/filippo/datasets"` is set in `config/kinova_pi05.toml`, and each session TOML uses `dataset_name = "FilippoGorini/<name>"` (note the `FilippoGorini/` prefix). The recorder writes to `<dataset_root>/<dataset_name>/` automatically.
 
 ### One-time setup: Hugging Face tokens
 
@@ -951,7 +1086,7 @@ Restore on a fresh server:
 
 - **Quest teleop is jerky, or the arm freezes briefly then snaps forward.** If WiFi is too unreliable to provide a smooth data stream, 
 you can fix it by connecting the Quest with a USB-C cable instead:
-  1. Run `./set_quest_adp_connection.sh` (re-run every time you unplug/replug the cable).
+  1. Run `./set_quest_adb_connection.sh` (re-run every time you unplug/replug the cable).
   2. In the Quest2ROS app on the headset, set the server IP to `127.0.0.1`.
 
 <!-- Add project-specific troubleshooting notes here. -->
