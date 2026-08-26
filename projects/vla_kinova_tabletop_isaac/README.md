@@ -279,8 +279,10 @@ The three bringup launchers share this set of arguments:
 | `gripper_max_velocity` | `100.0` | Gripper go-to speed [0–100%]. Lowering helps smoothing the discrete go-to stepping of the gripper when using the forward position controller. |
 | `gripper_max_force` | `100.0` | Gripper grasp force [0-100%]. Lower it for delicate objects. Only applied in low-level cyclic mode; high-level twist teleop ignores it. |
 | `tf_publish_rate` | `200.0` | `robot_state_publisher` /tf publish frequency [Hz]. |
+| `unwrap_joint_states` | `false` | (`kinova_controllers.launch.py` only.) Kortex-driver param. `false` = stock single-turn `[-π, π]` `/joint_states` (what MoveIt / the closed-loop JTC expect); `true` = continuous, multi-turn `/joint_states` so a joint driven past `±π` stays smooth instead of wrapping around. Set `true` for teleop, data collection, and VLA. |
+| `open_loop_control` | `false` | (`kinova_controllers.launch.py` only.) `false` = JTC closed loop (MoveIt / regular bring-up); `true` = open loop for VLA to avoid the JTC buzz/hum issue. |
 
-The MoveIt, MoveIt-Servo and Twist Pose Tracking launchers additionally accept `launch_rviz` (default `true`).
+The MoveIt, MoveIt-Servo and Twist Pose Tracking launchers additionally accept `launch_rviz` (default `true`). They include the bringup without forwarding `unwrap_joint_states` / `open_loop_control`, so those paths always use the defaults.
 
 ---
 
@@ -431,7 +433,7 @@ Brings up the robot side of the teleop loop.
 ros2 launch vla_kinova_teleop kinova_pose_tracking_twist.launch.py robot_ip:=192.168.50.12
 ```
 
-Includes `vla_kinova_bringup`'s `kinova_controllers.launch.py` (with `use_sim:=false`), switches the active arm controller from `joint_trajectory_controller` to `twist_controller`, and starts `twist_pose_tracking_node`. The gripper stays on `robotiq_gripper_controller` (the default `binary` mode); the swap to `gripper_velocity_controller` is present but commented out in the launch file. **Real robot only.**
+Includes `vla_kinova_bringup`'s `kinova_controllers.launch.py` (with `use_sim:=false` and `unwrap_joint_states:=true`, so the recorded/observed `/joint_states` are continuous through `±π`), switches the active arm controller from `joint_trajectory_controller` to `twist_controller`, and starts `twist_pose_tracking_node`. The gripper stays on `robotiq_gripper_controller` (the default `binary` mode); the swap to `gripper_velocity_controller` is present but commented out in the launch file. **Real robot only.**
 
 #### `quest_bringup.launch.py`
 
@@ -584,19 +586,21 @@ sudo sysctl --system
 
 **Real robot:**
 
+Like the asynchronous client, bring the arm up with the VLA flags `unwrap_joint_states:=true open_loop_control:=true`.
+
 ```bash
 ./set_dds_udp_buffers.sh                                   # once after every reboot, helps with publishing smooth ros2 camera topics
-ros2 launch vla_kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12
+ros2 launch vla_kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12 unwrap_joint_states:=true open_loop_control:=true auto_home:=true
 ros2 launch vla_kinova_sensors cameras.launch.py
 ros2 launch vla_policy_client policy_client_synchronous.launch.py use_sim:=false prompt:="lift the blue cube"
 ```
 
-**Isaac Sim** (the scene publishes the camera topics itself):
+**Isaac Sim** (the scene publishes the camera topics itself; `unwrap_joint_states` is a no-op in sim but `open_loop_control` still applies):
 
 ```bash
 # start Isaac Sim and open the tabletop scene first
-ros2 launch vla_kinova_bringup kinova_controllers.launch.py            
-ros2 launch vla_policy_client policy_client_synchronous.launch.py 
+ros2 launch vla_kinova_bringup kinova_controllers.launch.py open_loop_control:=true
+ros2 launch vla_policy_client policy_client_synchronous.launch.py
 ```
 
 The first inference cycle stalls a few seconds while the server JIT-compiles for
@@ -669,20 +673,22 @@ The client and the C++ streamer come up together via the combined launch file
 (`policy_client_asynchronous_jtc_streamer.launch.py`), which starts both and forwards the shared
 `plan_topic` / `control_hz` / `use_sim`.
 
+Bring the arm up with `unwrap_joint_states:=true open_loop_control:=true` (continuous state + open-loop JTC); `auto_home:=true` moves to the dataset start pose before the model takes over.
+
 **Real robot:**
 
 ```bash
 ./set_dds_udp_buffers.sh                                   # once after every reboot, helps with publishing smooth ros2 camera topics
-ros2 launch vla_kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12
+ros2 launch vla_kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12 unwrap_joint_states:=true open_loop_control:=true auto_home:=true
 ros2 launch vla_kinova_sensors cameras.launch.py
 ros2 launch vla_policy_client policy_client_asynchronous_jtc_streamer.launch.py use_sim:=false prompt:="lift the blue cube"
 ```
 
-**Isaac Sim** (the scene publishes the camera topics itself):
+**Isaac Sim** (the scene publishes the camera topics itself; `unwrap_joint_states` is a no-op in sim but `open_loop_control` still applies):
 
 ```bash
 # start Isaac Sim and open the tabletop scene first
-ros2 launch vla_kinova_bringup kinova_controllers.launch.py
+ros2 launch vla_kinova_bringup kinova_controllers.launch.py open_loop_control:=true
 ros2 launch vla_policy_client policy_client_asynchronous_jtc_streamer.launch.py
 ```
 
@@ -774,7 +780,7 @@ When the session ends (or you quit after keeping episodes), the script calls `/f
 
 Open each command in its own terminal; source the project setup in every new terminal first.
 
-1. Robot + teleop (this already includes `kinova_controllers.launch.py`, so no separate bringup is needed):
+1. Robot + teleop (this already includes `kinova_controllers.launch.py` with `unwrap_joint_states:=true`, so the recorded `/joint_states` are continuous through `±π`:
    ```bash
    ros2 launch vla_kinova_teleop kinova_pose_tracking_twist.launch.py
    ```

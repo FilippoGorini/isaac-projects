@@ -1,4 +1,5 @@
 import os
+import tempfile
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
@@ -15,6 +16,8 @@ def launch_setup(context, *args, **kwargs):
     gripper_max_velocity = LaunchConfiguration("gripper_max_velocity").perform(context)
     gripper_max_force = LaunchConfiguration("gripper_max_force").perform(context)
     tf_publish_rate = LaunchConfiguration("tf_publish_rate").perform(context)
+    unwrap_joint_states = LaunchConfiguration("unwrap_joint_states").perform(context)
+    open_loop_control = LaunchConfiguration("open_loop_control").perform(context).lower() == "true"
     is_sim     = use_sim.lower() == "true"
     use_sim_time = is_sim
 
@@ -25,7 +28,8 @@ def launch_setup(context, *args, **kwargs):
         f"gripper_max_velocity:={gripper_max_velocity} "
         f"gripper_max_force:={gripper_max_force} "
         f"isaac_arm_joint_commands:=/isaac_arm_commands "
-        f"isaac_gripper_joint_commands:=/isaac_gripper_commands"
+        f"isaac_gripper_joint_commands:=/isaac_gripper_commands "
+        f"unwrap_joint_states:={unwrap_joint_states}"
     )
     if not is_sim:
         # On real hardware, route the Robotiq gripper through the Kinova arm's
@@ -60,8 +64,19 @@ def launch_setup(context, *args, **kwargs):
         output="both",
     )
 
+    # Create temp file and use it to override open_loop_control parameter for the JTC (by default we're in closed loop but we need open loop for the VLA deployment)
+    jtc_args = ["joint_trajectory_controller"]
+    if open_loop_control:
+        ol = tempfile.NamedTemporaryFile(
+            mode="w", suffix="_jtc_open_loop.yaml", delete=False)
+        ol.write("joint_trajectory_controller:\n"
+                 "  ros__parameters:\n"
+                 "    open_loop_control: true\n")
+        ol.close()
+        jtc_args += ["--param-file", ol.name]
+
     jsb_spawner     = Node(package="controller_manager", executable="spawner", arguments=["joint_state_broadcaster"])
-    jtc_spawner     = Node(package="controller_manager", executable="spawner", arguments=["joint_trajectory_controller"])
+    jtc_spawner     = Node(package="controller_manager", executable="spawner", arguments=jtc_args)
     gripper_spawner = Node(package="controller_manager", executable="spawner", arguments=["robotiq_gripper_controller"])
 
     nodes = [rsp_node, ros2_control_node, jsb_spawner, jtc_spawner, gripper_spawner]
@@ -141,6 +156,20 @@ def generate_launch_description():
             "auto_home",
             default_value="false",
             description="Run the homing script on startup (always true in sim, opt-in on real robot)",
+        ),
+        DeclareLaunchArgument(
+            "unwrap_joint_states",
+            default_value="false",
+            description="Publish continuous (unwrapped) joint positions instead of the stock "
+                        "[-pi,pi] wrap. Keep false for MoveIt / closed-loop JTC; set true for "
+                        "teleop, data collection, and VLA deployment (real hardware only).",
+        ),
+        DeclareLaunchArgument(
+            "open_loop_control",
+            default_value="false",
+            description="JTC open_loop_control. false (closed loop, plans against measured "
+                        "state) for MoveIt / regular bring-up; true (open loop) for VLA "
+                        "deployment.",
         ),
         OpaqueFunction(function=launch_setup),
     ])

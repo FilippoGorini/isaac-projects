@@ -32,6 +32,7 @@
     gripper_max_velocity:=100.0
     gripper_max_force:=100.0
     gripper_com_port:=/dev/ttyUSB0
+    unwrap_joint_states:=false
     moveit_active:=false">
 
     <!-- Include and load arm macro files -->
@@ -63,6 +64,7 @@
       gripper_max_force="${gripper_max_force}"
       use_external_cable="${use_external_cable}"
       initial_positions="${initial_positions}"
+      unwrap_joint_states="${unwrap_joint_states}"
       moveit_active="${moveit_active}">
       <xacro:insert_block name="origin" />
     </xacro:load_arm>

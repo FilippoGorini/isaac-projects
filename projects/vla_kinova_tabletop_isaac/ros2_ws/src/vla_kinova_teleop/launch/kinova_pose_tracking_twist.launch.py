@@ -53,6 +53,7 @@ def launch_setup(context, *args, **kwargs):
             "auto_home": "false",
             "tf_publish_rate": tf_publish_rate,
             "gripper_max_force": gripper_max_force,
+            "unwrap_joint_states": "true",      # Unwrap joint states to collect continuous data without -pi/+pi wraparounds
         }.items(),
     )
 
