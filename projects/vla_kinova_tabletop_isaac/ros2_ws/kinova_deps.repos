@@ -2,7 +2,7 @@ repositories:
   ros2_kortex:
     type: git
     url: https://github.com/FilippoGorini/ros2_kortex.git
-    version: d625b875b0c85c1a27cfe62c8c5889e255b25342
+    version: f1e6f072898c0b2332156433d965f8dc2fd00e9e
   ros2_kortex_vision:
     type: git
     url: https://github.com/Kinovarobotics/ros2_kortex_vision.git
