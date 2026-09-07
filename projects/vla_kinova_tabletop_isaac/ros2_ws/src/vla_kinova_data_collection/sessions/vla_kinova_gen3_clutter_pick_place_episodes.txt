@@ -1,0 +1,504 @@
+# FilippoGorini/vla_kinova_gen3_clutter_pick_place
+# 500 episodes | 490147 frames | 140 distinct tasks | fps 30
+# episode_index : task prompt
+#------------------------------------------------------------
+  0 : pick the green marker and put it in the pen-holder
+  1 : pick the green marker and put it in the pen-holder
+  2 : pick the green marker and put it in the pen-holder
+  3 : grab the black pen and place it in the pen-holder
+  4 : grab the black pen and place it in the pen-holder
+  5 : grab the black pen and place it in the pen-holder
+  6 : take the orange highlighter and put it in the bowl
+  7 : take the orange highlighter and put it in the bowl
+  8 : pick the blue block and put it in the cup
+  9 : pick the blue block and put it in the cup
+ 10 : pick up the green marker and put it in the pen-holder
+ 11 : pick up the green marker and put it in the pen-holder
+ 12 : pick up the green marker and put it in the pen-holder
+ 13 : take the red glue stick and put it in the bowl
+ 14 : take the red glue stick and put it in the bowl
+ 15 : get the scissors and place them in the lunchbox
+ 16 : get the scissors and place them in the lunchbox
+ 17 : pick the green marker and put it in the left container
+ 18 : pick the green marker and put it in the left container
+ 19 : pick the green marker and put it in the left container
+ 20 : grab the pencil and place it in the container closer to you
+ 21 : grab the pencil and place it in the container closer to you
+ 22 : take the orange highlighter and put it in the left container
+ 23 : take the orange highlighter and put it in the left container
+ 24 : pick the blue cube and put it in the round container
+ 25 : pick the blue cube and put it in the round container
+ 26 : pick the blue cube and put it in the round container
+ 27 : grab the green marker and place it in the rectangular container
+ 28 : grab the green marker and place it in the rectangular container
+ 29 : grab the green marker and place it in the rectangular container
+ 30 : pick the green marker and put it in the pen-holder
+ 31 : pick the green marker and put it in the pen-holder
+ 32 : pick the green marker and put it in the pen-holder
+ 33 : grab the blue block and place it in the cup
+ 34 : grab the blue block and place it in the cup
+ 35 : grab the blue block and place it in the cup
+ 36 : pick the black pen and put it in the pen-holder
+ 37 : pick the black pen and put it in the pen-holder
+ 38 : pick the black pen and put it in the pen-holder
+ 39 : grab the blue cylinder and place it in the cup
+ 40 : grab the blue cylinder and place it in the cup
+ 41 : grab the blue cylinder and place it in the cup
+ 42 : take the green marker and put it in the bowl
+ 43 : take the green marker and put it in the bowl
+ 44 : pick the smaller cube and put it in the cup
+ 45 : pick the smaller cube and put it in the cup
+ 46 : pick the smaller cube and put it in the cup
+ 47 : grab the bigger cube and place it in the bowl
+ 48 : grab the bigger cube and place it in the bowl
+ 49 : grab the bigger cube and place it in the bowl
+ 50 : take the yellow glue stick and put it in the cup
+ 51 : take the yellow glue stick and put it in the cup
+ 52 : take the yellow glue stick and put it in the cup
+ 53 : get the pink highlighter and place it in the pen-holder
+ 54 : get the pink highlighter and place it in the pen-holder
+ 55 : get the pink highlighter and place it in the pen-holder
+ 56 : pick the smallest blue object and put it in the cup
+ 57 : pick the smallest blue object and put it in the cup
+ 58 : grab the masking tape and place it on the plate
+ 59 : grab the masking tape and place it on the plate
+ 60 : grab the masking tape and place it on the plate
+ 61 : grab the green marker and place it in the pen-holder
+ 62 : grab the green marker and place it in the pen-holder
+ 63 : grab the green marker and place it in the pen-holder
+ 64 : take the light-blue glue stick and put it in the bowl
+ 65 : take the light-blue glue stick and put it in the bowl
+ 66 : pick the purple correction tape and put it in the cup
+ 67 : pick the purple correction tape and put it in the cup
+ 68 : grab the black spray can and place it in the bowl
+ 69 : grab the black spray can and place it in the bowl
+ 70 : pick the bigger cube and put it in the left container
+ 71 : pick the bigger cube and put it in the left container
+ 72 : pick the bigger cube and put it in the left container
+ 73 : grab the orange highlighter and place it in the right container
+ 74 : grab the orange highlighter and place it in the right container
+ 75 : grab the orange highlighter and place it in the right container
+ 76 : take the yellow glue stick and put it in the container closer to you
+ 77 : take the yellow glue stick and put it in the container closer to you
+ 78 : take the yellow glue stick and put it in the container closer to you
+ 79 : pick the smaller cube and put it in the round container
+ 80 : pick the smaller cube and put it in the round container
+ 81 : pick the smaller cube and put it in the round container
+ 82 : grab the smallest cube and place it in the cup
+ 83 : grab the smallest cube and place it in the cup
+ 84 : pick the smaller cube and put it in the cup
+ 85 : pick the smaller cube and put it in the cup
+ 86 : pick the smaller cube and put it in the cup
+ 87 : grab the pink highlighter and place it in the pen-holder
+ 88 : grab the pink highlighter and place it in the pen-holder
+ 89 : pick the smaller cube and place it in the cup
+ 90 : pick the smaller cube and place it in the cup
+ 91 : pick the leftmost marker and put it in the pen-holder
+ 92 : pick the leftmost marker and put it in the pen-holder
+ 93 : pick the leftmost marker and put it in the pen-holder
+ 94 : grab the pencil next to the plate and place it in the cup
+ 95 : grab the pencil next to the plate and place it in the cup
+ 96 : grab the pencil next to the plate and place it in the cup
+ 97 : take the pen between the cups and put it in the pen-holder
+ 98 : take the pen between the cups and put it in the pen-holder
+ 99 : take the pen between the cups and put it in the pen-holder
+100 : get the rightmost object and place it in the bowl
+101 : get the rightmost object and place it in the bowl
+102 : get the rightmost object and place it in the bowl
+103 : pick the closest pencil and put it in the pen-holder
+104 : pick the closest pencil and put it in the pen-holder
+105 : pick the closest pencil and put it in the pen-holder
+106 : grab the glue stick behind the cup and place it in the pen-holder
+107 : grab the glue stick behind the cup and place it in the pen-holder
+108 : grab the glue stick behind the cup and place it in the pen-holder
+109 : pick the leftmost cube and put it in the left container
+110 : grab the pen next to the plate and place it in the container closer to you
+111 : grab the pen next to the plate and place it in the container closer to you
+112 : grab the pen next to the plate and place it in the container closer to you
+113 : take the rightmost marker and put it in the right container
+114 : take the rightmost marker and put it in the right container
+115 : take the rightmost marker and put it in the right container
+116 : pick the leftmost marker and put it in the pen-holder
+117 : pick the leftmost marker and put it in the pen-holder
+118 : pick the leftmost marker and put it in the pen-holder
+119 : grab the cube next to the plate and place it in the cup
+120 : grab the cube next to the plate and place it in the cup
+121 : take the leftmost marker and put it in the pen-holder
+122 : take the leftmost marker and put it in the pen-holder
+123 : take the leftmost marker and put it in the pen-holder
+124 : pick the rightmost cube and place it in the bowl
+125 : pick the rightmost cube and place it in the bowl
+126 : pick something to write with and put it in the pen-holder
+127 : pick something to write with and put it in the pen-holder
+128 : pick something to write with and put it in the pen-holder
+129 : grab something to write with and place it in the pen-holder
+130 : grab something to write with and place it in the pen-holder
+131 : take something to drink from and put it on the plate
+132 : take something to drink from and put it on the plate
+133 : take something to drink from and put it on the plate
+134 : pick something to clean a spill with and put it in the bowl
+135 : pick something to clean a spill with and put it in the bowl
+136 : pick something to clean a spill with and put it in the bowl
+137 : grab something to clean a spill with and place it on the plate
+138 : grab something to clean a spill with and place it on the plate
+139 : take something to write with and put it in the pen-holder
+140 : take something to write with and put it in the pen-holder
+141 : take something to write with and put it in the pen-holder
+142 : pick the towel and put it in the bowl
+143 : pick the towel and put it in the bowl
+144 : pick the towel and put it in the bowl
+145 : grab the bag and place it on the plate
+146 : grab the bag and place it on the plate
+147 : take the white and light-blue spray can and put it in the bowl
+148 : take the white and light-blue spray can and put it in the bowl
+149 : pick the tissue pack and place it in the lunchbox
+150 : pick the tissue pack and place it in the lunchbox
+151 : grab the dock and put it in the bowl
+152 : grab the dock and put it in the bowl
+153 : pick the red ball and put it in the bowl
+154 : pick the red ball and put it in the bowl
+155 : pick the red ball and put it in the bowl
+156 : grab a usb cable and put it in the bowl
+157 : grab a usb cable and put it in the bowl
+158 : take a usb cable and place it in the lunchbox
+159 : take a usb cable and place it in the lunchbox
+160 : pick the transparent box and put it on the plate
+161 : pick the transparent box and put it on the plate
+162 : pick the green marker and put it in the pen-holder
+163 : pick the green marker and put it in the pen-holder
+164 : grab the bigger cube and place it in the bowl
+165 : grab the bigger cube and place it in the bowl
+166 : pick the blue and grey screwdriver and put it in the lunchbox
+167 : pick the blue and grey screwdriver and put it in the lunchbox
+168 : pick the blue and grey screwdriver and put it in the lunchbox
+169 : take the pliers and put them in the lunchbox
+170 : take the pliers and put them in the lunchbox
+171 : take the pliers and put them in the lunchbox
+172 : pick the water bottle and put it in the bowl
+173 : pick the water bottle and put it in the bowl
+174 : pick the water bottle and put it in the bowl
+175 : get the gum box and place it in the lunchbox
+176 : get the gum box and place it in the lunchbox
+177 : pick the brown tape and put it on the plate
+178 : pick the brown tape and put it on the plate
+179 : grab the fork and place it in the bowl
+180 : grab the fork and place it in the bowl
+181 : pick the screwdriver and put it in the left container
+182 : pick the screwdriver and put it in the left container
+183 : pick the screwdriver and put it in the left container
+184 : grab the green marker and place it in the container closer to you
+185 : grab the green marker and place it in the container closer to you
+186 : grab the green marker and place it in the container closer to you
+187 : get the eraser and set it on the plate
+188 : get the eraser and set it on the plate
+189 : grab the pliers and place them in the rectangular container
+190 : grab the pliers and place them in the rectangular container
+191 : pick the screwdriver and put it in the lunchbox
+192 : pick the screwdriver and put it in the lunchbox
+193 : grab the fork and place it in the bowl
+194 : grab the fork and place it in the bowl
+195 : grab the fork and place it in the bowl
+196 : take the water bottle and put it in the bowl
+197 : take the water bottle and put it in the bowl
+198 : pick the blue and grey screwdriver and put it in the lunchbox
+199 : pick the blue and grey screwdriver and put it in the lunchbox
+200 : pick the blue and grey screwdriver and put it in the lunchbox
+201 : grab the black screwdriver and place it in the bowl
+202 : grab the black screwdriver and place it in the bowl
+203 : pick the brown tape and put it on the plate
+204 : pick the brown tape and put it on the plate
+205 : pick the brown tape and put it on the plate
+206 : grab the masking tape and place it in the bowl
+207 : grab the masking tape and place it in the bowl
+208 : take the green correction tape and put it in the cup
+209 : take the green correction tape and put it in the cup
+210 : take the green correction tape and put it in the cup
+211 : grab the fork and put it in the bowl
+212 : grab the fork and put it in the bowl
+213 : grab the fork and put it in the bowl
+214 : pick the smaller cube and put it in the round container
+215 : pick the smaller cube and put it in the round container
+216 : pick the smaller cube and put it in the round container
+217 : pick the blue and grey screwdriver and put it in the bowl
+218 : pick the blue and grey screwdriver and put it in the bowl
+219 : pick the leftmost tool and put it in the bowl
+220 : pick the leftmost tool and put it in the bowl
+221 : pick the leftmost tool and put it in the bowl
+222 : grab the bottle behind the cup and place it in the lunchbox
+223 : grab the bottle behind the cup and place it in the lunchbox
+224 : grab the bottle behind the cup and place it in the lunchbox
+225 : pick the screwdriver and put it in the left container
+226 : pick the screwdriver and put it in the left container
+227 : pick the screwdriver and put it in the left container
+228 : grab the tool behind the bottle and place it in the bowl
+229 : grab the tool behind the bottle and place it in the bowl
+230 : grab the leftmost tool and place it in the bowl
+231 : grab the leftmost tool and place it in the bowl
+232 : grab the leftmost tool and place it in the bowl
+233 : pick the black and white marker and put it in the cup
+234 : pick the black and white marker and put it in the cup
+235 : pick the black and white marker and put it in the cup
+236 : take the black pen and put it in the rectangular container
+237 : take the black pen and put it in the rectangular container
+238 : get the blue pen and place it in the round container
+239 : get the blue pen and place it in the round container
+240 : pick the red glue stick and put it in the container closer to you
+241 : pick the red glue stick and put it in the container closer to you
+242 : grab the clear tape and place it on the plate
+243 : grab the clear tape and place it on the plate
+244 : take the bag and put it on the plate
+245 : take the bag and put it on the plate
+246 : pick the tissue pack and place it in the lunchbox
+247 : pick the tissue pack and place it in the lunchbox
+248 : grab the transparent box and put it on the plate
+249 : grab the transparent box and put it on the plate
+250 : take the black cable and place it in the lunchbox
+251 : take the black cable and place it in the lunchbox
+252 : get the dock and put it in the rectangular container
+253 : get the dock and put it in the rectangular container
+254 : pick the gum box and place it in the cup
+255 : pick the gum box and place it in the cup
+256 : grab the red ball and put it in the cup
+257 : grab the red ball and put it in the cup
+258 : take the scissors and place them in the rectangular container
+259 : take the scissors and place them in the rectangular container
+260 : get the masking tape and put it in the container closer to you
+261 : get the masking tape and put it in the container closer to you
+262 : pick the grey cable and place it in the round container
+263 : pick the grey cable and place it in the round container
+264 : grab the towel and put it on the plate
+265 : grab the towel and put it on the plate
+266 : pick the green highlighter and put it in the right container
+267 : pick the green highlighter and put it in the right container
+268 : pick the green highlighter and put it in the right container
+269 : grab the black screwdriver and place it in the round container
+270 : grab the black screwdriver and place it in the round container
+271 : take the white and light-blue spray can and put it in the container closer to you
+272 : take the white and light-blue spray can and put it in the container closer to you
+273 : get the purple correction tape and place it in the cup
+274 : get the purple correction tape and place it in the cup
+275 : pick the black marker and put it in the right container
+276 : pick the black marker and put it in the right container
+277 : grab the leftmost pen and place it in the cup
+278 : grab the rightmost pen and place it in the cup
+279 : grab the rightmost pen and place it in the cup
+280 : take the leftmost highlighter and put it in the right container
+281 : take the leftmost highlighter and put it in the right container
+282 : pick the pencil next to the cup and place it in the rectangular container
+283 : pick the pencil next to the cup and place it in the rectangular container
+284 : grab the rightmost tool and put it in the container closer to you
+285 : grab the rightmost tool and put it in the container closer to you
+286 : take something to cut with and put it in the cup
+287 : take something to cut with and put it in the cup
+288 : pick something to eat with and place it in the rectangular container
+289 : pick something to eat with and place it in the rectangular container
+290 : grab something to tighten a screw with and put it in the lunchbox
+291 : grab something to tighten a screw with and put it in the lunchbox
+292 : grab something to tighten a screw with and put it in the lunchbox
+293 : take something to drink from and place it on the plate
+294 : take something to drink from and place it on the plate
+295 : pick something to write with and put it in the cup
+296 : pick something to write with and put it in the cup
+297 : grab something to clean a spill with and place it in the cup
+298 : grab something to clean a spill with and place it in the cup
+299 : put the black and white marker in the cup
+300 : put the black and white marker in the cup
+301 : put the black and white marker in the cup
+302 : put the black and white marker in the cup
+303 : place the pink highlighter in the pen-holder
+304 : place the pink highlighter in the pen-holder
+305 : place the pink highlighter in the pen-holder
+306 : place the pink highlighter in the pen-holder
+307 : put the blue pen in the cup
+308 : put the blue pen in the cup
+309 : put the blue pen in the cup
+310 : put the yellow pencil in the cup
+311 : put the yellow pencil in the cup
+312 : put the yellow pencil in the cup
+313 : put the red glue stick in the pen-holder
+314 : put the red glue stick in the pen-holder
+315 : put the red glue stick in the pen-holder
+316 : put the red glue stick in the pen-holder
+317 : put the red glue stick in the pen-holder
+318 : place the white eraser in the pen-holder
+319 : place the white eraser in the pen-holder
+320 : put the purple correction tape in the cup
+321 : put the purple correction tape in the cup
+322 : put the purple correction tape in the cup
+323 : pick the green highlighter and put it in the lunchbox
+324 : pick the green highlighter and put it in the lunchbox
+325 : pick the green highlighter and put it in the lunchbox
+326 : pick the green highlighter and put it in the lunchbox
+327 : grab the black marker and place it on the plate
+328 : grab the black marker and place it on the plate
+329 : grab the black marker and place it on the plate
+330 : take the black screwdriver and put it on the plate
+331 : take the black screwdriver and put it on the plate
+332 : take the black screwdriver and put it on the plate
+333 : pick the yellow glue stick and put it in the bowl
+334 : pick the yellow glue stick and put it in the bowl
+335 : pick the yellow glue stick and put it in the bowl
+336 : grab the clear tape and place it on the plate
+337 : grab the clear tape and place it on the plate
+338 : grab the clear tape and place it on the plate
+339 : take the light-blue glue stick and put it in the lunchbox
+340 : take the light-blue glue stick and put it in the lunchbox
+341 : take the light-blue glue stick and put it in the lunchbox
+342 : take the light-blue glue stick and put it in the lunchbox
+343 : pick the towel and put it in the bowl
+344 : pick the towel and put it in the bowl
+345 : pick the towel and put it in the bowl
+346 : grab the grey cable and place it in the lunchbox
+347 : grab the grey cable and place it in the lunchbox
+348 : grab the grey cable and place it in the lunchbox
+349 : take the black cable and put it on the plate
+350 : take the black cable and put it on the plate
+351 : take the black cable and put it on the plate
+352 : pick the bag and put it in the bowl
+353 : pick the bag and put it in the bowl
+354 : pick the bag and put it in the bowl
+355 : grab the towel and place it on the plate
+356 : grab the towel and place it on the plate
+357 : grab the towel and place it on the plate
+358 : take the object under the towel and put it in the bowl
+359 : grab the white and light-blue spray can under the bag and put it in the bowl
+360 : grab the white and light-blue spray can under the bag and put it in the bowl
+361 : grab the white and light-blue spray can under the bag and put it in the bowl
+362 : take the cup under the towel and put it on the plate
+363 : take the cup under the towel and put it on the plate
+364 : take the cup under the towel and put it on the plate
+365 : take the cup under the towel and put it on the plate
+366 : pick the grey cable under the towel and put it in the lunchbox
+367 : pick the grey cable under the towel and put it in the lunchbox
+368 : pick the grey cable under the towel and put it in the lunchbox
+369 : grab the red rope under the bag and place it on the plate
+370 : grab the red rope under the bag and place it on the plate
+371 : grab the red rope under the bag and place it on the plate
+372 : take the object under the towel and put it in the bowl
+373 : take the object under the towel and put it in the bowl
+374 : take the object under the towel and put it in the bowl
+375 : put the big cube on top of the small cube
+376 : put the big cube on top of the small cube
+377 : put the big cube on top of the small cube
+378 : put the big cube on top of the small cube
+379 : put the towel over the cup
+380 : put the towel over the cup
+381 : put the towel over the cup
+382 : put the towel over the cup
+383 : put the blue cylinder on the blue cube
+384 : put the blue cylinder on the blue cube
+385 : put the blue cylinder on the blue block
+386 : put the blue cylinder on the blue block
+387 : put the towel over the red rope
+388 : put the towel over the red rope
+389 : put the towel over the red rope
+390 : put the towel over the cube
+391 : put the towel over the cube
+392 : put the towel over the cube
+393 : put the bag on top of the block
+394 : put the bag on top of the block
+395 : put the bag on top of the block
+396 : pick the leftmost cube and put it in the left container
+397 : pick the leftmost cube and put it in the left container
+398 : take the orange highlighter and put it in the left container
+399 : take something to cut with and put it in the cup
+400 : grab the white and light-blue spray can under the bag and put it in the bowl
+401 : grab the white and light-blue spray can under the bag and put it in the bowl
+402 : grab the white and light-blue spray can under the bag and put it in the bowl
+403 : take the cup under the towel and put it on the plate
+404 : take the cup under the towel and put it on the plate
+405 : take the cup under the towel and put it on the plate
+406 : pick the grey cable under the towel and put it in the lunchbox
+407 : pick the grey cable under the towel and put it in the lunchbox
+408 : pick the grey cable under the towel and put it in the lunchbox
+409 : grab the red rope under the bag and place it on the plate
+410 : grab the red rope under the bag and place it on the plate
+411 : grab the red rope under the bag and place it on the plate
+412 : take the object under the towel and put it in the bowl
+413 : take the object under the towel and put it in the bowl
+414 : take the object under the towel and put it in the bowl
+415 : put the black and white marker in the cup
+416 : put the black and white marker in the cup
+417 : put the black and white marker in the cup
+418 : place the pink highlighter in the pen-holder
+419 : place the pink highlighter in the pen-holder
+420 : put the blue pen in the cup
+421 : put the blue pen in the cup
+422 : put the yellow pencil in the cup
+423 : put the yellow pencil in the cup
+424 : put the red glue stick in the pen-holder
+425 : put the red glue stick in the pen-holder
+426 : place the white eraser in the pen-holder
+427 : place the white eraser in the pen-holder
+428 : put the purple correction tape in the cup
+429 : put the purple correction tape in the cup
+430 : pick the green highlighter and put it in the lunchbox
+431 : pick the green highlighter and put it in the lunchbox
+432 : pick the green highlighter and put it in the lunchbox
+433 : grab the black marker and place it on the plate
+434 : grab the black marker and place it on the plate
+435 : grab the black marker and place it on the plate
+436 : take the black screwdriver and put it on the plate
+437 : take the black screwdriver and put it on the plate
+438 : take the black screwdriver and put it on the plate
+439 : pick the yellow glue stick and put it in the bowl
+440 : pick the yellow glue stick and put it in the bowl
+441 : pick the yellow glue stick and put it in the bowl
+442 : grab the clear tape and place it on the plate
+443 : grab the clear tape and place it on the plate
+444 : grab the clear tape and place it on the plate
+445 : take the light-blue glue stick and put it in the lunchbox
+446 : take the light-blue glue stick and put it in the lunchbox
+447 : pick the towel and put it in the bowl
+448 : pick the towel and put it in the bowl
+449 : pick the towel and put it in the bowl
+450 : pick the towel and put it in the bowl
+451 : grab the grey cable and place it in the lunchbox
+452 : grab the grey cable and place it in the lunchbox
+453 : grab the grey cable and place it in the lunchbox
+454 : take the black cable and put it on the plate
+455 : take the black cable and put it on the plate
+456 : take the black cable and put it on the plate
+457 : pick the bag and put it in the bowl
+458 : pick the bag and put it in the bowl
+459 : pick the bag and put it in the bowl
+460 : pick the bag and put it in the bowl
+461 : grab the towel and place it on the plate
+462 : grab the towel and place it on the plate
+463 : grab the towel and place it on the plate
+464 : take the light-blue glue stick and put it in the lunchbox
+465 : put the big cube on top of the small cube
+466 : put the big cube on top of the small cube
+467 : put the big cube on top of the small cube
+468 : put the blue cylinder on the blue block
+469 : put the blue cylinder on the blue block
+470 : put the blue cylinder on the blue block
+471 : put the towel over the cup
+472 : put the towel over the cup
+473 : put the towel over the cup
+474 : put the towel over the cup
+475 : put the towel over the cup
+476 : put the towel over the cup
+477 : put the towel over the cup
+478 : put the towel over the red rope
+479 : put the towel over the red rope
+480 : put the towel over the red rope
+481 : put the towel over the red rope
+482 : put the towel over the red rope
+483 : put the towel over the red rope
+484 : put the towel over the red rope
+485 : put the towel over the cube
+486 : put the towel over the cube
+487 : put the towel over the cube
+488 : put the towel over the cube
+489 : put the towel over the cube
+490 : put the towel over the cube
+491 : put the towel over the cube
+492 : put the bag on top of the block
+493 : put the bag on top of the block
+494 : put the bag on top of the block
+495 : put the bag on top of the block
+496 : put the bag on top of the block
+497 : put the bag on top of the block
+498 : put the bag on top of the block
+499 : put the bag on top of the block

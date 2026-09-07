@@ -1,0 +1,557 @@
+# =============================================================================
+# RECORDING SESSION — VLA pick-and-place (Kinova Gen3 + Robotiq 2F-85)
+# =============================================================================
+#
+# Task template: "<pick> <object reference> and <place> it <destination reference>"
+#
+# TAG FORMAT (per task group):
+#   # O# | D# | density: sparse|medium|dense | access: open|blocking     <N>
+#   <N> = total objects (targets + destinations) summed over ALL episodes in the
+#   group; divide by `episodes` for avg objects/episode.
+#   O# object-reference type:  O1 direct/named | O2 visual-property | O3 spatial |
+#                              O4 functional.
+#   D# destination-reference type:  D1 named container/surface | D2 shape
+#      (round vs rectangular) | D3 spatial (left/right/closer) | D4 relational
+#      (onto/under/over another object).
+#
+# DENSITY BANDS (avg objects/episode, targets + destinations) — re-derived from
+#   the actual recorded scenes (the original 3-4 / 6-8 / 9-12 scale was far too
+#   low; real scenes averaged ~11 objects):
+#     sparse <= 6 | medium 7-11 | dense >= 12
+#
+# ACCESS (binary):
+#   open     = target directly graspable.
+#   blocking = any physically-intelligent clearing was required — moving an
+#              in-the-way object, nudging/pushing it aside, flipping an upside-down
+#              destination cup, or uncovering an occluded target.
+#
+# RULES: verbs rotated (pick/pick up/grab/take/get + put/place/set), verb matches
+#   action; no "push/move/clear/tidy" in prompts (clearing is emergent)
+# =============================================================================
+
+dataset_name = "FilippoGorini/vla_kinova_gen3_clutter_pick_place"
+
+tasks = [
+
+# ========================= O1 — DIRECT / NAMED (~46) ========================
+
+# O1 | D1 | density: sparse | access: open      18
+{ prompt = "pick the green marker and put it in the pen-holder", episodes = 3 },
+# O1 | D1 | density: medium | access: open      24
+{ prompt = "grab the black pen and place it in the pen-holder", episodes = 3 },
+# O1 | D1 | density: sparse | access: open      12
+{ prompt = "take the orange highlighter and put it in the bowl", episodes = 2 },
+# O1 | D1 | density: medium | access: open      17
+{ prompt = "pick the blue block and put it in the cup", episodes = 2 },
+# O1 | D1 | density: medium | access: open      30
+{ prompt = "pick up the green marker and put it in the pen-holder", episodes = 3 },
+# O1 | D1 | density: medium | access: open      34
+{ prompt = "grab the masking tape and place it on the plate", episodes = 3 },
+# O1 | D1 | density: medium | access: open      21
+{ prompt = "take the red glue stick and put it in the bowl", episodes = 2 },
+# O1 | D1 | density: medium | access: open      19
+{ prompt = "get the scissors and place them in the lunchbox", episodes = 2 },
+# O1 | D3 | density: medium | access: open      22
+{ prompt = "pick the green marker and put it in the left container", episodes = 3 },
+# O1 | D3 | density: medium | access: open      18
+{ prompt = "grab the pencil and place it in the container closer to you", episodes = 2 },
+# O1 | D3 | density: medium | access: open      25
+{ prompt = "take the orange highlighter and put it in the left container", episodes = 3 },
+# O1 | D2 | density: medium | access: open      34
+{ prompt = "pick the blue cube and put it in the round container", episodes = 3 },
+# O1 | D2 | density: medium | access: open      30
+{ prompt = "grab the green marker and place it in the rectangular container", episodes = 3 },
+# O1 | D1 | density: medium | access: blocking      32
+{ prompt = "pick the green marker and put it in the pen-holder", episodes = 3 },
+# O1 | D1 | density: dense | access: blocking      39
+{ prompt = "grab the blue block and place it in the cup", episodes = 3 },
+# O1 | D1 | density: dense | access: open      38
+{ prompt = "pick the black pen and put it in the pen-holder", episodes = 3 },
+# O1 | D1 | density: dense | access: open      41
+{ prompt = "grab the blue cylinder and place it in the cup", episodes = 3 },
+# O1 | D1 | density: dense | access: blocking          24
+{ prompt = "take the green marker and put it in the bowl", episodes = 2 },
+
+
+# ====================== O2 — VISUAL PROPERTY (~48) ==========================
+
+# O2 | D1 | density: medium | access: open      23
+{ prompt = "pick the smaller cube and put it in the cup", episodes = 3 },
+# O2 | D1 | density: medium | access: open      35
+{ prompt = "grab the bigger cube and place it in the bowl", episodes = 3 },
+# O2 | D1 | density: dense | access: open      37
+{ prompt = "take the yellow glue stick and put it in the cup", episodes = 3 },
+# O2 | D1 | density: medium | access: 2 blocking 1 open     33
+{ prompt = "get the pink highlighter and place it in the pen-holder", episodes = 3 },
+# O2 | D1 | density: medium | access: open      28
+{ prompt = "pick the smallest blue object and put it in the cup", episodes = 2 },       # NOTES: we refer to the pen as smallest blue object but it's not necessarily so, it's thinner than the cubes but longer???
+# O2 | D1 | density: dense | access: 1 blocking 2 open      44
+{ prompt = "grab the green marker and place it in the pen-holder", episodes = 3 },
+# O2 | D1 | density: dense | access: open      31
+{ prompt = "take the light-blue glue stick and put it in the bowl", episodes = 2 },
+# O2 | D1 | density: medium | access: 1 blocking 1 open      23
+{ prompt = "pick the purple correction tape and put it in the cup", episodes = 2 },
+# O2 | D1 | density: dense | access: 1 blocking 1 open      29
+{ prompt = "grab the black spray can and place it in the bowl", episodes = 2 },
+# O2 | D3 | density: medium | access: 2 blocking 1 open      33
+{ prompt = "pick the bigger cube and put it in the left container", episodes = 3 },
+# O2 | D3 | density: dense | access: open      42
+{ prompt = "grab the orange highlighter and place it in the right container", episodes = 3 },
+# O2 | D3 | density: dense | access: open      42
+{ prompt = "take the yellow glue stick and put it in the container closer to you", episodes = 3 },
+# O2 | D2 | density: dense | access: 1 blocking 2 open      41
+{ prompt = "pick the smaller cube and put it in the round container", episodes = 3 },
+# O2 | D1 | density: dense | access: open      32
+{ prompt = "grab the smallest cube and place it in the cup", episodes = 2 },
+# O2 | D1 | density: dense | access: 2 blocking 1 open      40
+{ prompt = "pick the smaller cube and put it in the cup", episodes = 3 },
+# O2 | D1 | density: dense | access: 1 blocking 1 open      28
+{ prompt = "grab the pink highlighter and place it in the pen-holder", episodes = 2 },
+# O2 | D1 | density: medium | access: blocking     16
+{ prompt = "pick the smaller cube and place it in the cup", episodes = 2 },
+
+
+# =========================== O3 — SPATIAL (~44) =============================
+
+# O3 | D1 | density: medium | access: open      31
+{ prompt = "pick the leftmost marker and put it in the pen-holder", episodes = 3 },
+# O3 | D1 | density: medium | access: open      24
+{ prompt = "grab the pencil next to the plate and place it in the cup", episodes = 3 },
+# O3 | D1 | density: medium | access: 1 blocking 2 open      33
+{ prompt = "take the pen between the cups and put it in the pen-holder", episodes = 3 },
+# O3 | D1 | density: medium | access: open      30
+{ prompt = "get the rightmost object and place it in the bowl", episodes = 3 },
+# O3 | D1 | density: medium | access: open      28
+{ prompt = "pick the closest pencil and put it in the pen-holder", episodes = 3 },
+# O3 | D1 | density: medium | access: 1 blocking 2 open      30
+{ prompt = "grab the glue stick behind the cup and place it in the pen-holder", episodes = 3 },
+# O3 | D3 | density: dense | access: open      24
+{ prompt = "pick the leftmost cube and put it in the left container", episodes = 3 },
+# O3 | D3 | density: medium | access: open      30
+{ prompt = "grab the pen next to the plate and place it in the container closer to you", episodes = 3 },
+# O3 | D3 | density: medium | access: open      31
+{ prompt = "take the rightmost marker and put it in the right container", episodes = 3 },
+# O3 | D1 | density: medium | access: open      32
+{ prompt = "pick the leftmost marker and put it in the pen-holder", episodes = 3 },
+# O3 | D1 | density: dense | access: blocking      26
+{ prompt = "grab the cube next to the plate and place it in the cup", episodes = 2 },
+# O3 | D1 | density: dense | access: blocking      38
+{ prompt = "take the leftmost marker and put it in the pen-holder", episodes = 3 },
+# O3 | D1 | density: dense | access: open       25
+{ prompt = "pick the rightmost cube and place it in the bowl", episodes = 2 },
+
+
+# ==================== O4 — FUNCTIONAL write/drink/clean (~16) ===============
+
+# O4 | D1 | density: medium | access: open      32
+{ prompt = "pick something to write with and put it in the pen-holder", episodes = 3 },
+# O4 | D1 | density: dense | access: open      24
+{ prompt = "grab something to write with and place it in the pen-holder", episodes = 2 },
+# O4 | D1 | density: dense | access: open      36
+{ prompt = "take something to drink from and put it on the plate", episodes = 3 },
+# O4 | D1 | density: medium | access: open      29
+{ prompt = "pick something to clean a spill with and put it in the bowl", episodes = 3 },
+# O4 | D1 | density: dense | access: 1 blocking 1 open      28
+{ prompt = "grab something to clean a spill with and place it on the plate", episodes = 2 },
+# O4 | D1 | density: medium | access: blocking      30
+{ prompt = "take something to write with and put it in the pen-holder", episodes = 3 },
+
+
+# ============= PROMOTED + DEFORMABLE + DENSE-OPEN TARGETS (~20) =============
+
+# O1 | D1 | density: medium | access: open      26
+{ prompt = "pick the towel and put it in the bowl", episodes = 3 },
+# O1 | D1 | density: medium | access: open      18
+{ prompt = "grab the bag and place it on the plate", episodes = 2 },
+# O2 | D1 | density: medium | access: open      21
+{ prompt = "take the white and light-blue spray can and put it in the bowl", episodes = 2 },
+# O1 | D1 | density: medium | access: 1 blocking 1 open      22
+{ prompt = "pick the tissue pack and place it in the lunchbox", episodes = 2 },
+# O1 | D1 | density: dense | access: open      34
+{ prompt = "grab the dock and put it in the bowl", episodes = 2 },
+# O1 | D1 | density: medium | access: open      22
+{ prompt = "pick the red ball and put it in the bowl", episodes = 3 },
+# O1 | D1 | density: dense | access: open      25
+{ prompt = "grab a usb cable and put it in the bowl", episodes = 2 },   
+# O1 | D1 | density: medium | access: open      20
+{ prompt = "take a usb cable and place it in the lunchbox", episodes = 2 },
+# O1 | D1 | density: medium | access: open      21
+{ prompt = "pick the transparent box and put it on the plate", episodes = 2 },
+# O1 | D1 | density: dense | access: open      30
+{ prompt = "pick the green marker and put it in the pen-holder", episodes = 2 },
+# O2 | D1 | density: dense | access: open      34
+{ prompt = "grab the bigger cube and place it in the bowl", episodes = 2 },
+
+# =================== O1 — DIRECT (tools + new objects) (~40) ============== ==
+
+# O1 | D1 | density: medium | access: open      29
+{ prompt = "pick the blue and grey screwdriver and put it in the lunchbox", episodes = 3 },
+# O1 | D1 | density: medium | access: open      30
+{ prompt = "take the pliers and put them in the lunchbox", episodes = 3 },
+# O1 | D1 | density: medium | access: open      27
+{ prompt = "pick the water bottle and put it in the bowl", episodes = 3 },
+# O1 | D1 | density: medium | access: open      17
+{ prompt = "get the gum box and place it in the lunchbox", episodes = 2 },
+# O1 | D1 | density: dense | access: open      24
+{ prompt = "pick the brown tape and put it on the plate", episodes = 2 },
+# O1 | D1 | density: medium | access: open      16
+{ prompt = "grab the fork and place it in the bowl", episodes = 2 },
+# O1 | D3 | density: medium | access: open      22
+{ prompt = "pick the screwdriver and put it in the left container", episodes = 3 },
+# O1 | D3 | density: medium | access: open      35
+{ prompt = "grab the green marker and place it in the container closer to you", episodes = 3 },
+# O1 | D3 | density: medium | access: open      22
+{ prompt = "get the eraser and set it on the plate", episodes = 2 },
+# O1 | D2 | density: medium | access: open      19
+{ prompt = "grab the pliers and place them in the rectangular container", episodes = 2 },
+# O1 | D1 | density: medium | access: open      19
+{ prompt = "pick the screwdriver and put it in the lunchbox", episodes = 2 },
+# O1 | D1 | density: dense | access: open      32
+{ prompt = "grab the fork and place it in the bowl", episodes = 3 },
+# O1 | D1 | density: medium | access: blocking      19
+{ prompt = "take the water bottle and put it in the bowl", episodes = 2 },
+
+
+# ============ O2 — VISUAL PROPERTY (tool/tape/cutlery clusters) (~30) =======
+
+# O2 | D1 | density: medium | access: open      35
+{ prompt = "pick the blue and grey screwdriver and put it in the lunchbox", episodes = 3 },
+# O2 | D1 | density: medium | access: open      23
+{ prompt = "grab the black screwdriver and place it in the bowl", episodes = 2 },
+# O2 | D1 | density: medium | access: open      28
+{ prompt = "pick the brown tape and put it on the plate", episodes = 3 },
+# O2 | D1 | density: medium | access: open      21
+{ prompt = "grab the masking tape and place it in the bowl", episodes = 2 },
+# O2 | D1 | density: medium | access: 1 blocking 2 open      33
+{ prompt = "take the green correction tape and put it in the cup", episodes = 3 },
+# O2 | D1 | density: dense | access: open      38
+{ prompt = "grab the fork and put it in the bowl", episodes = 3 },
+# O2 | D2 | density: medium | access: 1 blocking 2 open      34
+{ prompt = "pick the smaller cube and put it in the round container", episodes = 3 },
+# O2 | D1 | density: dense | access: 1 blocking 1 open      24
+{ prompt = "pick the blue and grey screwdriver and put it in the bowl", episodes = 2 },
+
+
+# ==================== O3 — SPATIAL (new objects/dests) (~24) ================
+
+# O3 | D1 | density: medium | access: open      30
+{ prompt = "pick the leftmost tool and put it in the bowl", episodes = 3 },
+# O3 | D1 | density: medium | access: 1 blocking 2 open      31
+{ prompt = "grab the bottle behind the cup and place it in the lunchbox", episodes = 3 },
+# O3 | D3 | density: medium | access: open      30
+{ prompt = "pick the screwdriver and put it in the left container", episodes = 3 },
+# O3 | D1 | density: medium | access: blocking      20
+{ prompt = "grab the tool behind the bottle and place it in the bowl", episodes = 2 },
+# O3 | D1 | density: medium | access: open       30
+{ prompt = "grab the leftmost tool and place it in the bowl", episodes = 3 },
+
+# Remaining/rebalance
+
+# O1 | D1 | density: sparse | access: open
+{ prompt = "pick the black and white marker and put it in the cup", episodes = 3 },
+# O1 | D2 | density: sparse | access: open
+{ prompt = "take the black pen and put it in the rectangular container", episodes = 2 },
+# O1 | D2 | density: sparse | access: open
+{ prompt = "get the blue pen and place it in the round container", episodes = 2 },
+# O1 | D3 | density: sparse | access: open
+{ prompt = "pick the red glue stick and put it in the container closer to you", episodes = 2 },
+# O1 | D1 | density: sparse | access: open
+{ prompt = "grab the clear tape and place it on the plate", episodes = 2 },
+# O1 | D1 | density: sparse | access: open
+{ prompt = "take the bag and put it on the plate", episodes = 2 },
+# O1 | D1 | density: sparse | access: open
+{ prompt = "pick the tissue pack and place it in the lunchbox", episodes = 2 },
+# O1 | D1 | density: sparse | access: open
+{ prompt = "grab the transparent box and put it on the plate", episodes = 2 },
+# O1 | D1 | density: sparse | access: open
+{ prompt = "take the black cable and place it in the lunchbox", episodes = 2 },
+# O1 | D2 | density: sparse | access: open
+{ prompt = "get the dock and put it in the rectangular container", episodes = 2 },
+# O1 | D1 | density: sparse | access: open
+{ prompt = "pick the gum box and place it in the cup", episodes = 2 },
+# O1 | D1 | density: sparse | access: open
+{ prompt = "grab the red ball and put it in the cup", episodes = 2 },
+# O1 | D2 | density: sparse | access: open
+{ prompt = "take the scissors and place them in the rectangular container", episodes = 2 },
+# O1 | D3 | density: sparse | access: open
+{ prompt = "get the masking tape and put it in the container closer to you", episodes = 2 },
+# O1 | D2 | density: sparse | access: open
+{ prompt = "pick the grey cable and place it in the round container", episodes = 2 },
+# O1 | D1 | density: sparse | access: open
+{ prompt = "grab the towel and put it on the plate", episodes = 2 },
+# O2 | D3 | density: sparse | access: open
+{ prompt = "pick the green highlighter and put it in the right container", episodes = 3 },
+# O2 | D2 | density: sparse | access: open
+{ prompt = "grab the black screwdriver and place it in the round container", episodes = 2 },
+# O2 | D3 | density: sparse | access: open
+{ prompt = "take the white and light-blue spray can and put it in the container closer to you", episodes = 2 },
+# O2 | D1 | density: sparse | access: open
+{ prompt = "get the purple correction tape and place it in the cup", episodes = 2 },
+# O2 | D3 | density: sparse | access: open
+{ prompt = "pick the black marker and put it in the right container", episodes = 2 },
+# O3 | D1 | density: sparse | access: open
+{ prompt = "grab the rightmost pen and place it in the cup", episodes = 2 },
+# O3 | D1 | density: sparse | access: open
+{ prompt = "grab the leftmost pen and place it in the cup", episodes = 1 },   # ep.277 relabelled: took leftmost, not rightmost (single example)
+# O3 | D3 | density: sparse | access: open
+{ prompt = "take the leftmost highlighter and put it in the right container", episodes = 2 },
+# O3 | D2 | density: sparse | access: open
+{ prompt = "pick the pencil next to the cup and place it in the rectangular container", episodes = 2 },
+# O3 | D3 | density: sparse | access: open
+{ prompt = "grab the rightmost tool and put it in the container closer to you", episodes = 2 },
+# O4 | D1 | density: sparse | access: open
+{ prompt = "take something to cut with and put it in the cup", episodes = 3 },
+# O4 | D2 | density: sparse | access: open
+{ prompt = "pick something to eat with and place it in the rectangular container", episodes = 2 },
+# O4 | D1 | density: sparse | access: open
+{ prompt = "grab something to tighten a screw with and put it in the lunchbox", episodes = 3 },
+# O4 | D1 | density: sparse | access: open
+{ prompt = "take something to drink from and place it on the plate", episodes = 2 },
+# O4 | D1 | density: sparse | access: open
+{ prompt = "pick something to write with and put it in the cup", episodes = 2 },
+# O4 | D1 | density: sparse | access: open
+{ prompt = "grab something to clean a spill with and place it in the cup", episodes = 2 },
+
+
+
+#############################################################################
+############### PHASE 2 — PHYSICAL INTELLIGENCE (append, ~100) ###############
+#############################################################################
+# Focus: dexterous / contact-rich behaviours a VLM + classical-planner stack
+# structurally CANNOT do. Grounding kept trivial on purpose (direct named target,
+# tiny vocabulary) so capacity goes into MANIPULATION. Scenes stay sparse but
+# deliberately obstructed — HOW to block/obstruct each scene is Filippo's choice
+# at record time, so no per-task obstruction type is written here. The
+# manipulation is EMERGENT — never name flip / push / clear in the prompt; the
+# under/over RELATIONS are named (that is their grounding part). Keep ONE
+# consistent strategy per scene-type (avoid the BC multimodality trap); vary the
+# object POSE across the >=3 episodes of a prompt. Keep start-pose variation.
+#
+# DEFORMABLE targets (towel, bag, grey + black cable, red rope, crumpled paper)
+# fill ~half of EACH of the clearing / occlusion / under-over groups — the
+# physical-intelligence payoff is highest on floppy objects. (Red rope + crumpled
+# paper are promoted from distractor-only for this phase.) Reflective / transparent
+# object choices are still improvised within these same behaviours at record time.
+#
+# TARGETS otherwise from the UNDER-represented pool (no green marker; cubes only for
+# the size-contrast stack/under demos). Destinations spread off bowl/pen-holder;
+# cup/pen-holder dominate dest-prep only because they ARE the flip target.
+
+# --- destination preparation: the cup/pen-holder is upside-down / on its side, prep it first ---
+# O1 | D1 | density: sparse | access: blocking
+{ prompt = "put the black and white marker in the cup", episodes = 4 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "place the pink highlighter in the pen-holder", episodes = 4 },
+# O1 | D1 | density: sparse | access: blocking
+{ prompt = "put the blue pen in the cup", episodes = 3 },
+# O1 | D1 | density: sparse | access: blocking
+{ prompt = "put the yellow pencil in the cup", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "put the red glue stick in the pen-holder", episodes = 5 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "place the white eraser in the pen-holder", episodes = 2 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "put the purple correction tape in the cup", episodes = 3 },
+
+# --- clearing: target or destination is obstructed, clear it first (~half deformable) ---
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "pick the green highlighter and put it in the lunchbox", episodes = 4 },
+# O1 | D1 | density: sparse | access: blocking
+{ prompt = "grab the black marker and place it on the plate", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "take the black screwdriver and put it on the plate", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "pick the yellow glue stick and put it in the bowl", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "grab the clear tape and place it on the plate", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "take the light-blue glue stick and put it in the lunchbox", episodes = 4 },
+# O1 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "pick the towel and put it in the bowl", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "grab the grey cable and place it in the lunchbox", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "take the black cable and put it on the plate", episodes = 3 },
+# O1 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "pick the bag and put it in the bowl", episodes = 3 },
+# O1 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "grab the towel and place it on the plate", episodes = 3 },
+
+# --- occlusion: target hidden under the towel / bag, uncover then grasp (spatial ref O3; ~half deformable) ---
+# O3 | D1 | density: sparse | access: blocking
+{ prompt = "grab the white and light-blue spray can under the bag and put it in the bowl", episodes = 3 },
+# O3 | D1 | density: sparse | access: blocking
+{ prompt = "take the cup under the towel and put it on the plate", episodes = 4 },
+# O3 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "pick the grey cable under the towel and put it in the lunchbox", episodes = 3 },
+# O3 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "grab the red rope under the bag and place it on the plate", episodes = 3 },
+# O3 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "take the object under the towel and put it in the bowl", episodes = 4 },
+
+# --- under / over relations (D4 = relational placement onto/under/over another object; ~half deformable) ---
+# O2 | D4 | density: sparse | access: open
+{ prompt = "put the big cube on top of the small cube", episodes = 4 },
+# O1 | D4 | density: sparse | access: blocking
+{ prompt = "put the towel over the cup", episodes = 4 },
+# O1 | D4 | density: sparse | access: open
+{ prompt = "put the blue cylinder on the blue cube", episodes = 2 },
+# O1 | D4 | density: sparse | access: open
+{ prompt = "put the blue cylinder on the blue block", episodes = 2 },
+# O1 | D4 | density: sparse | access: blocking   (deformable)
+{ prompt = "put the towel over the red rope", episodes = 3 },
+# O1 | D4 | density: sparse | access: blocking   (deformable)
+{ prompt = "put the towel over the cube", episodes = 3 },
+# O1 | D4 | density: sparse | access: blocking   (deformable)
+{ prompt = "put the bag on top of the block", episodes = 3 },
+
+
+# ============ PHASE 3 — DEEPEN the Phase-2 skills (+100 -> clean 500) ============
+# NO new tasks: same prompt strings as the (commented) Phase-2 block above, recorded
+# again with varied object POSE / obstruction so each hard skill gets enough demos to
+# actually be learned. Counts here are ADDITIONAL episodes; later you can fold them
+# into the Phase-2 lines by simply bumping those episode counts.
+# Share of the 100:  occlusion 15 | destination-prep 15 | clearing 35 | cover/under 35.
+#   (occlusion + dest-prep reduced and equalised at 15%; the bulk goes to the harder
+#    deformable clearing + cover/drape/under relations.)
+# Dataset math: record these 100 + the 4 rebalance above = +104; after the 4 NOTES
+#   deletes -> 500 clean.
+
+# -- occlusion (+15) --
+# O3 | D1 | density: sparse | access: blocking
+{ prompt = "grab the white and light-blue spray can under the bag and put it in the bowl", episodes = 3 },
+# O3 | D1 | density: sparse | access: blocking
+{ prompt = "take the cup under the towel and put it on the plate", episodes = 3 },
+# O3 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "pick the grey cable under the towel and put it in the lunchbox", episodes = 3 },
+# O3 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "grab the red rope under the bag and place it on the plate", episodes = 3 },
+# O3 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "take the object under the towel and put it in the bowl", episodes = 3 },
+
+# -- destination preparation (+15) --
+# O1 | D1 | density: sparse | access: blocking
+{ prompt = "put the black and white marker in the cup", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "place the pink highlighter in the pen-holder", episodes = 2 },
+# O1 | D1 | density: sparse | access: blocking
+{ prompt = "put the blue pen in the cup", episodes = 2 },
+# O1 | D1 | density: sparse | access: blocking
+{ prompt = "put the yellow pencil in the cup", episodes = 2 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "put the red glue stick in the pen-holder", episodes = 2 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "place the white eraser in the pen-holder", episodes = 2 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "put the purple correction tape in the cup", episodes = 2 },
+
+# -- clearing (+35; deformables weighted) --
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "pick the green highlighter and put it in the lunchbox", episodes = 3 },
+# O1 | D1 | density: sparse | access: blocking
+{ prompt = "grab the black marker and place it on the plate", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "take the black screwdriver and put it on the plate", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "pick the yellow glue stick and put it in the bowl", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "grab the clear tape and place it on the plate", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking
+{ prompt = "take the light-blue glue stick and put it in the lunchbox", episodes = 3 },
+# O1 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "pick the towel and put it in the bowl", episodes = 4 },
+# O2 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "grab the grey cable and place it in the lunchbox", episodes = 3 },
+# O2 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "take the black cable and put it on the plate", episodes = 3 },
+# O1 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "pick the bag and put it in the bowl", episodes = 4 },
+# O1 | D1 | density: sparse | access: blocking   (deformable)
+{ prompt = "grab the towel and place it on the plate", episodes = 3 },
+
+# -- cover / drape / under relations (+35; deformables weighted) --
+# O2 | D4 | density: sparse | access: open
+{ prompt = "put the big cube on top of the small cube", episodes = 3 },
+# O1 | D4 | density: sparse | access: open
+{ prompt = "put the blue cylinder on the blue block", episodes = 3 },
+# O1 | D4 | density: sparse | access: blocking   (deformable)
+{ prompt = "put the towel over the cup", episodes = 7 },
+# O1 | D4 | density: sparse | access: blocking   (deformable)
+{ prompt = "put the towel over the red rope", episodes = 7 },
+# O1 | D4 | density: sparse | access: blocking   (deformable)
+{ prompt = "put the towel over the cube", episodes = 7 },
+# O1 | D4 | density: sparse | access: blocking   (deformable)
+{ prompt = "put the bag on top of the block", episodes = 8 },
+
+]
+
+# =============================================================================
+# DISTRIBUTION  (recomputed over the 500-episode CLEAN dataset from the per-task
+#   O#/D#/density/access tags below; TOML task counts verified equal to the
+#   recorded dataset. "N blocking M open" access tags split per episode.)
+# =============================================================================
+# TOTAL: 500 episodes.
+#
+# Object-reference TYPE:      O1 45% | O2 31% | O3 18% | O4 6%
+#   (O1 direct/named  O2 visual-property  O3 spatial  O4 functional/implicit)
+# Destination-reference TYPE: D1 72% | D2 6% | D3 10% | D4 11%
+#   (D1 direct-named  D2 round/rectangular shape-contrast  D3 spatial container
+#    closer/left/right  D4 relational placement over/on-top-of/on another object)
+# Density:  sparse 54% | medium 32% | dense 14%
+# Access:   open 55% | blocking 45%   (blocking = clear/nudge/flip/uncover)
+#   Deformable-tagged (towel/bag/cable/rope) episodes: 18%.
+#
+# DESTINATION by location:
+#   bowl 19% | cup 15% | plate 14% | pen-holder 14% | lunchbox 11%
+#   D3 containers: closer-to-you 4% | left 4% | round 3% | rect 3% | right 3%
+#   D4 relational: over 6% | on-top-of 4% | on 1%
+#
+# OBJECT (target) by category:
+#   writing 25% (125 eps)
+#   deformable 15% (77 eps)
+#   cube/block/cyl 12% (58 eps)
+#   tool 11% (53 eps)
+#   misc 8% (42 eps)
+#   glue stick 7% (35 eps)
+#   tape 6% (32 eps)
+#   functional 6% (30 eps)
+#   cable 5% (26 eps)
+#   spray can 2% (12 eps)
+#   generic 2% (10 eps)
+#
+# OBJECT (target) by identity  [eps; * = spatial/comparative/implicit reference]:
+#   writing: green marker 25, marker* 12, pink highlighter 11, black-and-white
+#     marker 10, green highlighter 10, pen* 9, black pen 8, orange highlighter 8,
+#     black marker 8, pencil* 8, blue pen 7, yellow pencil 5, pencil 2,
+#     highlighter* 2
+#   deformable: towel 49, bag 22, red rope 6
+#   cube/block/cyl: smaller cube 14, blue cylinder 10, bigger cube 8, big cube 7,
+#     cube* 7, blue block 5, blue cube 3, smallest cube 2, smallest blue obj 2
+#   tool: black screwdriver 10, tool* 10, blue-and-grey screwdriver 8, fork 8,
+#     screwdriver* 8, pliers 5, scissors 4
+#   misc: cup 7, red ball 5, water bottle 5, tissue pack 4, dock 4,
+#     transparent box 4, gum box 4, white eraser 4, bottle* 3, eraser 2
+#   glue stick: yellow glue stick 12, red glue stick 11, light-blue glue stick 9,
+#     glue stick* 3
+#   tape: purple corr. tape 9, clear tape 8, masking tape 7, brown tape 5,
+#     green corr. tape 3
+#   functional: fn:write 10, fn:clean 7, fn:drink 5, fn:cut 3, fn:tighten 3,
+#     fn:eat 2
+#   cable: grey cable 14, black cable 8, usb cable 4
+#   spray can: white-and-light-blue spray can 10, black spray can 2
+#   generic: generic* 10
+#
+# BALANCE NOTES (current 500):
+#   - blocking 45% (was ~13% mid-collection) and sparse 54% — the Phase-2/3
+#     physical-intelligence + basics work rebalanced both.
+#   - deformables well-covered (towel 49, bag 22); towel is the single most
+#     frequent target — the under->over/on-top-of relabels moved each draped
+#     cloth to the correct (grasped) target.
+#   - residual skew: writing objects (~25%) and bowl/cup/pen-holder destinations
+#     still lead; D2 (shape contrast) is the thinnest at 6%.
+#
+# DROPPED (not in final set): vase, hammer (safety/noise), ethernet adapter,
+#   board eraser.
+# DEFERRED to later phases: fully-implicit intent ("I'm thirsty"); text/symbol
+#   label destinations; handover ("hand me"); colour-matched sets; food category.
+# =============================================================================
