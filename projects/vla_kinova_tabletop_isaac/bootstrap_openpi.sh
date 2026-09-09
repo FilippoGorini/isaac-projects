@@ -9,7 +9,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPENPI_DIR="$PROJECT_DIR/external/openpi"
 
 FORK_URL="https://github.com/FilippoGorini/openpi.git"
-FORK_BRANCH="kinova-gen3"
+FORK_BRANCH="train_rtc"   
 UPSTREAM_URL="https://github.com/Physical-Intelligence/openpi.git"
 
 # Install uv if not already installed, this is needed for the openpi installation
