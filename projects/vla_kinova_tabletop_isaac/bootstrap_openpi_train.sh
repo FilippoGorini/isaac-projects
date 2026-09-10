@@ -43,6 +43,13 @@ echo "==> Installing system dependencies (ffmpeg, python3-pip)..."
 sudo apt-get update -y
 sudo apt-get install -y ffmpeg python3-pip
 
+# Ubuntu 24.04's system Python is PEP 668 "externally managed", so `pip install` into it fails
+# with `error: externally-managed-environment`. This env var overrides that for the pip installs
+# below. It is a harmless no-op on Ubuntu 22.04 (older pip ignores the unknown var, and there is no
+# marker to override). Safe here: this is an ephemeral training box where nothing depends on the
+# system Python. (Alternative would be pipx / a dedicated venv for these two CLIs.)
+export PIP_BREAK_SYSTEM_PACKAGES=1
+
 # gsutil: openpi pulls base checkpoints with `gsutil -m cp -r` from gs://openpi-assets.
 # NOTE: the apt `gsutil` package is an unrelated grid tool that rejects `-m`: install
 # Google's real gsutil from PyPI instead (public bucket, no credentials needed)
