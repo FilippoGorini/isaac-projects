@@ -77,8 +77,8 @@ def _ros_image_to_uint8_hwc(msg: Image) -> np.ndarray:
 
 
 class PolicyClientAsynchronousRtcNode(Node):
-    def __init__(self):
-        super().__init__("policy_client_asynchronous_rtc")
+    def __init__(self, node_name: str = "policy_client_asynchronous_rtc"):
+        super().__init__(node_name)
 
         # --- parameters ---
         self.declare_parameter("policy_host", "localhost")
@@ -94,6 +94,8 @@ class PolicyClientAsynchronousRtcNode(Node):
         # pi05_kinova_finetune_rtc trained on randint(0, max_delay=8) = delays 0..7. Choose d in
         # slight excess of the real latency so the next chunk is back before the prefix runs out.
         self.declare_parameter("rtc_delay_steps", 5)
+        # The served checkpoint's trained max_delay: this is just to warn in case a delay bigger than the max the checkpoint was trained on is requested
+        self.declare_parameter("model_max_delay", 10)
         # RTC safety blend: short smoothstep seam absorbing a latency overrun (chunk later than d
         # steps) or imperfect pinning. Small -- RTC handles the bulk; 0 => pure RTC.
         self.declare_parameter("rtc_blend_steps", 3)
@@ -137,6 +139,7 @@ class PolicyClientAsynchronousRtcNode(Node):
         self._dataset_hz = gp("control_hz").get_parameter_value().double_value
         self._infer_hz = gp("inference_hz").get_parameter_value().double_value
         self._rtc_delay = gp("rtc_delay_steps").get_parameter_value().integer_value
+        self._model_max_delay = gp("model_max_delay").get_parameter_value().integer_value
         self._rtc_blend_steps = gp("rtc_blend_steps").get_parameter_value().integer_value
         use_sim = gp("use_sim").get_parameter_value().bool_value
 
@@ -168,11 +171,13 @@ class PolicyClientAsynchronousRtcNode(Node):
 
         if self._rtc_delay < 1:
             raise SystemExit("rtc_delay_steps must be >= 1.")
-        if self._rtc_delay > 7:
+        max_in_dist = self._model_max_delay - 1   # trained delays randint(0, max_delay) = 0..max-1
+        if self._rtc_delay > max_in_dist:
             self.get_logger().warn(
-                f"rtc_delay_steps={self._rtc_delay} is out of the model's trained range: "
-                "pi05_kinova_finetune_rtc sampled delays randint(0, max_delay=8) = 0..7, "
-                "so d>7 is out of distribution.")
+                f"rtc_delay_steps={self._rtc_delay} exceeds the served model's trained range: "
+                f"max_delay={self._model_max_delay} => delays 0..{max_in_dist}, so "
+                f"d>{max_in_dist} is out of distribution. Set model_max_delay to match the "
+                "checkpoint the server is running if this is wrong.")
 
         self._dt_dataset = 1.0 / self._dataset_hz
         self._infer_period = (1.0 / self._infer_hz) if self._infer_hz > 0.0 else 0.0

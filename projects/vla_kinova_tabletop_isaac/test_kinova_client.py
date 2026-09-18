@@ -12,14 +12,25 @@ Observation (matches policy_client_synchronous_node._build_obs after resize):
   wrist_rgb  uint8   (224, 224, 3)   ~147 KB   -> ~294 KB/request
   prompt     str
 
+Pass --rtc-delay d (>0) to ALSO attach the RTC committed prefix (action_prefix
+(d,7) + delay=d), exactly like policy_client_asynchronous_rtc after its first
+cycle. This exercises the RTC pin path (Pi0Faster) instead of plain inference, so
+the timing matches the real node, and it doubles as a pre-flight check that the
+served checkpoint is actually RTC-capable. Prefix bytes are negligible (~d*28 B)
+next to the ~294 KB of images, so it does not skew transport time -- it only
+confirms the RTC code path costs the same server compute (it should: same denoise
+steps, the pin is a cheap masked write).
+
 Two warmup requests (untimed) trigger server-side JIT and warm the TCP window,
-matching how the real client reaches steady state. Use --idle-sec to insert a
-gap between requests and observe TCP slow-start-after-idle (should be a no-op if
-net.ipv4.tcp_slow_start_after_idle=0 is set on this machine).
+matching how the real client reaches steady state. With --rtc-delay the warmup
+carries the prefix too, so the RTC-specific jit compilation is triggered untimed.
+Use --idle-sec to insert a gap between requests and observe TCP slow-start-after-idle
+(should be a no-op if net.ipv4.tcp_slow_start_after_idle=0 is set on this machine).
 
 Usage:
     python3 test_kinova_client.py --host 194.93.48.73 --port 8000 -n 30
-    python3 test_kinova_client.py --host 194.93.48.73 --idle-sec 1.0   # mimic node cadence
+    python3 test_kinova_client.py --host 194.93.48.73 --idle-sec 0.5   # mimic node cadence
+    python3 test_kinova_client.py --host 194.93.48.73 --rtc-delay 5    # measure the RTC path
 """
 import argparse
 import statistics
@@ -31,14 +42,24 @@ from openpi_client.websocket_client_policy import WebsocketClientPolicy
 IMG_SHAPE = (224, 224, 3)  # matches image_resolution=224 after resize_with_pad
 
 
-def make_obs(prompt: str) -> dict:
-    return {
+def make_obs(prompt: str, rtc_delay: int = 0) -> dict:
+    obs = {
         "joints": np.zeros(6, dtype=np.float32),
         "gripper": np.zeros(1, dtype=np.float32),
         "base_rgb": np.random.randint(0, 256, IMG_SHAPE, dtype=np.uint8),
         "wrist_rgb": np.random.randint(0, 256, IMG_SHAPE, dtype=np.uint8),
         "prompt": prompt,
     }
+    if rtc_delay > 0:
+        # RTC committed prefix: d raw-absolute setpoints (6 arm rad + 1 gripper), the same shape
+        # policy_client_asynchronous_rtc sends via _prefix_from_plan. The values are arbitrary for
+        # a latency probe (server compute is prefix-content-independent) -- a gentle ramp off the
+        # zero state stands in for a real slice of the committed plan.
+        prefix = np.zeros((rtc_delay, 7), dtype=np.float32)
+        prefix[:, :6] = np.linspace(0.0, 0.02, rtc_delay, dtype=np.float32)[:, None]
+        obs["action_prefix"] = prefix
+        obs["delay"] = int(rtc_delay)
+    return obs
 
 
 def _pct(xs: list[float], q: float) -> float:
@@ -68,22 +89,28 @@ def main() -> None:
     ap.add_argument("--warmup", type=int, default=2, help="Untimed warmup requests")
     ap.add_argument(
         "--idle-sec", type=float, default=0.0,
-        help="Sleep between requests; set ~1.0 to mimic the node's per-cycle idle.",
+        help="Sleep between requests; set ~0.5 to mimic the node's per-cycle idle.",
+    )
+    ap.add_argument(
+        "--rtc-delay", type=int, default=0,
+        help="If >0, attach the RTC committed prefix (action_prefix (d,7) + delay=d) so the probe "
+             "hits the RTC pin path, matching policy_client_asynchronous_rtc. 0 => plain inference.",
     )
     args = ap.parse_args()
 
-    obs = make_obs(args.prompt)
+    obs = make_obs(args.prompt, args.rtc_delay)
     payload_kb = (obs["base_rgb"].nbytes + obs["wrist_rgb"].nbytes) / 1024
+    rtc_str = f"RTC prefix d={args.rtc_delay}" if args.rtc_delay > 0 else "plain (no RTC prefix)"
     print(f"Connecting to ws://{args.host}:{args.port} ...")
     policy = WebsocketClientPolicy(host=args.host, port=args.port)
     print(
         f"Connected. payload {payload_kb:.0f} KB/request "
-        f"(2x {IMG_SHAPE} uint8) | warmup {args.warmup} | steps {args.num_steps} | "
-        f"idle {args.idle_sec:.2f} s"
+        f"(2x {IMG_SHAPE} uint8) | {rtc_str} | warmup {args.warmup} | "
+        f"steps {args.num_steps} | idle {args.idle_sec:.2f} s"
     )
 
     for _ in range(args.warmup):
-        policy.infer(make_obs(args.prompt))
+        policy.infer(make_obs(args.prompt, args.rtc_delay))
 
     round_trip, server, transport = [], [], []
     for i in range(args.num_steps):

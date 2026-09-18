@@ -4,7 +4,8 @@ policy_client_asynchronous_rtc:
     policy_port: 8000
     prompt: "lift the blue cube"
     control_hz: 30.0          # rate of incoming VLA actions (dt = 1/30) => 30 Hz plan spacing
-    inference_hz: 1.5         # target chunk-generation rate; 0.0 => free-running
+    inference_hz: 4.0         # target chunk-generation rate; 0.0 => free-running. Ceiling = 1/round-trip
+                              # (~6-7 Hz @ 150 ms); asking for more than that just free-runs at the latency limit
     use_sim: true             # false => real-robot camera topics + use_sim_time off
 
     # This node only produces the 30 Hz plan (on plan_topic) + drives the gripper. The arm
@@ -18,7 +19,8 @@ policy_client_asynchronous_rtc:
     # each observation so the RTC-finetuned checkpoint (pi05_kinova_finetune_rtc) pins the new
     # chunk's first d steps to what the arm is already executing (seamless). On time the chunk is
     # swapped in cleanly; only a latency overrun (chunk later than d) crossfades over rtc_blend_steps.
-    rtc_delay_steps: 5        # d = round(latency/dt); ~140 ms @ 30 Hz => 5. Max 7 (trained randint(0,8)=0..7)
+    rtc_delay_steps: 6        # d = round(latency/dt); ~140 ms @ 30 Hz => 5. Cap = model_max_delay-1
+    model_max_delay: 10       # served checkpoint's trained max_delay (clutter_rtc=10 => d<=9; finetune_rtc=8 => d<=7); only gates the OOD warning
     rtc_blend_steps: 5        # short safety cross-fade for latency overrun / imperfect pinning; 0 => pure RTC
 
     # ---- gripper hysteresis (near-binary model output: 0 open / ~0.8 closed) ----
