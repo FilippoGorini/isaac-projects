@@ -19,7 +19,7 @@ setup(
     zip_safe=True,
     maintainer='filippo',
     maintainer_email='filippogorini7@gmail.com',
-    description='ROS 2 policy client for pi0 VLA on Kinova Gen3',
+    description='ROS 2 policy client for pi0/pi05 VLA on Kinova Gen3',
     license='Apache-2.0',
     extras_require={
         'test': [
@@ -31,6 +31,8 @@ setup(
             'policy_client = vla_policy_client.policy_client_node:main',
             'policy_client_synchronous = vla_policy_client.policy_client_synchronous_node:main',
             'policy_client_asynchronous_rtc = vla_policy_client.policy_client_asynchronous_rtc_node:main',
+            'policy_client_asynchronous_rtc_prompted = vla_policy_client.policy_client_asynchronous_rtc_prompted_node:main',
+            'speech_to_prompt = vla_policy_client.speech_to_prompt_node:main',
         ],
     },
 )
