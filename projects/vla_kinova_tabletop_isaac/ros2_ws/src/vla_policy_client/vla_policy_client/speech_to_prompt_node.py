@@ -12,6 +12,7 @@ import tty
 import numpy as np
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from std_msgs.msg import String
 
 SAMPLE_RATE = 16000
@@ -72,9 +73,11 @@ class SpeechToPromptNode(Node):
         topic = self.get_parameter("prompt_topic").get_parameter_value().string_value
         model = self.get_parameter("model").get_parameter_value().string_value
 
-        self._prompt = None
-        self._pub = self.create_publisher(String, topic, 10)
-        self.create_timer(0.2, self._republish)   
+        # Latched topic so that we publish on change only. DDS keeps the last sample so that if we start the client after this node it still gets the prompt sent last
+        qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        self._prompt = ""       
+        self._pub = self.create_publisher(String, topic, qos)
+        self._set_prompt("")    # latch the initial idle state
 
         preload_cuda_libs()     # load cuda stuff
         self.get_logger().info(f"Loading {model}...")
@@ -83,9 +86,10 @@ class SpeechToPromptNode(Node):
         list(self._model.transcribe(np.zeros(SAMPLE_RATE, np.float32), language="en")[0])  # warmup
         self.get_logger().info(f"Ready, publishing prompts on '{topic}'")
 
-    def _republish(self):
-        if self._prompt:
-            self._pub.publish(String(data=self._prompt))
+    def _set_prompt(self, prompt: str) -> None:
+        """Update the desired task and latch it on the topic (published on change only)."""
+        self._prompt = prompt
+        self._pub.publish(String(data=prompt))
 
     def record_loop(self):      # loop to record audio when the user wants to publish a new prompt for the model
         import sounddevice as sd
@@ -100,7 +104,7 @@ class SpeechToPromptNode(Node):
         stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32",
                                 callback=callback)
         stream.start()
-        print("\nSPACE = start/stop recording, q = quit\n")
+        print("\nSPACE = start/stop recording | ESC = cancel recording / stop robot | q = quit\n")
         old_term = termios.tcgetattr(sys.stdin)
         try:
             tty.setcbreak(sys.stdin.fileno())
@@ -109,13 +113,24 @@ class SpeechToPromptNode(Node):
                     continue
                 key = sys.stdin.read(1)
                 if key == "q":
+                    self._set_prompt("")            # stop the robot before quitting
+                    time.sleep(0.2)                      
                     break
-                if key != " ":
+                if key == "\x1b":                   # if ESC cancel recording, or stop robot when idle
+                    if recording:
+                        recording = False
+                        chunks.clear()
+                        print("CANCELLED, press SPACE to record again\n")
+                    else:
+                        self._set_prompt("")        # send empty string to make the robot go idle (the client only runs inference if it has a valid non-empty prompt, otherwise it stops the arm)
+                        print("STOPPED (arm idle), press SPACE to task again\n")
+                    continue
+                if key != " ":                      # SPACE = record toggle
                     continue
                 if not recording:
                     chunks.clear()
                     recording = True
-                    print("recording... (SPACE to stop)")
+                    print("recording... (SPACE to send, ESC to cancel)")
                     continue
                 recording = False
                 audio = np.concatenate(chunks, axis=0)[:, 0] if chunks else np.zeros(0, np.float32)
@@ -128,10 +143,9 @@ class SpeechToPromptNode(Node):
                 prompt = process_prompt(raw)                                # process the prompt to remove punctuation, make everything lowercase and substitute manually the words we know are often misheard
                 if not prompt:
                     continue
-                self._prompt = prompt
-                self._pub.publish(String(data=prompt))
+                self._set_prompt(prompt)
                 print(f'heard ({time.monotonic() - t0:.2f}s): "{raw}"')
-                print(f'prompt -> "{prompt}"\n')
+                print(f'prompt: "{prompt}"\n')
 
         except KeyboardInterrupt:
             pass

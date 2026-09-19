@@ -1,40 +1,37 @@
 #!/usr/bin/env python3
 """Voice-prompted asynchronous RTC VLA policy client.
 
-Identical to policy_client_asynchronous_rtc (it subclasses it, so the whole grid/RTC
-machinery is literally the same code); the only differences:
+Subclasses policy_client_asynchronous_rtc unchanged; the only difference is where the prompt
+comes from: `prompt_topic` (std_msgs/String from the speech_to_prompt node) instead of the
+static `prompt` parameter. It's a latched level signal -- a non-empty prompt is the active
+task, "" means stop.
 
-  * The prompt comes from `prompt_topic` (std_msgs/String, published by the speech_to_prompt
-    node) instead of the static `prompt` parameter. A new message swaps the prompt used in
-    all subsequent observations.
-  * NO observations are sent until the first prompt arrives -- querying the model without
-    the task conditioning it was trained with would make the arm do arbitrary things. The
-    node connects to the server, then idles (with a throttled "waiting" log) until the
-    first prompt; the grid anchors on the first real observation as usual.
-  * The `prompt` parameter is kept as an OPTIONAL initial prompt: non-empty => start
-    immediately with it (no waiting), and voice prompts replace it as they arrive. The
-    voice config leaves it "" (wait for the first utterance).
+  * No task ("" prompt) => no inference: querying the model without task conditioning would
+    move the arm arbitrarily, so _build_obs gates and the plan is dropped (the C++ streamer
+    then holds the last knot -> arm holds pose).
+  * A non-empty prompt (re)starts inference exactly like the first one -- dropping the plan
+    makes first_chunk True again, so no stale RTC prefix/blend.
+  * The `prompt` parameter is an OPTIONAL initial task: non-empty => start immediately; the
+    voice config leaves it "" and waits for the first utterance.
 
-Prompts are published already normalized (lowercase, no trailing punctuation) by the
-speech_to_prompt node; the same normalization is applied here anyway so any other publisher
-on the topic behaves identically.
+Prompts are normalized here too (process_prompt) so any publisher on the topic behaves the same.
 """
 
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from std_msgs.msg import String
 
 from vla_policy_client.policy_client_asynchronous_rtc_node import (
     PolicyClientAsynchronousRtcNode,
 )
-from vla_policy_client.speech_to_prompt_node import normalize_prompt
+from vla_policy_client.speech_to_prompt_node import process_prompt
 
 
 class PolicyClientAsynchronousRtcPromptedNode(PolicyClientAsynchronousRtcNode):
     def __init__(self):
-        # Set BEFORE the base init: the base constructor starts the inference thread, which
-        # may call _build_obs (overridden below) before this constructor finishes.
-        self._prompt_ready = False
+        # Set BEFORE the base init: the base constructor starts the inference thread, which may
+        # call _build_obs (overridden below, reads _prompt_topic) before this constructor finishes
         self._prompt_topic = "/vla_prompt"
 
         super().__init__(node_name="policy_client_asynchronous_rtc_prompted")
@@ -42,36 +39,42 @@ class PolicyClientAsynchronousRtcPromptedNode(PolicyClientAsynchronousRtcNode):
         self.declare_parameter("prompt_topic", "/vla_prompt")
         self._prompt_topic = (
             self.get_parameter("prompt_topic").get_parameter_value().string_value)
-        self.create_subscription(String, self._prompt_topic, self._cb_prompt, 10)
+        self._prompt = process_prompt(self._prompt)     # normalize the optional config prompt
+        # Latched QoS to match the speec to test node. Last prompt is kept by DDS so this client gets the most recent prompt even if started after the voice prompting node
+        qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(String, self._prompt_topic, self._cb_prompt, qos)
 
-        if self._prompt.strip():
-            self._prompt = normalize_prompt(self._prompt)
-            self._prompt_ready = True
+        if self._prompt:
             self.get_logger().info(
                 f"Initial prompt from config: \"{self._prompt}\" -- starting immediately; "
-                f"voice prompts on '{self._prompt_topic}' will replace it.")
+                f"prompts on '{self._prompt_topic}' replace it (\"\" = stop).")
         else:
             self.get_logger().info(
-                f"Holding observations until the first prompt arrives on "
-                f"'{self._prompt_topic}' (start the speech_to_prompt node and speak).")
+                f"Idle until a prompt arrives on '{self._prompt_topic}' "
+                f"(start the speech_to_prompt node and speak).")
 
     def _cb_prompt(self, msg: String) -> None:
-        prompt = normalize_prompt(msg.data)
-        if not prompt:
+        # The topic is latched so we only react on a change
+        prompt = process_prompt(msg.data)
+        if prompt == self._prompt:
             return
-        # The topic is re-published at ~5 Hz; only react (log/swap) on an actual change.
-        if prompt != self._prompt:
-            self._prompt = prompt
+        self._prompt = prompt
+        if prompt:
             self.get_logger().info(f'New prompt: "{prompt}"')
-            self._log_event({"type": "prompt", "t": self._now(), "prompt": prompt})
-        self._prompt_ready = True
+        else:
+            # If stopping, drop the active plan -> C++ streamer holds the last knot -> arm goes idle
+            # When resuming first_chunk goes True again: keep the whole chunk and no stale RTC prefix or blend
+            with self._plan_lock:
+                self._plan = None
+            self.get_logger().info("Prompt cleared -> inference paused, arm holding pose.")
+        self._log_event({"type": "prompt", "t": self._now(), "prompt": prompt})
 
     def _build_obs(self) -> dict | None:
-        # Gate: without the first prompt the model has no task conditioning, so send nothing
-        # (the inference loop just logs the throttled "Waiting for observations" line).
-        if not self._prompt_ready:
+        # Don't query the model and keep arm idle if there's no task on the prompt topic (with no language conditioning it would move arbitrarily)
+        # As soon as there is a valid non empty prompt, build observation the usual way and query the model
+        if not self._prompt:
             with self._obs_lock:
-                self._missing_status = f"waiting for first prompt on '{self._prompt_topic}'"
+                self._missing_status = f"idle, waiting for a prompt on '{self._prompt_topic}'"
             return None
         return super()._build_obs()
 
