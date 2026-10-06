@@ -17,6 +17,7 @@ def launch_setup(context, *args, **kwargs):
     realsense_color_profile = LaunchConfiguration("realsense_color_profile").perform(context)
     zed_camera_model = LaunchConfiguration("zed_camera_model").perform(context)
     kinova_ip = LaunchConfiguration("kinova_ip").perform(context)
+    disable_autofocus = LaunchConfiguration("disable_autofocus").perform(context)
 
     zed_disable_depth = LaunchConfiguration("zed_disable_depth").perform(context).lower() == "true"
     zed_resolution = LaunchConfiguration("zed_resolution").perform(context)
@@ -34,6 +35,7 @@ def launch_setup(context, *args, **kwargs):
             )),
             launch_arguments={
                 "device": kinova_ip,
+                "disable_autofocus": disable_autofocus,
             }.items(),
         ))
 
@@ -115,6 +117,11 @@ def generate_launch_description():
             "kinova_ip",
             default_value="192.168.50.12",
             description="IPv4 address of the Kinova arm; forwarded to kinova_vision as 'device'",
+        ),
+        DeclareLaunchArgument(
+            "disable_autofocus",
+            default_value="true",
+            description="Replace the wrist colour autofocus with a fixed manual focus once the stream is up",
         ),
         DeclareLaunchArgument(
             "zed_disable_depth",

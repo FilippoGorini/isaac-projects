@@ -13,6 +13,7 @@ def launch_setup(context, *args, **kwargs):
     camera_link_frame_id = LaunchConfiguration("camera_link_frame_id").perform(context)
     color_camera_info_url = LaunchConfiguration("color_camera_info_url").perform(context)
     max_color_pub_rate = LaunchConfiguration("max_color_pub_rate").perform(context)
+    disable_autofocus = LaunchConfiguration("disable_autofocus").perform(context).lower() == "true"
 
     color_node = Node(
         package="kinova_vision",
@@ -49,7 +50,17 @@ def launch_setup(context, *args, **kwargs):
         arguments=["0", "0", "0", "0", "0", "0", camera_link_frame_id, color_frame_id],
     )
 
-    return [color_node, color_tf_publisher]
+    actions = [color_node, color_tf_publisher]
+    # Disable autofocus by fixing a manual focus value after the stream is up (focus_after_stream node waits for the stream to start)
+    if disable_autofocus:
+        actions.append(Node(
+            package="vla_kinova_sensors",
+            executable="focus_after_stream.py",
+            name="focus_after_stream",
+            output="screen",
+            arguments=[device, "170"],  # fixed lens position (170 is a good in the middle value for typical object distances)
+        ))
+    return actions
 
 
 def generate_launch_description():
@@ -77,6 +88,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "max_color_pub_rate", default_value="30.0",
             description="Maximum color image publication rate (Hz)",
+        ),
+        DeclareLaunchArgument(
+            "disable_autofocus", default_value="true",
+            description="Replace the wrist colour autofocus with a fixed manual focus once the stream is up",
         ),
         OpaqueFunction(function=launch_setup),
     ])
