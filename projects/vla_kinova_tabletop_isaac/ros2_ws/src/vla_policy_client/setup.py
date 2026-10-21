@@ -33,6 +33,8 @@ setup(
             'policy_client_asynchronous_rtc = vla_policy_client.policy_client_asynchronous_rtc_node:main',
             'policy_client_asynchronous_rtc_prompted = vla_policy_client.policy_client_asynchronous_rtc_prompted_node:main',
             'speech_to_prompt = vla_policy_client.speech_to_prompt_node:main',
+            'plot_vla_trace = vla_policy_client.plot_trace:main',
+            'convert_vla_trace = vla_policy_client.convert_trace:main',
         ],
     },
 )
