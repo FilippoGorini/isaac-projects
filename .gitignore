@@ -33,3 +33,6 @@ projects/**/checkpoints/
 .idea/
 *.swp
 *.swo
+
+reports/
+research_notes/

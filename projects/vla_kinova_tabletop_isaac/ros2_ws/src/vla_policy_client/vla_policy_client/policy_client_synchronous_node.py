@@ -343,15 +343,19 @@ class PolicyClientSynchronousNode(Node):
                 time.sleep(0.2)
                 continue
 
-            # Step the chunk's per-timestep gripper output at control_hz, in sync
-            # with the arm trajectory. This loop is the wall-clock pacing.
-            start = time.monotonic()
+            # Step the chunk's per-timestep gripper output at control_hz, paced on the
+            # SIM clock (get_clock honors use_sim_time) so it advances in lock-step with
+            # the JTC, which plays the chunk's time_from_start on the sim clock. Wall pacing
+            # here outruns the arm whenever RTF < 1: the loop finishes a wall-second early and
+            # the next goal preempts the still-running chunk, so the arm barely moves.
+            clock = self.get_clock()
+            t0_ns = clock.now().nanoseconds
+            step_ns = int(self._dt * 1e9)
             for i in range(horizon):
                 self._update_gripper(float(actions[i, 6]))
-                target = start + (i + 1) * self._dt
-                sleep_for = target - time.monotonic()
-                if sleep_for > 0.0:
-                    time.sleep(sleep_for)
+                target_ns = t0_ns + (i + 1) * step_ns
+                while self._running and rclpy.ok() and clock.now().nanoseconds < target_ns:
+                    time.sleep(0.002)
 
             # Gate the next inference on the arm trajectory actually finishing.
             if not self._arm_done.wait(timeout=max(2.0, horizon * self._dt + 1.0)):
