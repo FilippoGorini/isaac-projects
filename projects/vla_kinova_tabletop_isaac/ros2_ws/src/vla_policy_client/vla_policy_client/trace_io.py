@@ -41,6 +41,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+# fallback for traces written before the client logged meta["arm_joints"]
 ARM_JOINTS = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"]
 
 
@@ -75,6 +76,10 @@ class Run:
     # inference-rate reports
     rate_t: np.ndarray            # (R,)
     rate_hz: np.ndarray           # (R,)
+
+    @property
+    def arm_joints(self) -> list:
+        return list(self.meta.get("arm_joints", ARM_JOINTS))
 
     @property
     def control_hz(self) -> float:
@@ -147,6 +152,7 @@ def load_run(path: str) -> Run:
     ge_t, ge_cmd, ge_pos, ge_val, ge_disp = [], [], [], [], []
     rate_t, rate_hz = [], []
     have_vel = have_eff = have_grip = False
+    n_arm = len(ARM_JOINTS)
 
     with open(path) as f:
         for line in f:
@@ -160,6 +166,7 @@ def load_run(path: str) -> Run:
             tp = r.get("type")
             if tp == "meta":
                 meta.update(r)
+                n_arm = len(meta.get("arm_joints", ARM_JOINTS))
             elif tp == "chunk":
                 t_obs.append(r["t_obs"])
                 t_arr.append(r["t_arrive"])
@@ -181,10 +188,10 @@ def load_run(path: str) -> Run:
                 js_grip.append(r.get("grip", np.nan))
                 if "vel" in r:
                     have_vel = True
-                js_vel.append(r.get("vel", [np.nan] * 6))
+                js_vel.append(r.get("vel", [np.nan] * n_arm))
                 if "eff" in r:
                     have_eff = True
-                js_eff.append(r.get("eff", [np.nan] * 6))
+                js_eff.append(r.get("eff", [np.nan] * n_arm))
             elif tp == "gripper":
                 ge_t.append(r["t"])
                 ge_cmd.append(r.get("cmd", ""))
@@ -195,7 +202,7 @@ def load_run(path: str) -> Run:
                 rate_t.append(r["t"])
                 rate_hz.append(r.get("hz", np.nan))
 
-    def arr(x, w=6):
+    def arr(x, w=n_arm):
         return np.asarray(x, dtype=float) if len(x) else np.zeros((0, w))
 
     return Run(
@@ -248,8 +255,8 @@ def save_npz(run: Run, path: str) -> None:
         js_t=run.js_t,
         js_pos=run.js_pos,
         js_grip=np.zeros((0,)) if run.js_grip is None else run.js_grip,
-        js_vel=np.zeros((0, 6)) if run.js_vel is None else run.js_vel,
-        js_eff=np.zeros((0, 6)) if run.js_eff is None else run.js_eff,
+        js_vel=np.zeros((0, len(run.arm_joints))) if run.js_vel is None else run.js_vel,
+        js_eff=np.zeros((0, len(run.arm_joints))) if run.js_eff is None else run.js_eff,
         grip_evt_t=run.grip_evt_t,
         grip_evt_cmd=np.array(run.grip_evt_cmd, dtype=object),
         grip_evt_position=run.grip_evt_position,

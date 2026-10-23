@@ -43,12 +43,6 @@ except ImportError as e:
         "Run: pip install openpi-client typing-extensions"
     ) from e
 
-ARM_JOINTS = [
-    "joint_1", "joint_2", "joint_3",
-    "joint_4", "joint_5", "joint_6",
-]
-GRIPPER_JOINT = "robotiq_85_left_knuckle_joint"
-
 # Camera topic defaults, picked by the `use_sim` parameter. Real-robot topics
 # come from the RealSense D435 (external, 640x480) and the Kinova wrist camera
 # (320x240) while sim topics are published by Isaac Sim
@@ -59,10 +53,14 @@ GRIPPER_JOINT = "robotiq_85_left_knuckle_joint"
 # Both the sim and real topic names are exposed as parameters (defaults below);
 # `use_sim` only chooses which pair the node subscribes to. The joint-state and
 # controller topics are not split because they are identical in sim and real.
-DEFAULT_SIM_BASE_TOPIC = "/isaac_external_camera/color/image_raw"
-DEFAULT_SIM_WRIST_TOPIC = "/isaac_wrist_camera/color/image_raw"
-DEFAULT_REAL_BASE_TOPIC = "/realsense/d435/color/image_raw"
-DEFAULT_REAL_WRIST_TOPIC = "/camera/color/image_raw"
+DEFAULT_SIM_CAMERA_TOPICS = [
+    "/isaac_external_camera/color/image_raw",
+    "/isaac_wrist_camera/color/image_raw",
+]
+DEFAULT_REAL_CAMERA_TOPICS = [
+    "/realsense/d435/color/image_raw",
+    "/camera/color/image_raw",
+]
 
 
 def _ros_image_to_uint8_hwc(msg: Image) -> np.ndarray:
@@ -95,16 +93,22 @@ class PolicyClientSynchronousNode(Node):
         self.declare_parameter("gripper_open_position", 0.0)
         self.declare_parameter("gripper_max_effort", 50.0)
 
+        # Arm joints in state/action order + the gripper joint (obs = joints + gripper).
+        self.declare_parameter(
+            "arm_joints", ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"]
+        )
+        self.declare_parameter("gripper_joint", "robotiq_85_left_knuckle_joint")
+
         # Camera topics. Both the sim and real names are exposed explicitly; the
         # node subscribes to the pair selected by `use_sim`. The joint-state and
         # controller topics below are NOT split: /joint_states (the
         # joint_state_broadcaster output, what the dataset was recorded from) and
         # the controller actions are identical in sim and real. The node indexes
         # joint values by name, so /joint_states' scrambled ordering is irrelevant.
-        self.declare_parameter("sim_base_image_topic", DEFAULT_SIM_BASE_TOPIC)
-        self.declare_parameter("sim_wrist_image_topic", DEFAULT_SIM_WRIST_TOPIC)
-        self.declare_parameter("real_base_image_topic", DEFAULT_REAL_BASE_TOPIC)
-        self.declare_parameter("real_wrist_image_topic", DEFAULT_REAL_WRIST_TOPIC)
+        # Parallel arrays: image from topic i goes to the server as obs[camera_keys[i]].
+        self.declare_parameter("camera_keys", ["base_rgb", "wrist_rgb"])
+        self.declare_parameter("sim_camera_topics", DEFAULT_SIM_CAMERA_TOPICS)
+        self.declare_parameter("real_camera_topics", DEFAULT_REAL_CAMERA_TOPICS)
         self.declare_parameter("joint_states_topic", "/joint_states")
         self.declare_parameter(
             "arm_action", "/joint_trajectory_controller/follow_joint_trajectory"
@@ -128,6 +132,12 @@ class PolicyClientSynchronousNode(Node):
         self._grip_closed_pos = gp("gripper_closed_position").get_parameter_value().double_value
         self._grip_open_pos = gp("gripper_open_position").get_parameter_value().double_value
         self._grip_effort = gp("gripper_max_effort").get_parameter_value().double_value
+        # +1 if the gripper closes towards larger values (Robotiq knuckle), -1 otherwise
+        self._grip_sign = 1.0 if self._grip_closed_pos >= self._grip_open_pos else -1.0
+
+        self._arm_joints = list(gp("arm_joints").get_parameter_value().string_array_value)
+        self._gripper_joint = gp("gripper_joint").get_parameter_value().string_value
+        self._n_arm = len(self._arm_joints)
 
         js_topic = gp("joint_states_topic").get_parameter_value().string_value
         arm_action = gp("arm_action").get_parameter_value().string_value
@@ -136,12 +146,15 @@ class PolicyClientSynchronousNode(Node):
         self._resize_images = gp("resize_images").get_parameter_value().bool_value
         self._image_res = gp("image_resolution").get_parameter_value().integer_value
 
-        if use_sim:
-            base_topic = gp("sim_base_image_topic").get_parameter_value().string_value
-            wrist_topic = gp("sim_wrist_image_topic").get_parameter_value().string_value
-        else:
-            base_topic = gp("real_base_image_topic").get_parameter_value().string_value
-            wrist_topic = gp("real_wrist_image_topic").get_parameter_value().string_value
+        camera_keys = list(gp("camera_keys").get_parameter_value().string_array_value)
+        topics_param = "sim_camera_topics" if use_sim else "real_camera_topics"
+        camera_topics = list(gp(topics_param).get_parameter_value().string_array_value)
+        if len(camera_topics) != len(camera_keys):
+            raise SystemExit(
+                f"{topics_param} has {len(camera_topics)} topics but camera_keys "
+                f"has {len(camera_keys)}; they must be parallel arrays."
+            )
+        cameras = dict(zip(camera_keys, camera_topics))
 
         self._dt = 1.0 / hz
         # Gripper starts open (the robot is homed before VLA control begins).
@@ -149,7 +162,7 @@ class PolicyClientSynchronousNode(Node):
 
         self.get_logger().info(
             f"Mode: {'SIM' if use_sim else 'REAL'} | "
-            f"base='{base_topic}' wrist='{wrist_topic}' js='{js_topic}' | "
+            f"cameras={cameras} js='{js_topic}' | "
             f"resize={'%dx%d (PIL)' % (self._image_res, self._image_res) if self._resize_images else 'off (native)'}"
         )
 
@@ -161,8 +174,7 @@ class PolicyClientSynchronousNode(Node):
         # --- observation state (guarded by _obs_lock) ---
         self._obs_lock = threading.Lock()
         self._joint_positions: dict[str, float] = {}
-        self._base_image: np.ndarray | None = None
-        self._wrist_image: np.ndarray | None = None
+        self._images: dict[str, np.ndarray | None] = {k: None for k in camera_keys}
 
         # --- action clients ---
         self._arm_client = ActionClient(self, FollowJointTrajectory, arm_action)
@@ -174,8 +186,10 @@ class PolicyClientSynchronousNode(Node):
 
         # --- subscriptions ---
         self.create_subscription(JointState, js_topic, self._cb_joint_states, 10)
-        self.create_subscription(Image, base_topic, self._cb_base_image, 2)
-        self.create_subscription(Image, wrist_topic, self._cb_wrist_image, 2)
+        for key, topic in cameras.items():
+            self.create_subscription(
+                Image, topic, lambda msg, key=key: self._cb_image(key, msg), 2
+            )
 
         # --- control loop thread ---
         self._running = True
@@ -192,15 +206,10 @@ class PolicyClientSynchronousNode(Node):
             for name, pos in zip(msg.name, msg.position):
                 self._joint_positions[name] = pos
 
-    def _cb_base_image(self, msg: Image) -> None:
+    def _cb_image(self, key: str, msg: Image) -> None:
         arr = _ros_image_to_uint8_hwc(msg)
         with self._obs_lock:
-            self._base_image = arr
-
-    def _cb_wrist_image(self, msg: Image) -> None:
-        arr = _ros_image_to_uint8_hwc(msg)
-        with self._obs_lock:
-            self._wrist_image = arr
+            self._images[key] = arr
 
     # ------------------------------------------------------------------
     # Observation packaging
@@ -209,30 +218,30 @@ class PolicyClientSynchronousNode(Node):
     def _build_obs(self) -> dict | None:
         with self._obs_lock:
             missing = [
-                j for j in ARM_JOINTS + [GRIPPER_JOINT]
+                j for j in self._arm_joints + [self._gripper_joint]
                 if j not in self._joint_positions
             ]
-            if missing or self._base_image is None or self._wrist_image is None:
+            if missing or any(img is None for img in self._images.values()):
                 return None
             joints = np.array(
-                [self._joint_positions[j] for j in ARM_JOINTS], dtype=np.float32
+                [self._joint_positions[j] for j in self._arm_joints], dtype=np.float32
             )
             gripper = np.array(
-                [self._joint_positions[GRIPPER_JOINT]], dtype=np.float32
+                [self._joint_positions[self._gripper_joint]], dtype=np.float32
             )
-            base_rgb = self._base_image
-            wrist_rgb = self._wrist_image
+            images = dict(self._images)
 
         # Resize outside of the lock to keep the callbacks responsive
         if self._resize_images:
-            base_rgb = image_tools.resize_with_pad(base_rgb, self._image_res, self._image_res)
-            wrist_rgb = image_tools.resize_with_pad(wrist_rgb, self._image_res, self._image_res)
+            images = {
+                k: image_tools.resize_with_pad(v, self._image_res, self._image_res)
+                for k, v in images.items()
+            }
 
         return {
             "joints": joints,
             "gripper": gripper,
-            "base_rgb": np.ascontiguousarray(base_rgb),
-            "wrist_rgb": np.ascontiguousarray(wrist_rgb),
+            **{k: np.ascontiguousarray(v) for k, v in images.items()},
             "prompt": self._prompt,
         }
 
@@ -248,10 +257,10 @@ class PolicyClientSynchronousNode(Node):
             return False
 
         goal = FollowJointTrajectory.Goal()
-        goal.trajectory.joint_names = ARM_JOINTS
+        goal.trajectory.joint_names = self._arm_joints
         for i, action in enumerate(actions):
             pt = JointTrajectoryPoint()
-            pt.positions = [float(v) for v in action[:6]]
+            pt.positions = [float(v) for v in action[:self._n_arm]]
             elapsed_ns = int((i + 1) * self._dt * 1e9)
             pt.time_from_start = Duration(
                 sec=elapsed_ns // 1_000_000_000,
@@ -286,10 +295,11 @@ class PolicyClientSynchronousNode(Node):
     # ------------------------------------------------------------------
 
     def _update_gripper(self, value: float) -> None:
-        if not self._gripper_closed and value > self._close_thr:
+        s = self._grip_sign
+        if not self._gripper_closed and s * value > s * self._close_thr:
             self._gripper_closed = True
             self._send_gripper_goal(self._grip_closed_pos)
-        elif self._gripper_closed and value < self._open_thr:
+        elif self._gripper_closed and s * value < s * self._open_thr:
             self._gripper_closed = False
             self._send_gripper_goal(self._grip_open_pos)
 
@@ -334,7 +344,7 @@ class PolicyClientSynchronousNode(Node):
             server_ms = result.get("server_timing", {}).get("infer_ms")
 
             actions = np.asarray(result["actions"])
-            if actions.ndim != 2 or actions.shape[1] < 7:
+            if actions.ndim != 2 or actions.shape[1] < self._n_arm + 1:
                 self.get_logger().error(f"Unexpected action shape: {actions.shape}")
                 continue
             horizon = actions.shape[0]
@@ -352,7 +362,7 @@ class PolicyClientSynchronousNode(Node):
             t0_ns = clock.now().nanoseconds
             step_ns = int(self._dt * 1e9)
             for i in range(horizon):
-                self._update_gripper(float(actions[i, 6]))
+                self._update_gripper(float(actions[i, self._n_arm]))
                 target_ns = t0_ns + (i + 1) * step_ns
                 while self._running and rclpy.ok() and clock.now().nanoseconds < target_ns:
                     time.sleep(0.002)

@@ -65,9 +65,6 @@ except ImportError as e:
         f"Failed to import openpi_client ({e}). Run: pip install openpi-client"
     ) from e
 
-ARM_JOINTS = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"]
-GRIPPER_JOINT = "robotiq_85_left_knuckle_joint"
-
 
 def _ros_image_to_uint8_hwc(msg: Image) -> np.ndarray:
     data = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
@@ -111,12 +108,19 @@ class PolicyClientAsynchronousRtcNode(Node):
         self.declare_parameter("gripper_open_position", 0.0)
         self.declare_parameter("gripper_max_effort", 50.0)
 
+        # Arm joints in state/action order + the gripper joint (obs = joints + gripper).
+        self.declare_parameter("arm_joints", ["joint_1", "joint_2", "joint_3",
+                                              "joint_4", "joint_5", "joint_6"])
+        self.declare_parameter("gripper_joint", "robotiq_85_left_knuckle_joint")
+
         # Camera topics (use_sim picks the pair). /joint_states is read by joint name, so its
         # scrambled order is irrelevant.
-        self.declare_parameter("sim_base_image_topic", "/isaac_external_camera/color/image_raw")
-        self.declare_parameter("sim_wrist_image_topic", "/isaac_wrist_camera/color/image_raw")
-        self.declare_parameter("real_base_image_topic", "/realsense/d435/color/image_raw")
-        self.declare_parameter("real_wrist_image_topic", "/camera/color/image_raw")
+        # Parallel arrays: image from topic i goes to the server as obs[camera_keys[i]].
+        self.declare_parameter("camera_keys", ["base_rgb", "wrist_rgb"])
+        self.declare_parameter("sim_camera_topics", ["/isaac_external_camera/color/image_raw",
+                                                     "/isaac_wrist_camera/color/image_raw"])
+        self.declare_parameter("real_camera_topics", ["/realsense/d435/color/image_raw",
+                                                      "/camera/color/image_raw"])
         self.declare_parameter("joint_states_topic", "/joint_states")
         # 30 Hz plan output: the C++ jtc_stream_node subscribes here, shapes it, and streams to
         # the JTC. This node does NOT publish to the JTC directly.
@@ -150,6 +154,12 @@ class PolicyClientAsynchronousRtcNode(Node):
         self._grip_closed_pos = gp("gripper_closed_position").get_parameter_value().double_value
         self._grip_open_pos = gp("gripper_open_position").get_parameter_value().double_value
         self._grip_effort = gp("gripper_max_effort").get_parameter_value().double_value
+        # +1 if the gripper closes towards larger values (Robotiq knuckle), -1 otherwise
+        self._grip_sign = 1.0 if self._grip_closed_pos >= self._grip_open_pos else -1.0
+
+        self._arm_joints = list(gp("arm_joints").get_parameter_value().string_array_value)
+        self._gripper_joint = gp("gripper_joint").get_parameter_value().string_value
+        self._n_arm = len(self._arm_joints)
 
         js_topic = gp("joint_states_topic").get_parameter_value().string_value
         plan_topic = gp("plan_topic").get_parameter_value().string_value
@@ -162,12 +172,13 @@ class PolicyClientAsynchronousRtcNode(Node):
         self._js_log_period = 1.0 / js_log_hz if js_log_hz > 0 else 0.0   # 0 => every sample
         self._rate_report_sec = gp("rate_report_sec").get_parameter_value().double_value
 
-        if use_sim:
-            base_topic = gp("sim_base_image_topic").get_parameter_value().string_value
-            wrist_topic = gp("sim_wrist_image_topic").get_parameter_value().string_value
-        else:
-            base_topic = gp("real_base_image_topic").get_parameter_value().string_value
-            wrist_topic = gp("real_wrist_image_topic").get_parameter_value().string_value
+        camera_keys = list(gp("camera_keys").get_parameter_value().string_array_value)
+        topics_param = "sim_camera_topics" if use_sim else "real_camera_topics"
+        camera_topics = list(gp(topics_param).get_parameter_value().string_array_value)
+        if len(camera_topics) != len(camera_keys):
+            raise SystemExit(f"{topics_param} has {len(camera_topics)} topics but camera_keys "
+                             f"has {len(camera_keys)}; they must be parallel arrays.")
+        cameras = dict(zip(camera_keys, camera_topics))
 
         if self._rtc_delay < 1:
             raise SystemExit("rtc_delay_steps must be >= 1.")
@@ -190,7 +201,7 @@ class PolicyClientAsynchronousRtcNode(Node):
             f"inference {infer_str}\n"
             f"  plan -> '{plan_topic}' (shaped + streamed by the C++ jtc_stream_node) | "
             f"gripper loop {self._gripper_hz:.0f} Hz\n"
-            f"  base='{base_topic}' wrist='{wrist_topic}' js='{js_topic}'\n"
+            f"  cameras={cameras} js='{js_topic}'\n"
             f"  RTC: committed prefix + fixed delay d={self._rtc_delay} | "
             f"safety blend {self._rtc_blend_steps} steps"
         )
@@ -204,8 +215,7 @@ class PolicyClientAsynchronousRtcNode(Node):
         self._obs_lock = threading.Lock()
         self._joint_positions: dict[str, float] = {}
         self._measured_arm = None
-        self._base_image = None
-        self._wrist_image = None
+        self._images: dict[str, np.ndarray | None] = {k: None for k in camera_keys}
         self._missing_status = "initializing"
 
         # --- shared 30 Hz grid ---
@@ -227,8 +237,8 @@ class PolicyClientAsynchronousRtcNode(Node):
         self._plan_pub = self.create_publisher(JointTrajectory, plan_topic, 10)
         self._gripper_client = ActionClient(self, GripperCommand, gripper_action)
         self.create_subscription(JointState, js_topic, self._cb_joint_states, 10)
-        self.create_subscription(Image, base_topic, self._cb_base_image, 2)
-        self.create_subscription(Image, wrist_topic, self._cb_wrist_image, 2)
+        for key, topic in cameras.items():
+            self.create_subscription(Image, topic, lambda msg, key=key: self._cb_image(key, msg), 2)
 
         # --- debug JSONL logging (opt-in, append-only => Ctrl-C safe) ---
         self._log_lock = threading.Lock()
@@ -249,6 +259,7 @@ class PolicyClientAsynchronousRtcNode(Node):
                              "grip_close_thr": self._close_thr, "grip_open_thr": self._open_thr,
                              "grip_closed_pos": self._grip_closed_pos,
                              "grip_open_pos": self._grip_open_pos,
+                             "arm_joints": self._arm_joints,
                              "t_start": self._now()})
             self.get_logger().info(f"Debug trace -> {path}")
 
@@ -290,9 +301,9 @@ class PolicyClientAsynchronousRtcNode(Node):
             for name, pos in zip(msg.name, msg.position):
                 self._joint_positions[name] = pos
             arm = None
-            grip = self._joint_positions.get(GRIPPER_JOINT)
-            if all(j in self._joint_positions for j in ARM_JOINTS):
-                self._measured_arm = np.array([self._joint_positions[j] for j in ARM_JOINTS])
+            grip = self._joint_positions.get(self._gripper_joint)
+            if all(j in self._joint_positions for j in self._arm_joints):
+                self._measured_arm = np.array([self._joint_positions[j] for j in self._arm_joints])
                 arm = self._measured_arm
 
         # Trace the measured state (outside the lock), throttled to js_log_hz. Capture
@@ -309,21 +320,16 @@ class PolicyClientAsynchronousRtcNode(Node):
             rec["grip"] = float(grip)
         if len(msg.velocity) == len(msg.name):
             vmap = {n: v for n, v in zip(msg.name, msg.velocity)}
-            rec["vel"] = [vmap[j] for j in ARM_JOINTS]
+            rec["vel"] = [vmap[j] for j in self._arm_joints]
         if len(msg.effort) == len(msg.name):
             emap = {n: e for n, e in zip(msg.name, msg.effort)}
-            rec["eff"] = [emap[j] for j in ARM_JOINTS]
+            rec["eff"] = [emap[j] for j in self._arm_joints]
         self._log_event(rec)
 
-    def _cb_base_image(self, msg: Image) -> None:
+    def _cb_image(self, key: str, msg: Image) -> None:
         arr = _ros_image_to_uint8_hwc(msg)
         with self._obs_lock:
-            self._base_image = arr
-
-    def _cb_wrist_image(self, msg: Image) -> None:
-        arr = _ros_image_to_uint8_hwc(msg)
-        with self._obs_lock:
-            self._wrist_image = arr
+            self._images[key] = arr
 
     def _log_event(self, rec: dict) -> None:
         if self._log_fh is None:
@@ -350,26 +356,24 @@ class PolicyClientAsynchronousRtcNode(Node):
 
     def _build_obs(self) -> dict | None:
         with self._obs_lock:
-            missing = [j for j in ARM_JOINTS + [GRIPPER_JOINT] if j not in self._joint_positions]
-            if missing or self._base_image is None or self._wrist_image is None:
-                self._missing_status = (
-                    f"joints missing {len(missing)} | "
-                    f"base {'OK' if self._base_image is not None else 'WAIT'} | "
-                    f"wrist {'OK' if self._wrist_image is not None else 'WAIT'}"
-                )
+            missing = [j for j in self._arm_joints + [self._gripper_joint]
+                       if j not in self._joint_positions]
+            if missing or any(img is None for img in self._images.values()):
+                self._missing_status = f"joints missing {len(missing)} | " + " | ".join(
+                    f"{k} {'OK' if img is not None else 'WAIT'}" for k, img in self._images.items())
                 return None
-            joints = np.array([self._joint_positions[j] for j in ARM_JOINTS], dtype=np.float32)
-            gripper = np.array([self._joint_positions[GRIPPER_JOINT]], dtype=np.float32)
-            base_rgb, wrist_rgb = self._base_image, self._wrist_image
+            joints = np.array([self._joint_positions[j] for j in self._arm_joints],
+                              dtype=np.float32)
+            gripper = np.array([self._joint_positions[self._gripper_joint]], dtype=np.float32)
+            images = dict(self._images)
 
         # Resize outside the lock to keep the callbacks responsive.
         if self._resize_images:
-            base_rgb = image_tools.resize_with_pad(base_rgb, self._image_res, self._image_res)
-            wrist_rgb = image_tools.resize_with_pad(wrist_rgb, self._image_res, self._image_res)
+            images = {k: image_tools.resize_with_pad(v, self._image_res, self._image_res)
+                      for k, v in images.items()}
 
         return {"joints": joints, "gripper": gripper,
-                "base_rgb": np.ascontiguousarray(base_rgb),
-                "wrist_rgb": np.ascontiguousarray(wrist_rgb), "prompt": self._prompt}
+                **{k: np.ascontiguousarray(v) for k, v in images.items()}, "prompt": self._prompt}
 
     # ------------------------------------------------------------------
     # Inference loop (producer): observe -> infer -> update the grid plan
@@ -445,7 +449,7 @@ class PolicyClientAsynchronousRtcNode(Node):
 
         server_ms = result.get("server_timing", {}).get("infer_ms")
         actions = np.asarray(result["actions"])
-        if actions.ndim != 2 or actions.shape[1] < 7:
+        if actions.ndim != 2 or actions.shape[1] < self._n_arm + 1:
             self.get_logger().error(f"Unexpected action shape: {actions.shape}")
             self._schedule_next(n_obs)
             return
@@ -505,17 +509,18 @@ class PolicyClientAsynchronousRtcNode(Node):
         self.get_logger().info(
             f"Chunk | {timing} | dropped {d_elapsed}/{horizon}, kept {len(retained)}, "
             f"seam@{off} | gap {gap}")
+        n = self._n_arm
         self._log_event({
             "type": "chunk", "t_obs": t_obs, "t_arrive": t_anchor,
             "d": int(d_elapsed), "horizon": int(horizon),
-            "raw": actions[:, :6].tolist(), "blended": blended[:, :6].tolist(),
+            "raw": actions[:, :n].tolist(), "blended": blended[:, :n].tolist(),
             # Gripper command trajectory (col 6): lets a stuck / never-reopened gripper be
             # diagnosed straight from the trace -- did the model even command open (value below
             # gripper_open_threshold), or did it sit in the hysteresis dead zone?
-            "grip_raw": actions[:, 6].tolist(), "grip_blended": blended[:, 6].tolist(),
+            "grip_raw": actions[:, n].tolist(), "grip_blended": blended[:, n].tolist(),
             # RTC: the committed prefix we SENT (arm cols); on the grid the pin is exact so
             # the plotter's overlay should sit exactly on the returned raw[0:d].
-            "sent_prefix": (sent_prefix[:, :6].tolist() if sent_prefix is not None else None)})
+            "sent_prefix": (sent_prefix[:, :n].tolist() if sent_prefix is not None else None)})
         self._schedule_next(n_obs)
 
     def _wait_until_ros(self, target: float) -> None:
@@ -557,7 +562,7 @@ class PolicyClientAsynchronousRtcNode(Node):
         knots, n0 = plan
         m = len(knots)
         idxs = [min(max(n_obs - n0 + i, 0), m - 1) for i in range(d)]
-        return np.asarray(knots[idxs, :7], dtype=np.float32)
+        return np.asarray(knots[idxs, :self._n_arm + 1], dtype=np.float32)
 
     def _seam_gap(self, retained_new: np.ndarray, n_start: int, off: int, plan) -> float | None:
         """Largest per-joint disagreement (rad) at the seam -- the new chunk's first FRESH knot
@@ -568,7 +573,8 @@ class PolicyClientAsynchronousRtcNode(Node):
             return None
         knots_old, n0_old = plan
         j = min(max(n_start + off - n0_old, 0), len(knots_old) - 1)
-        return float(np.max(np.abs(retained_new[off, :6] - knots_old[j, :6])))
+        n = self._n_arm
+        return float(np.max(np.abs(retained_new[off, :n] - knots_old[j, :n])))
 
     def _blend_on_grid(self, retained_new: np.ndarray, n_start: int, off: int, plan,
                        blend_steps: int) -> np.ndarray:
@@ -588,12 +594,13 @@ class PolicyClientAsynchronousRtcNode(Node):
         if K <= 0:
             return retained_new
         blended = retained_new.copy()
+        n = self._n_arm
         for k in range(K + 1):
             ri = off + k                                       # retained knot being faded
             j = min(max(n_start + ri - n0_old, 0), m_old - 1)  # old plan knot at this grid step
             s = k / K
             w = s * s * (3.0 - 2.0 * s)                        # 0 (pure old) -> 1 (pure new)
-            blended[ri, :6] = (1.0 - w) * knots_old[j, :6] + w * retained_new[ri, :6]
+            blended[ri, :n] = (1.0 - w) * knots_old[j, :n] + w * retained_new[ri, :n]
         return blended
 
     # ------------------------------------------------------------------
@@ -607,10 +614,10 @@ class PolicyClientAsynchronousRtcNode(Node):
         t_ref = self._t0 + n0 * self._dt_dataset
         msg = JointTrajectory()
         msg.header.stamp = Time(nanoseconds=int(t_ref * 1e9)).to_msg()
-        msg.joint_names = ARM_JOINTS
+        msg.joint_names = self._arm_joints
         for k in range(len(knots)):
             pt = JointTrajectoryPoint()
-            pt.positions = [float(v) for v in knots[k, :6]]
+            pt.positions = [float(v) for v in knots[k, :self._n_arm]]
             elapsed = k * self._dt_dataset
             pt.time_from_start = Duration(sec=int(elapsed),
                                           nanosec=int((elapsed - int(elapsed)) * 1e9))
@@ -643,7 +650,7 @@ class PolicyClientAsynchronousRtcNode(Node):
         knots, n0 = plan
         # The step currently in progress (floor) -> the gripper command being executed now.
         idx = min(max(self._get_last_step(self._now()) - n0, 0), len(knots) - 1)
-        self._update_gripper(float(knots[idx, 6]))
+        self._update_gripper(float(knots[idx, self._n_arm]))
 
     # ------------------------------------------------------------------
     # Gripper: hysteresis gate, level-triggered (one goal per state change)
@@ -654,10 +661,11 @@ class PolicyClientAsynchronousRtcNode(Node):
         # the dispatch was skipped (server not up), the level-triggered gate would think it already
         # commanded the new state and never retry -- leaving the gripper stuck (e.g. closed on the
         # cube, never reopening).
-        if not self._gripper_closed and value > self._close_thr:
+        s = self._grip_sign
+        if not self._gripper_closed and s * value > s * self._close_thr:
             if self._send_gripper_goal(self._grip_closed_pos, value):
                 self._gripper_closed = True
-        elif self._gripper_closed and value < self._open_thr:
+        elif self._gripper_closed and s * value < s * self._open_thr:
             if self._send_gripper_goal(self._grip_open_pos, value):
                 self._gripper_closed = False
 

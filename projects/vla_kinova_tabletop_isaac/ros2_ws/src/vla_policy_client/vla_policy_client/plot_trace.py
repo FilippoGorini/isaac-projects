@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import numpy as np
 
-from vla_policy_client.trace_io import ARM_JOINTS, load_run
+from vla_policy_client.trace_io import load_run
 
 
 def _pin_residual(run, j):
@@ -290,7 +290,7 @@ def _plot_gripper(run, t0, args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("trace", help="JSONL trace file")
-    ap.add_argument("--joints", type=int, nargs="+", default=list(range(6)),
+    ap.add_argument("--joints", type=int, nargs="+", default=None,
                     help="Joint indices to plot (0-5), default all")
     ap.add_argument("--stride", type=int, default=1, help="Plot every Nth chunk (default 1)")
     ap.add_argument("--tmin", type=float, default=None, help="Start time (s, normalized)")
@@ -318,8 +318,9 @@ def main():
     t0 = run.t0
     mode = "RTC" if run.meta.get("rtc_prefix") else run.meta.get("arm_mode", "?")
 
-    for j in args.joints:
-        jname = ARM_JOINTS[j] if j < len(ARM_JOINTS) else f"j{j}"
+    arm_joints = run.arm_joints
+    for j in (args.joints if args.joints is not None else range(len(arm_joints))):
+        jname = arm_joints[j] if j < len(arm_joints) else f"j{j}"
         fig, ax = plt.subplots(1, 1, figsize=(14, 5))
         _plot_joint(ax, run, j, t0, args)
         if run.meta.get("rtc_prefix"):
