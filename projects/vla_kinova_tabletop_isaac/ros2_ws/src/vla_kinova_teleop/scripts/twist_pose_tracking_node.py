@@ -18,6 +18,11 @@ end_effector_link, when the control frame is offset from it the commanded linear
 velocity is corrected for the lever arm: the angular velocity is unchanged but
 v_ee = v_control - w x t, where t is the control frame origin expressed in EE axes
 (looked up once from TF).
+
+All of the above is output_mode kortex_tool_twist (default). output_mode twist_stamped
+instead publishes the saturated base-frame twist as geometry_msgs/TwistStamped
+(frame_id = base_frame), with no tool-frame rotation and no lever-arm correction, for
+MoveIt Servo or Cartesian velocity controllers that move control_frame themselves.
 """
 
 
@@ -25,7 +30,7 @@ import signal
 import numpy as np
 import rclpy
 import transforms3d.quaternions as t3dq
-from geometry_msgs.msg import PoseStamped, Twist
+from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
@@ -72,6 +77,10 @@ class TwistPoseTrackingNode(Node):
         self.control_frame = self._declare("control_frame", "end_effector_link")
         target_topic = self._declare("target_topic", "/target_frame")
         twist_command_topic = self._declare("twist_command_topic", "/twist_controller/commands")
+        self.output_mode = self._declare("output_mode", "kortex_tool_twist")
+        if self.output_mode not in ("kortex_tool_twist", "twist_stamped"):
+            raise SystemExit(f"output_mode must be kortex_tool_twist or twist_stamped, "
+                             f"got '{self.output_mode}'")
 
         # Dynamic parameters
         for name, default in _DYNAMIC_PARAMS.items():
@@ -83,7 +92,8 @@ class TwistPoseTrackingNode(Node):
         self.target_sub = self.create_subscription(
             PoseStamped, target_topic, self._target_callback, qos_profile_sensor_data
         )
-        self.twist_pub = self.create_publisher(Twist, twist_command_topic, 1)
+        twist_type = TwistStamped if self.output_mode == "twist_stamped" else Twist
+        self.twist_pub = self.create_publisher(twist_type, twist_command_topic, 1)
 
         # State
         self.latest_target = None
@@ -104,6 +114,7 @@ class TwistPoseTrackingNode(Node):
         self.get_logger().info(
             f"twist_pose_tracking_node ready @ {self.loop_rate_hz:.1f} Hz. "
             f"Subscribing: {target_topic} | Publishing: {twist_command_topic} "
+            f"({self.output_mode})"
         )
 
     def _declare(self, name, default):
@@ -160,8 +171,19 @@ class TwistPoseTrackingNode(Node):
         self.prev_error_ang = None
         self.prev_tick_time = None
 
+    def _stamped_twist(self, v, w):
+        msg = TwistStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = self.base_frame
+        msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z = (float(x) for x in v)
+        msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z = (float(x) for x in w)
+        return msg
+
     def _publish_zero_twist(self):
-        self.twist_pub.publish(Twist())
+        if self.output_mode == "twist_stamped":
+            self.twist_pub.publish(self._stamped_twist(np.zeros(3), np.zeros(3)))
+        else:
+            self.twist_pub.publish(Twist())
 
     def _tick(self):
         now = self.get_clock().now()
@@ -251,6 +273,10 @@ class TwistPoseTrackingNode(Node):
         # Saturate magnitudes in base frame
         v_base = _saturate(v_base, self._p("max_linear_velocity"))
         w_base = _saturate(w_base, self._p("max_angular_velocity"))
+
+        if self.output_mode == "twist_stamped":
+            self.twist_pub.publish(self._stamped_twist(v_base, w_base))
+            return
 
         # Rotate base_frame twist into end effector one
         # R_base_to_tool = R_ee_from_base = (R_base_from_ee)^T
