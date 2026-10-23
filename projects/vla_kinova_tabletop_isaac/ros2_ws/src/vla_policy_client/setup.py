@@ -35,6 +35,7 @@ setup(
             'speech_to_prompt = vla_policy_client.speech_to_prompt_node:main',
             'plot_vla_trace = vla_policy_client.plot_trace:main',
             'convert_vla_trace = vla_policy_client.convert_trace:main',
+            'mock_policy_server = vla_policy_client.mock_policy_server:main',
         ],
     },
 )
