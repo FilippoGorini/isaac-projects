@@ -39,13 +39,14 @@ projects/vla_kinova_tabletop_isaac/
     ├── kinova_deps.repos              # vcstool manifest for ros2_kortex + kinova_vision
     ├── teleop_deps.repos              # vcstool manifest for the Quest teleop packages
     └── src/
-        ├── vla_kinova_description/          # Customized URDF/Xacro robot description
-        ├── vla_kinova_bringup/              # ros2_control + MoveIt 2 launches and configs
-        ├── vla_kinova_sensors/              # RealSense D435 + Kinova wrist camera bringup
-        ├── vla_kinova_teleop/               # Quest 3 twist-based EE pose tracking
-        ├── vla_kinova_data_collection/      # LeRobot dataset recording
-        ├── vla_policy_client/               # ROS 2 WebSocket client for the VLA policy server
-        └── vla_kinova_jtc_streamer/         # C++ streamer to oversample the 30 hz VLA plan and smooth the arm's motion
+        ├── kinova_description/        # Customized URDF/Xacro robot description
+        ├── kinova_bringup/            # ros2_control + MoveIt 2 launches and configs, Kortex twist teleop launch
+        ├── kinova_sensors/            # RealSense D435 + Kinova wrist camera bringup
+        ├── vela_robots/               # Robot profiles (robot.yaml + recorder TOMLs), one folder per robot
+        ├── vela_teleop/               # Quest 3 twist-based EE pose tracking
+        ├── vela_data_collection/      # LeRobot dataset recording
+        ├── vela_policy_client/        # ROS 2 WebSocket client for the VLA policy server
+        └── vela_jtc_streamer/         # C++ streamer to oversample the 30 hz VLA plan and smooth the arm's motion
 ```
 
 ---
@@ -150,7 +151,7 @@ This imports the Unity `ROS-TCP-Endpoint` and the `FilippoGorini/Quest2ROS2` for
 (pinned in `teleop_deps.repos`), generates the `quest2ros` message package the Quest
 app expects (created locally from `Quest2ROS2/Files_for_msg_pkg`), installs
 `tf_transformations`, and rebuilds the workspace. Required for the
-`vla_kinova_teleop` launch files.
+`vela_teleop` launch files.
 
 **7. Bootstrap the lerobot_ros data-recording layer (skip if you don't plan to record datasets):**
 
@@ -217,17 +218,31 @@ the terminal inside the VNC desktop:
 
 | Package | Description |
 |---------|-------------|
-| [`vla_kinova_description`](#vla_kinova_description) | Project-specific description package wrapping the upstream `kortex_description` and `robotiq_description` packages, with separate `ros2_control` command topics for the arm and gripper. |
-| [`vla_kinova_bringup`](#vla_kinova_bringup) | ros2_control + MoveIt 2 controller configuration and launch files. Brings up the robot in either Isaac Sim or on real hardware. |
-| [`vla_kinova_sensors`](#vla_kinova_sensors) | Camera bringup for the Intel RealSense D435 (external) and the Kinova wrist camera via `kinova_vision` (RGB only); ZED 2 supported as an optional alternative external camera. |
-| [`vla_kinova_teleop`](#vla_kinova_teleop) | Twist-based teleoperation that subscribes to a target EE pose (from the Quest right-arm controller) and drives the Kortex twist controller. |
-| [`vla_kinova_data_collection`](#vla_kinova_data_collection) | TOML-driven dataset recording on top of `lerobot_ros`. Provides a launch file for the recorder node and a script to automate the data-collection process based on predefined TOML configuration files for each recording session (tasks, number of episodes etc) |
-| [`vla_policy_client`](#vla_policy_client) | ROS 2 clients that connect to the $\pi_{0.5}$ VLA policy server over WebSocket, subscribe to joint states and camera images, and drive the arm and gripper. Provides a **synchronous** client (one action chunk per blocking cycle) and an **asynchronous** streaming client (continuous 30 Hz plan + real-time chunking). |
-| [`vla_kinova_jtc_streamer`](#vla_kinova_jtc_streamer) | Minimal C++ streamer that oversamples the asynchronous client's 30 Hz arm plan and feeds short-horizon points to the Kinova JTC. |
+| [`kinova_description`](#kinova_description) | Project-specific description package wrapping the upstream `kortex_description` and `robotiq_description` packages, with separate `ros2_control` command topics for the arm and gripper. |
+| [`kinova_bringup`](#kinova_bringup) | ros2_control + MoveIt 2 controller configuration and launch files. Brings up the robot in either Isaac Sim or on real hardware. |
+| [`kinova_sensors`](#kinova_sensors) | Camera bringup for the Intel RealSense D435 (external) and the Kinova wrist camera via `kinova_vision` (RGB only); ZED 2 supported as an optional alternative external camera. |
+| [`vela_teleop`](#vela_teleop) | Twist-based teleoperation that subscribes to a target EE pose (from the Quest right-arm controller) and drives the Kortex twist controller. |
+| [`vela_data_collection`](#vela_data_collection) | TOML-driven dataset recording on top of `lerobot_ros`. Provides a launch file for the recorder node and a script to automate the data-collection process based on predefined TOML configuration files for each recording session (tasks, number of episodes etc) |
+| [`vela_policy_client`](#vela_policy_client) | ROS 2 clients that connect to the $\pi_{0.5}$ VLA policy server over WebSocket, subscribe to joint states and camera images, and drive the arm and gripper. Provides a **synchronous** client (one action chunk per blocking cycle) and an **asynchronous** streaming client (continuous 30 Hz plan + real-time chunking). |
+| [`vela_jtc_streamer`](#vela_jtc_streamer) | Minimal C++ streamer that oversamples the asynchronous client's 30 Hz arm plan and feeds short-horizon points to the Kinova JTC. |
+| `vela_robots` | Config-only robot profiles: `config/<robot>/robot.yaml` (joints, gripper, cameras, frames, controller topics shared by all nodes) and the recorder TOMLs. Every launch file takes `robot:=<profile>` (default `kinova_gen3_6dof`). |
+
+**Package renames (2026-10).** `vela_*` = framework, `kinova_*` = Kinova adapter. Launch args and console scripts are unchanged. After pulling, `rm -rf build/vla_* install/vla_*`, rebuild, and open new terminals.
+
+| Old | New |
+|-----|-----|
+| `vla_kinova_description` | `kinova_description` |
+| `vla_kinova_bringup` | `kinova_bringup` (now also has `kinova_pose_tracking_twist.launch.py` and `gripper_sine_test.py`) |
+| `vla_kinova_sensors` | `kinova_sensors` |
+| `vla_kinova_jtc_streamer` | `vela_jtc_streamer` |
+| `vla_kinova_teleop` | `vela_teleop` |
+| `vla_kinova_data_collection` | `vela_data_collection` |
+| `vla_policy_client` | `vela_policy_client` |
+| `kinova_controllers_moveit_servo.launch.py`, `policy_client.launch.py` | removed (legacy) |
 
 ---
 
-## `vla_kinova_description`
+## `kinova_description`
 
 Hosts the URDF / xacro stack for the Kinova Gen3 6-DoF arm + Robotiq 2F-85 gripper. Wraps the upstream `kortex_description` and `robotiq_description` packages without modifying them, exposing separate `ros2_control` command topics for the arm (`/isaac_arm_commands`) and gripper (`/isaac_gripper_commands`) instead of the single `/isaac_joint_commands` used upstream.
 
@@ -248,9 +263,9 @@ The xacro files are layered: `gen3.xacro` is the entry point referenced by the l
 
 ---
 
-## `vla_kinova_bringup`
+## `kinova_bringup`
 
-Brings up `ros2_control`, the controllers, and optionally MoveIt 2. Depends on `vla_kinova_description` for the URDF. Also ships the `home_robot.py` script (auto-run after JTC spawn in sim, optional on real robot). The old MoveIt-Servo teleop path was removed; the teleop uses the Kortex twist controller via `vla_kinova_teleop`.
+Brings up `ros2_control`, the controllers, and optionally MoveIt 2. Depends on `kinova_description` for the URDF. Also ships the `home_robot.py` script (auto-run after JTC spawn in sim, optional on real robot). The old MoveIt-Servo teleop path was removed; the teleop uses the Kortex twist controller via `vela_teleop`.
 
 ### Package Files
 
@@ -259,6 +274,8 @@ Brings up `ros2_control`, the controllers, and optionally MoveIt 2. Depends on `
 - **`config/moveit.rviz`**, **`config/servo.rviz`**: RViz presets for MoveIt motion planning and for Servo/Twist Teleop.
 - **`config/joint_limits.yaml`**: Joint limits for MoveIt planning.
 - **`scripts/home_robot.py`**: Sends a single `JointTrajectory` to the home pose.
+- **`scripts/gripper_sine_test.py`**: helper diagnostic script (streams a sine position to the gripper).
+- **`launch/kinova_pose_tracking_twist.launch.py`**: Kortex twist teleop bringup, documented under [`vela_teleop`](#vela_teleop).
 
 ### Launch Files
 
@@ -288,13 +305,13 @@ The MoveIt and Twist Pose Tracking launchers additionally accept `launch_rviz` (
 *Basic joint control, Isaac Sim (no motion planning):*
 
 ```bash
-ros2 launch vla_kinova_bringup kinova_controllers.launch.py
+ros2 launch kinova_bringup kinova_controllers.launch.py
 ```
 
 *Basic joint control, real robot:*
 
 ```bash
-ros2 launch vla_kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12
+ros2 launch kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12
 ```
 
 Starts `robot_state_publisher` and `ros2_control_node`, then spawns `joint_state_broadcaster`, `joint_trajectory_controller`, and `robotiq_gripper_controller`. On the real robot, `twist_controller`, `gripper_velocity_controller`, and `gripper_position_controller` are also pre-loaded **inactive** (and `fault_controller` active) so they can be switched in later (e.g. by the teleop stack).
@@ -304,13 +321,13 @@ Starts `robot_state_publisher` and `ros2_control_node`, then spawns `joint_state
 *MoveIt 2 + RViz, Isaac Sim:*
 
 ```bash
-ros2 launch vla_kinova_bringup kinova_controllers_moveit.launch.py
+ros2 launch kinova_bringup kinova_controllers_moveit.launch.py
 ```
 
 *MoveIt 2 + RViz, real robot:*
 
 ```bash
-ros2 launch vla_kinova_bringup kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.50.12
+ros2 launch kinova_bringup kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.50.12
 ```
 
 Same as the basic launcher plus MoveIt 2 `move_group` and RViz with the project motion-planning preset.
@@ -318,12 +335,12 @@ Same as the basic launcher plus MoveIt 2 `move_group` and RViz with the project 
 To also run the homing script when connecting to the real robot:
 
 ```bash
-ros2 launch vla_kinova_bringup kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.50.12 auto_home:=true
+ros2 launch kinova_bringup kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.50.12 auto_home:=true
 ```
 
 ---
 
-## `vla_kinova_sensors`
+## `kinova_sensors`
 
 Camera bringup for the RGB feeds consumed by the VLA policy and by the data-recording pipeline. By default it brings up two cameras, both RGB-only (depth disabled — the VLA doesn't need it) and both publishing **raw** (the compressed/theora transports are turned off to save CPU, since we only ever record raw):
 
@@ -355,32 +372,32 @@ The ZED-specific arguments above are bundled into a single `param_overrides` str
 *Default (RealSense external + Kinova wrist):*
 
 ```bash
-ros2 launch vla_kinova_sensors cameras.launch.py
+ros2 launch kinova_sensors cameras.launch.py
 ```
 
 *Wrist + both D435s (keep each D435 on a USB 3 port, the node logs `Device USB type: 3.2`):*
 
 ```bash
-ros2 launch vla_kinova_sensors cameras.launch.py launch_realsense_2:=true
+ros2 launch kinova_sensors cameras.launch.py launch_realsense_2:=true
 ```
 
 *Wrist only / external only:*
 
 ```bash
-ros2 launch vla_kinova_sensors cameras.launch.py launch_realsense:=false
-ros2 launch vla_kinova_sensors cameras.launch.py launch_wrist:=false
+ros2 launch kinova_sensors cameras.launch.py launch_realsense:=false
+ros2 launch kinova_sensors cameras.launch.py launch_wrist:=false
 ```
 
 *Higher-resolution RealSense RGB:*
 
 ```bash
-ros2 launch vla_kinova_sensors cameras.launch.py realsense_color_profile:=1280x720x30
+ros2 launch kinova_sensors cameras.launch.py realsense_color_profile:=1280x720x30
 ```
 
 *Use the ZED instead of the RealSense as the external camera:*
 
 ```bash
-ros2 launch vla_kinova_sensors cameras.launch.py launch_zed:=true launch_realsense:=false
+ros2 launch kinova_sensors cameras.launch.py launch_zed:=true launch_realsense:=false
 ```
 
 ### Reliable camera topic rates (run after every reboot)
@@ -397,7 +414,7 @@ This is intentionally **not** persisted to `/etc/sysctl.d` as the lab's workstat
 
 ---
 
-## `vla_kinova_teleop`
+## `vela_teleop`
 
 Twist-based end-effector pose tracking for the real Kinova Gen3, driven by a Meta Quest 3 (the `quest2ros2` right-arm controller publishes the desired EE pose on `/target_frame`). The `twist_pose_tracking_node` runs a per-axis PID on the 6D pose error (with respect to the control frame (`fingertips_frame`), which can be offset from the end effector one) in `base_link`, saturates the resulting twist, rotates it into the firmware TOOL frame, and publishes on the Kortex `twist_controller` command topic.
 
@@ -412,11 +429,10 @@ In either mode the Quest controller also publishes a latched `JointState` on `/g
 
 - **`scripts/twist_pose_tracking_node.py`**: The teleop tracking node.
 - **`config/twist_pose_tracking.yaml`**: PID gains, saturation limits, stale-target handling.
-- **`scripts/gripper_sine_test.py`**: helper diagnostic script.
 
 ### Launch Files
 
-#### `kinova_pose_tracking_twist.launch.py`
+#### `kinova_pose_tracking_twist.launch.py` (in `kinova_bringup`)
 
 Brings up the robot side of the teleop loop.
 
@@ -428,10 +444,10 @@ Brings up the robot side of the teleop loop.
 | `gripper_max_force` | `100.0` | Gripper grasp force [0-100%], forwarded to `kinova_controllers.launch.py`. Only applied in low-level cyclic mode; twist teleop ignores it. |
 
 ```bash
-ros2 launch vla_kinova_teleop kinova_pose_tracking_twist.launch.py robot_ip:=192.168.50.12
+ros2 launch kinova_bringup kinova_pose_tracking_twist.launch.py robot_ip:=192.168.50.12
 ```
 
-Includes `vla_kinova_bringup`'s `kinova_controllers.launch.py` (with `use_sim:=false` and `unwrap_joint_states:=true`, so the recorded/observed `/joint_states` are continuous through `±π`), switches the active arm controller from `joint_trajectory_controller` to `twist_controller`, and starts `twist_pose_tracking_node`. The gripper stays on `robotiq_gripper_controller` (the default `binary` mode); the swap to `gripper_velocity_controller` is present but commented out in the launch file. **Real robot only.**
+Includes `kinova_bringup`'s `kinova_controllers.launch.py` (with `use_sim:=false` and `unwrap_joint_states:=true`, so the recorded/observed `/joint_states` are continuous through `±π`), switches the active arm controller from `joint_trajectory_controller` to `twist_controller`, and starts `twist_pose_tracking_node`. The gripper stays on `robotiq_gripper_controller` (the default `binary` mode); the swap to `gripper_velocity_controller` is present but commented out in the launch file. **Real robot only.**
 
 #### `quest_bringup.launch.py`
 
@@ -443,7 +459,7 @@ Brings up the Quest side of the teleop loop: the ROS-TCP endpoint that the Quest
 | `ros_tcp_port` | `10000` | TCP port the Quest VR app connects to. |
 
 ```bash
-ros2 launch vla_kinova_teleop quest_bringup.launch.py
+ros2 launch vela_teleop quest_bringup.launch.py
 ```
 
 Replaces the manual two-terminal workflow (`ros2 launch ros_tcp_endpoint endpoint.py` + `ros2 run q2r2_bringup right_arm_controller`). Run alongside `kinova_pose_tracking_twist.launch.py` to get the full teleop stack.
@@ -462,7 +478,7 @@ time you unplug/replug the USB cable.
 
 ---
 
-## `vla_policy_client`
+## `vela_policy_client`
 
 This package implements the ROS 2 side of the VLA inference loop. It provides a
 **synchronous** client (documented first below) and an **asynchronous streaming**
@@ -588,17 +604,17 @@ Like the asynchronous client, bring the arm up with the VLA flags `unwrap_joint_
 
 ```bash
 ./set_dds_udp_buffers.sh                                   # once after every reboot, helps with publishing smooth ros2 camera topics
-ros2 launch vla_kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12 unwrap_joint_states:=true open_loop_control:=true auto_home:=true
-ros2 launch vla_kinova_sensors cameras.launch.py
-ros2 launch vla_policy_client policy_client_synchronous.launch.py use_sim:=false prompt:="lift the blue cube"
+ros2 launch kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12 unwrap_joint_states:=true open_loop_control:=true auto_home:=true
+ros2 launch kinova_sensors cameras.launch.py
+ros2 launch vela_policy_client policy_client_synchronous.launch.py use_sim:=false prompt:="lift the blue cube"
 ```
 
 **Isaac Sim** (the scene publishes the camera topics itself; `unwrap_joint_states` is a no-op in sim but `open_loop_control` still applies):
 
 ```bash
 # start Isaac Sim and open the tabletop scene first
-ros2 launch vla_kinova_bringup kinova_controllers.launch.py open_loop_control:=true
-ros2 launch vla_policy_client policy_client_synchronous.launch.py
+ros2 launch kinova_bringup kinova_controllers.launch.py open_loop_control:=true
+ros2 launch vela_policy_client policy_client_synchronous.launch.py
 ```
 
 The first inference cycle stalls a few seconds while the server JIT-compiles for
@@ -610,7 +626,7 @@ Streaming alternative to the synchronous client that removes the per-chunk pause
 synchronous client the arm visibly steps once per inference). Instead of executing one chunk
 at a time, the inference loop maintains a continuously-updated **30 Hz "ideal" arm plan**,
 published as a `JointTrajectory` on `plan_topic` (`/vla_arm_plan`); a separate C++ node,
-[`vla_kinova_jtc_streamer`](#vla_kinova_jtc_streamer), oversamples that plan and streams
+[`vela_jtc_streamer`](#vela_jtc_streamer), oversamples that plan and streams
 short-horizon points to the JTC. This node does **not** command the JTC directly, so the
 arm-shaping knobs (`tick_hz`, `jtc_horizon`) live on **that** node. The gripper is driven here,
 through the same hysteresis gate as the synchronous client.
@@ -677,29 +693,29 @@ Bring the arm up with `unwrap_joint_states:=true open_loop_control:=true` (conti
 
 ```bash
 ./set_dds_udp_buffers.sh                                   # once after every reboot, helps with publishing smooth ros2 camera topics
-ros2 launch vla_kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12 unwrap_joint_states:=true open_loop_control:=true auto_home:=true
-ros2 launch vla_kinova_sensors cameras.launch.py
-ros2 launch vla_policy_client policy_client_asynchronous_jtc_streamer.launch.py use_sim:=false prompt:="lift the blue cube"
+ros2 launch kinova_bringup kinova_controllers.launch.py use_sim:=false robot_ip:=192.168.50.12 unwrap_joint_states:=true open_loop_control:=true auto_home:=true
+ros2 launch kinova_sensors cameras.launch.py
+ros2 launch vela_policy_client policy_client_asynchronous_jtc_streamer.launch.py use_sim:=false prompt:="lift the blue cube"
 ```
 
 **Isaac Sim** (the scene publishes the camera topics itself; `unwrap_joint_states` is a no-op in sim but `open_loop_control` still applies):
 
 ```bash
 # start Isaac Sim and open the tabletop scene first
-ros2 launch vla_kinova_bringup kinova_controllers.launch.py open_loop_control:=true
-ros2 launch vla_policy_client policy_client_asynchronous_jtc_streamer.launch.py
+ros2 launch kinova_bringup kinova_controllers.launch.py open_loop_control:=true
+ros2 launch vela_policy_client policy_client_asynchronous_jtc_streamer.launch.py
 ```
 
 To run the client and the streamer separately (e.g. to tune the streamer on its own):
 
 ```bash
-ros2 launch vla_policy_client policy_client_asynchronous_rtc.launch.py
-ros2 launch vla_kinova_jtc_streamer jtc_stream_node.launch.py
+ros2 launch vela_policy_client policy_client_asynchronous_rtc.launch.py
+ros2 launch vela_jtc_streamer jtc_stream_node.launch.py
 ```
 
 ---
 
-## `vla_kinova_jtc_streamer`
+## `vela_jtc_streamer`
 
 Minimal, reliable-timing **C++** streamer that shapes the asynchronous client's 30 Hz arm plan
 onto the Kinova JTC. It subscribes to the 30 Hz `JointTrajectory` plan on `plan_topic`, and at
@@ -727,12 +743,12 @@ Two knobs matter: `tick_hz` (stream rate) and `jtc_horizon` (the latency ↔ smo
 | `arm_trajectory_topic` | `/joint_trajectory_controller/joint_trajectory` | JTC trajectory topic to stream to (set in `vela_robots/config/<robot>/robot.yaml`). |
 
 ```bash
-ros2 launch vla_kinova_jtc_streamer jtc_stream_node.launch.py
+ros2 launch vela_jtc_streamer jtc_stream_node.launch.py
 ```
 
 ---
 
-## `vla_kinova_data_collection`
+## `vela_data_collection`
 
 Project-specific dataset-recording layer that sits on top of `lerobot_ros`. Uses the robot profile's recorder TOML (`vela_robots/config/<robot>/recorder.toml`) and holds one or more "session" TOMLs describing what to record (`sessions/*.toml`), a convenience launch file for the recorder, and a single-keystroke driver that automates the recorder's service calls during teleoperation.
 
@@ -745,7 +761,7 @@ The lerobot_ros recorder itself (the `dataset_recorder` node) lives in `ros2_ws/
 - **`sessions/example.toml`**: Example recording session: `dataset_name`, plus an ordered list of `{prompt, episodes}` tasks. 
 - **`scripts/camera_rate_monitor.py`**: Live per-camera rate / gap monitor. Listens to `camera_info` (same stamps as the images), so it adds no image traffic and is safe to run during teleop; subscribing to the raw image topics, including with `ros2 topic hz`, lags the arm. Run with `python3`.
 - **`launch/lerobot_recorder.launch.py`**: Wraps `ros2 run lerobot_ros dataset_recorder` so you don't have to expand the config path each time; also sets `HF_HUB_OFFLINE=1` so reopening an existing dataset doesn't try to fetch it from Hugging Face.
-- **`vla_kinova_data_collection/record_session.py`**: Script to automate data-collection given a TOML plan for the recording session. Connects to the recorder's services (`/new_dataset`, `/start_episode`, `/end_episode`, `/store_episodes`, `/finalize_dataset`), walks through the slots in a session TOML, and handles keep/discard/skip/quit from the keyboard.
+- **`vela_data_collection/record_session.py`**: Script to automate data-collection given a TOML plan for the recording session. Connects to the recorder's services (`/new_dataset`, `/start_episode`, `/end_episode`, `/store_episodes`, `/finalize_dataset`), walks through the slots in a session TOML, and handles keep/discard/skip/quit from the keyboard.
 
 ### Launch File
 
@@ -759,7 +775,7 @@ Starts the lerobot_ros recorder (the robot profile's `recorder.toml` is loaded b
 | `config` | `recorder.toml` of that profile | Path to the recorder TOML. Override to point at a different config (e.g. `recorder_2ext.toml`). |
 
 ```bash
-ros2 launch vla_kinova_data_collection lerobot_recorder.launch.py
+ros2 launch vela_data_collection lerobot_recorder.launch.py
 ```
 
 ### Console Script
@@ -768,11 +784,11 @@ ros2 launch vla_kinova_data_collection lerobot_recorder.launch.py
 
 Interactive driver. Reads a session TOML, opens the recorder's services, and walks through `{task, episode}` slots while you teleoperate. Keys (no Enter needed): `SPACE`/`Enter` start, `k` keep, `d` discard (retries the slot), `s` skip, `q` quit. During an in-progress recording, `q` discards the in-flight episode and exits cleanly.
 
-The `--session` value can be a bare name (looked up in CWD first, then in `share/vla_kinova_data_collection/sessions/`) or a relative/absolute path:
+The `--session` value can be a bare name (looked up in CWD first, then in `share/vela_data_collection/sessions/`) or a relative/absolute path:
 
 ```bash
-ros2 run vla_kinova_data_collection record_session --session example
-ros2 run vla_kinova_data_collection record_session -s ~/my_thesis_session.toml
+ros2 run vela_data_collection record_session --session example
+ros2 run vela_data_collection record_session -s ~/my_thesis_session.toml
 ```
 
 When the session ends (or you quit after keeping episodes), the script calls `/finalize_dataset`, which waits for the background encoding to finish and writes the dataset metadata before returning. You do **not** need to Ctrl-C the recorder to persist the dataset.
@@ -783,23 +799,23 @@ Open each command in its own terminal; source the project setup in every new ter
 
 1. Robot + teleop (this already includes `kinova_controllers.launch.py` with `unwrap_joint_states:=true`, so the recorded `/joint_states` are continuous through `±π`:
    ```bash
-   ros2 launch vla_kinova_teleop kinova_pose_tracking_twist.launch.py
+   ros2 launch kinova_bringup kinova_pose_tracking_twist.launch.py
    ```
 2. Quest bridge (ROS-TCP endpoint + Quest controller):
    ```bash
-   ros2 launch vla_kinova_teleop quest_bringup.launch.py
+   ros2 launch vela_teleop quest_bringup.launch.py
    ```
 3. Cameras (RealSense D435 external + Kinova wrist):
    ```bash
-   ros2 launch vla_kinova_sensors cameras.launch.py
+   ros2 launch kinova_sensors cameras.launch.py
    ```
 4. Recorder:
    ```bash
-   ros2 launch vla_kinova_data_collection lerobot_recorder.launch.py
+   ros2 launch vela_data_collection lerobot_recorder.launch.py
    ```
 5. Session driver (kicks off the actual recording loop):
    ```bash
-   ros2 run vla_kinova_data_collection record_session --session example
+   ros2 run vela_data_collection record_session --session example
    ```
 
 Finalize: the driver calls `/finalize_dataset` automatically when it exits after keeping episodes, so it blocks until the encoding finishes and the metadata (`info.json` + per-episode stats) is written. Once it prints that the dataset is finalized, the recorder can be safely Ctrl-C'd.

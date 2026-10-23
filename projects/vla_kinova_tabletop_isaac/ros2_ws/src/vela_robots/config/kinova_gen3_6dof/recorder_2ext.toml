@@ -2,7 +2,7 @@
 # Separate file because adding a feature changes the dataset schema: use a NEW
 # dataset_name with this config, it can't append to 2-camera datasets.
 # Bring up the cameras with:
-#   ros2 launch vla_kinova_sensors cameras.launch.py launch_realsense_2:=true
+#   ros2 launch kinova_sensors cameras.launch.py launch_realsense_2:=true
 # (D435 serials default in cameras.launch.py: external=243522072381, external_2=244222074111)
 #
 # lerobot_ros recording config for the Kinova Gen3 + Robotiq 2F-85 setup.
