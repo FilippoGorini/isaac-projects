@@ -11,7 +11,6 @@
 // version lives in the vla_traj_streamer package on the devel branch.)
 
 #include <algorithm>
-#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -25,11 +24,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "trajectory_msgs/msg/joint_trajectory.hpp"
 #include "trajectory_msgs/msg/joint_trajectory_point.hpp"
-
-using Vec6 = std::array<double, 6>;
-
-static const std::array<std::string, 6> ARM_JOINTS =
-{"joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"};
 
 static builtin_interfaces::msg::Duration dur_from_sec(double s)
 {
@@ -89,25 +83,19 @@ private:
   void on_plan(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
   {
     const size_t n = msg->points.size();
-    if (n == 0) return;
-    // Map the message joint order onto ARM_JOINTS (the plan may arrive in any order).
-    std::array<int, 6> idx{-1, -1, -1, -1, -1, -1};
-    for (size_t j = 0; j < msg->joint_names.size(); ++j) {
-      for (int a = 0; a < 6; ++a) {
-        if (msg->joint_names[j] == ARM_JOINTS[a]) idx[a] = static_cast<int>(j);
-      }
-    }
-    for (int a = 0; a < 6; ++a) {
-      if (idx[a] < 0) {
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
-                             "plan missing joint %s; ignoring", ARM_JOINTS[a].c_str());
-        return;
-      }
-    }
-    std::vector<double> arr(n * 6);
+    const size_t nj = msg->joint_names.size();
+    if (n == 0 || nj == 0) return;
+    // Joints are whatever the plan names (the client's arm_joints), forwarded as-is to the JTC.
+    std::vector<double> arr(n * nj);
     for (size_t k = 0; k < n; ++k) {
       const auto & pos = msg->points[k].positions;
-      for (int a = 0; a < 6; ++a) arr[k * 6 + a] = pos[idx[a]];
+      if (pos.size() != nj) {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                             "plan point %zu has %zu positions for %zu joints; ignoring",
+                             k, pos.size(), nj);
+        return;
+      }
+      std::copy(pos.begin(), pos.end(), arr.begin() + k * nj);
     }
     // Knot spacing from the point stamps (fallback to control_hz); t_ref from
     // header.stamp (fallback to receive time if the publisher left it at 0).
@@ -121,6 +109,7 @@ private:
 
     std::lock_guard<std::mutex> lk(plan_mtx_);
     plan_ = std::move(arr);
+    plan_names_ = msg->joint_names;
     plan_n_ = static_cast<int>(n);
     plan_dt_ = dt;
     plan_t_ref_ = t_ref;
@@ -128,33 +117,31 @@ private:
   }
 
   // Linear interpolation of the arm columns at fractional index f, clamped to the plan.
-  static Vec6 sample_linear(const std::vector<double> & plan, int n, double f)
+  static std::vector<double> sample_linear(const std::vector<double> & plan, int n, size_t nj,
+                                           double f)
   {
-    Vec6 pos{};
-    if (n <= 1) {
-      for (int a = 0; a < 6; ++a) pos[a] = plan[a];
-      return pos;
-    }
+    if (n <= 1) return std::vector<double>(plan.begin(), plan.begin() + nj);
+    std::vector<double> pos(nj);
     if (f < 0.0) f = 0.0;
     if (f > n - 1) f = n - 1;
     int i = static_cast<int>(std::floor(f));
     if (i > n - 2) i = n - 2;
     if (i < 0) i = 0;
     double u = f - i;
-    for (int a = 0; a < 6; ++a) {
-      double p1 = plan[static_cast<size_t>(i) * 6 + a];
-      double p2 = plan[static_cast<size_t>(i + 1) * 6 + a];
+    for (size_t a = 0; a < nj; ++a) {
+      double p1 = plan[static_cast<size_t>(i) * nj + a];
+      double p2 = plan[static_cast<size_t>(i + 1) * nj + a];
       pos[a] = (1.0 - u) * p1 + u * p2;
     }
     return pos;
   }
 
-  void publish_point(const Vec6 & pos)
+  void publish_point(const std::vector<std::string> & names, std::vector<double> pos)
   {
     trajectory_msgs::msg::JointTrajectory msg;
-    msg.joint_names.assign(ARM_JOINTS.begin(), ARM_JOINTS.end());
+    msg.joint_names = names;
     trajectory_msgs::msg::JointTrajectoryPoint pt;
-    pt.positions.assign(pos.begin(), pos.end());
+    pt.positions = std::move(pos);
     pt.time_from_start = dur_from_sec(jtc_horizon_);
     msg.points.push_back(std::move(pt));
     arm_pub_->publish(std::move(msg));
@@ -168,16 +155,19 @@ private:
     auto report_wall = std::chrono::steady_clock::now();
 
     while (running_ && rclcpp::ok()) {
-      std::vector<double> plan; int pn = 0; double pdt = 0, pref = 0; bool have;
+      std::vector<double> plan; std::vector<std::string> names;
+      int pn = 0; double pdt = 0, pref = 0; bool have;
       {
         std::lock_guard<std::mutex> lk(plan_mtx_);
         have = have_plan_;
-        if (have) { plan = plan_; pn = plan_n_; pdt = plan_dt_; pref = plan_t_ref_; }
+        if (have) {
+          plan = plan_; names = plan_names_; pn = plan_n_; pdt = plan_dt_; pref = plan_t_ref_;
+        }
       }
 
       if (have) {
         double f = (now_sec() - pref) / pdt;
-        publish_point(sample_linear(plan, pn, f));
+        publish_point(names, sample_linear(plan, pn, names.size(), f));
       }
 
       ++n_report;
@@ -202,6 +192,7 @@ private:
 
   std::mutex plan_mtx_;
   std::vector<double> plan_;
+  std::vector<std::string> plan_names_;
   int plan_n_ = 0;
   double plan_dt_ = 0.0, plan_t_ref_ = 0.0;
   bool have_plan_ = false;
