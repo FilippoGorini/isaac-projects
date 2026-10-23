@@ -48,6 +48,8 @@ def generate_launch_description():
                               description="30 Hz plan spacing (client) + streamer fallback knot spacing"),
         DeclareLaunchArgument("use_sim", default_value="true",
                               description="true => sim clock + sim cameras; false => real robot"),
+        DeclareLaunchArgument("robot", default_value="kinova_gen3_6dof",
+                              description="Robot profile: vela_robots/config/<robot>/robot.yaml"),
     ]
 
     client = IncludeLaunchDescription(
@@ -63,6 +65,7 @@ def generate_launch_description():
             "plan_topic": LC("plan_topic"),
             "control_hz": LC("control_hz"),
             "use_sim": LC("use_sim"),
+            "robot": LC("robot"),
         }.items(),
     )
     streamer = IncludeLaunchDescription(
@@ -73,6 +76,7 @@ def generate_launch_description():
             "control_hz": LC("control_hz"),
             "plan_topic": LC("plan_topic"),
             "use_sim": LC("use_sim"),
+            "robot": LC("robot"),
         }.items(),
     )
     return LaunchDescription(declared + [client, streamer])

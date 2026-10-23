@@ -135,7 +135,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "launch_realsense_2",
             default_value="false",
-            description="Bring up a second D435 (RGB only; recorded as observation.images.external_2 with kinova_pi05_2ext.toml)",
+            description="Bring up a second D435 (RGB only; recorded as observation.images.external_2 with the kinova_gen3_6dof recorder_2ext.toml)",
         ),
         DeclareLaunchArgument(
             "realsense_2_serial",

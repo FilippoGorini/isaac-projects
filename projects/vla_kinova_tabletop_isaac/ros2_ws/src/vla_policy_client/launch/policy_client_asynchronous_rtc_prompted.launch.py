@@ -49,6 +49,15 @@ _OVERRIDABLE = [
 ]
 
 
+def _robot_yaml(context):
+    # launch_ros only warns about a missing params file, so fail loudly on a bad robot:=
+    robot = LaunchConfiguration("robot").perform(context)
+    path = os.path.join(get_package_share_directory("vela_robots"), "config", robot, "robot.yaml")
+    if not os.path.isfile(path):
+        raise RuntimeError(f"robot:={robot} has no profile ({path})")
+    return path
+
+
 def launch_setup(context, *args, **kwargs):
     config = os.path.join(get_package_share_directory(PKG), "config", CONFIG)
     overrides = {}
@@ -58,7 +67,7 @@ def launch_setup(context, *args, **kwargs):
             overrides[name] = cast(val)
     overrides["use_sim_time"] = _BOOL(LaunchConfiguration("use_sim").perform(context))
     return [Node(package=PKG, executable=EXECUTABLE, name=EXECUTABLE,
-                 output="screen", parameters=[config, overrides])]
+                 output="screen", parameters=[config, _robot_yaml(context), overrides])]
 
 
 def generate_launch_description():
@@ -77,6 +86,7 @@ def generate_launch_description():
             "control_hz": LaunchConfiguration("control_hz", default="30.0"),
             "plan_topic": LaunchConfiguration("plan_topic", default="/vla_arm_plan"),
             "use_sim": LaunchConfiguration("use_sim"),
+            "robot": LaunchConfiguration("robot"),
         }.items(),
     )
 
@@ -102,6 +112,8 @@ def generate_launch_description():
                               description="30 Hz plan topic (client publishes, streamer subscribes)"),
         DeclareLaunchArgument("control_hz", default_value="30.0",
                               description="30 Hz plan spacing (client) + streamer fallback knot spacing"),
+        DeclareLaunchArgument("robot", default_value="kinova_gen3_6dof",
+                              description="Robot profile: vela_robots/config/<robot>/robot.yaml"),
         DeclareLaunchArgument("use_sim", default_value="true",
                               description="true => sim clock + sim cameras; false => real robot"),
         OpaqueFunction(function=launch_setup),

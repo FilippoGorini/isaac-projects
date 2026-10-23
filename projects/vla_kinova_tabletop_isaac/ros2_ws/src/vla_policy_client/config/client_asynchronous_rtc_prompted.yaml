@@ -27,20 +27,8 @@ policy_client_asynchronous_rtc_prompted:
     model_max_delay: 10       # served checkpoint's trained max_delay (clutter_rtc=10 => d<=9; finetune_rtc=8 => d<=7); only gates the OOD warning
     rtc_blend_steps: 5        # short safety cross-fade for latency overrun / imperfect pinning; 0 => pure RTC
 
-    # ---- gripper hysteresis (near-binary model output: 0 open / ~0.8 closed) ----
-    gripper_close_threshold: 0.55
-    gripper_open_threshold: 0.30
-    gripper_closed_position: 0.8
-    gripper_open_position: 0.0
-    gripper_max_effort: 50.0
-
-    # ---- camera topics (use_sim picks the pair) ----
-    camera_keys:        ["base_rgb", "wrist_rgb"]     # obs key sent to the server for each topic
-    sim_camera_topics:  ["/isaac_external_camera/color/image_raw", "/isaac_wrist_camera/color/image_raw"]
-    real_camera_topics: ["/realsense/d435/color/image_raw", "/camera/color/image_raw"]
-
-    joint_states_topic: "/joint_states"
-    gripper_action: "/robotiq_gripper_controller/gripper_cmd"
+    # Robot facts (joints, gripper values, cameras, controller topics) come from
+    # vela_robots/config/<robot>/robot.yaml, loaded after this file by the launch files.
 
     resize_images: true
     image_resolution: 224

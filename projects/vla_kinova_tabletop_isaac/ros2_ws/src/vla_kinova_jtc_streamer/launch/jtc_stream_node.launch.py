@@ -21,6 +21,15 @@ _OVERRIDABLE = [
 ]
 
 
+def _robot_yaml(context):
+    # launch_ros only warns about a missing params file, so fail loudly on a bad robot:=
+    robot = LaunchConfiguration("robot").perform(context)
+    path = os.path.join(get_package_share_directory("vela_robots"), "config", robot, "robot.yaml")
+    if not os.path.isfile(path):
+        raise RuntimeError(f"robot:={robot} has no profile ({path})")
+    return path
+
+
 def launch_setup(context, *args, **kwargs):
     config = os.path.join(get_package_share_directory(PKG), "config", CONFIG)
     overrides = {}
@@ -30,7 +39,7 @@ def launch_setup(context, *args, **kwargs):
             overrides[name] = cast(val)
     overrides["use_sim_time"] = _BOOL(LaunchConfiguration("use_sim").perform(context))
     return [Node(package=PKG, executable=EXECUTABLE, name=EXECUTABLE,
-                 output="screen", parameters=[config, overrides])]
+                 output="screen", parameters=[config, _robot_yaml(context), overrides])]
 
 
 def generate_launch_description():
@@ -42,7 +51,10 @@ def generate_launch_description():
         arg("jtc_horizon", "JTC point time_from_start (s); latency<->smoothness knob"),
         arg("control_hz", "Fallback plan knot spacing (Hz) when the plan has <2 points"),
         arg("plan_topic", "30 Hz plan topic from the Python VLA client"),
-        arg("arm_trajectory_topic", "JTC trajectory topic to stream to"),
+        DeclareLaunchArgument("arm_trajectory_topic", default_value="",
+                              description="JTC trajectory topic to stream to (empty => value from robot.yaml)"),
+        DeclareLaunchArgument("robot", default_value="kinova_gen3_6dof",
+                              description="Robot profile: vela_robots/config/<robot>/robot.yaml"),
         DeclareLaunchArgument("use_sim", default_value="false",
                               description="true => sim clock; false => system clock (real robot)"),
         OpaqueFunction(function=launch_setup),

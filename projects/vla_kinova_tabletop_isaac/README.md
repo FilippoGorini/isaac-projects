@@ -350,7 +350,7 @@ The ZED 2 is supported as an **optional alternative external camera** (`launch_z
 | `launch_wrist` | `true` | Bring up the Kinova wrist camera (RGB only, raw, depth disabled). |
 | `launch_realsense` | `true` | Bring up the Intel RealSense D435 (RGB only; recorded as `observation.images.external`). |
 | `realsense_serial` | `243522072381` | Serial of the first D435. Empty = first device found (only valid without `launch_realsense_2`). |
-| `launch_realsense_2` | `false` | Bring up a second D435 on `/realsense/d435_2/color/image_raw` (recorded as `observation.images.external_2` with `kinova_pi05_2ext.toml`). |
+| `launch_realsense_2` | `false` | Bring up a second D435 on `/realsense/d435_2/color/image_raw` (recorded as `observation.images.external_2` with `vela_robots/config/kinova_gen3_6dof/recorder_2ext.toml`). |
 | `realsense_2_serial` | `244222074111` | Serial of the second D435. Serials are per-device, so the mapping holds whatever USB port each camera is plugged into (`rs-enumerate-devices -s`). |
 | `realsense_color_profile` | `640x480x30` | RealSense color profile `WIDTHxHEIGHTxFPS`, shared by both D435s. Valid combos depend on the USB link (`rs-enumerate-devices -c`). |
 | `launch_zed` | `false` | Bring up the ZED 2 instead of / alongside the RealSense (needs the ZED SDK). |
@@ -548,7 +548,7 @@ On a fresh cloud GPU server (assuming open 8000 port):
 | `/joint_trajectory_controller/follow_joint_trajectory` | `control_msgs/FollowJointTrajectory` | Whole 30-step chunk sent as one multi-point goal; its result gates the next cycle. |
 | `/robotiq_gripper_controller/gripper_cmd` | `control_msgs/GripperCommand` | Open/close goal, fired only on a hysteresis state change. |
 
-**Parameters** (set in `config/client_synchronous.yaml`):
+**Parameters** (set in `config/client_synchronous.yaml`; robot facts such as the gripper values, joints and camera topics come from `vela_robots/config/<robot>/robot.yaml`, selected with the `robot` launch arg, default `kinova_gen3_6dof`):
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -735,7 +735,7 @@ Two knobs matter: `tick_hz` (stream rate) and `jtc_horizon` (the latency ↔ smo
 | `jtc_horizon` | `0.1` | `time_from_start` of each streamed point [s]. Latency ↔ smoothness knob. |
 | `control_hz` | `30.0` | Fallback plan knot spacing if the plan message has <2 points. |
 | `plan_topic` | `/vla_arm_plan` | 30 Hz plan topic from the Python VLA client. |
-| `arm_trajectory_topic` | `/joint_trajectory_controller/joint_trajectory` | JTC trajectory topic to stream to. |
+| `arm_trajectory_topic` | `/joint_trajectory_controller/joint_trajectory` | JTC trajectory topic to stream to (set in `vela_robots/config/<robot>/robot.yaml`). |
 
 ```bash
 ros2 launch vla_kinova_jtc_streamer jtc_stream_node.launch.py
@@ -745,14 +745,14 @@ ros2 launch vla_kinova_jtc_streamer jtc_stream_node.launch.py
 
 ## `vla_kinova_data_collection`
 
-Project-specific dataset-recording layer that sits on top of `lerobot_ros`. Holds the Kinova-specific recorder TOML (`config/kinova_pi05.toml`), one or more "session" TOMLs describing what to record (`sessions/*.toml`), a convenience launch file for the recorder, and a single-keystroke driver that automates the recorder's service calls during teleoperation.
+Project-specific dataset-recording layer that sits on top of `lerobot_ros`. Uses the robot profile's recorder TOML (`vela_robots/config/<robot>/recorder.toml`) and holds one or more "session" TOMLs describing what to record (`sessions/*.toml`), a convenience launch file for the recorder, and a single-keystroke driver that automates the recorder's service calls during teleoperation.
 
 The lerobot_ros recorder itself (the `dataset_recorder` node) lives in `ros2_ws/src/lerobot_ros/` and is installed by `bootstrap_lerobot_ros.sh`. This package is the thin Kinova wrapper around it.
 
 ### Package Files
 
-- **`config/kinova_pi05.toml`**: Recorder configuration. Sets `fps=30`, `robot_type=kinova_gen3_6dof_2f85`, `dataset_root`, and topic subscriptions. Two `/joint_states` subscriptions (one tagged `observation`, one tagged `action` for the arm joints), plus `/gripper_command/state` as the gripper dimension of the action, plus the RealSense D435 RGB feed (640x480) and the Kinova wrist RGB feed (320x240) as image topics. The recorded image dimensions match the published topics exactly, so lerobot_ros records them verbatim (no resize, no JPEG round-trip).
-- **`config/kinova_pi05_2ext.toml`**: Same as `kinova_pi05.toml` plus the second D435 as `observation.images.external_2`. Different dataset schema, so use it with a new `dataset_name`.
+- **`vela_robots/config/kinova_gen3_6dof/recorder.toml`** (was `config/kinova_pi05.toml` here): Recorder configuration. Sets `fps=30`, `robot_type=kinova_gen3_6dof_2f85`, `dataset_root`, and topic subscriptions. Two `/joint_states` subscriptions (one tagged `observation`, one tagged `action` for the arm joints), plus `/gripper_command/state` as the gripper dimension of the action, plus the RealSense D435 RGB feed (640x480) and the Kinova wrist RGB feed (320x240) as image topics. The recorded image dimensions match the published topics exactly, so lerobot_ros records them verbatim (no resize, no JPEG round-trip).
+- **`vela_robots/config/kinova_gen3_6dof/recorder_2ext.toml`** (was `config/kinova_pi05_2ext.toml`): Same as `recorder.toml` plus the second D435 as `observation.images.external_2`. Different dataset schema, so use it with a new `dataset_name`.
 - **`sessions/example.toml`**: Example recording session: `dataset_name`, plus an ordered list of `{prompt, episodes}` tasks. 
 - **`scripts/camera_rate_monitor.py`**: Live per-camera rate / gap monitor. Listens to `camera_info` (same stamps as the images), so it adds no image traffic and is safe to run during teleop; subscribing to the raw image topics, including with `ros2 topic hz`, lags the arm. Run with `python3`.
 - **`launch/lerobot_recorder.launch.py`**: Wraps `ros2 run lerobot_ros dataset_recorder` so you don't have to expand the config path each time; also sets `HF_HUB_OFFLINE=1` so reopening an existing dataset doesn't try to fetch it from Hugging Face.
@@ -762,11 +762,12 @@ The lerobot_ros recorder itself (the `dataset_recorder` node) lives in `ros2_ws/
 
 #### `lerobot_recorder.launch.py`
 
-Starts the lerobot_ros recorder (kinova TOML is loaded by default).
+Starts the lerobot_ros recorder (the robot profile's `recorder.toml` is loaded by default).
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `config` | `kinova_pi05.toml` from this package's `share/config/` | Path to the recorder TOML. Override to point at a different config. |
+| `robot` | `kinova_gen3_6dof` | Robot profile in `vela_robots/config/`. |
+| `config` | `recorder.toml` of that profile | Path to the recorder TOML. Override to point at a different config (e.g. `recorder_2ext.toml`). |
 
 ```bash
 ros2 launch vla_kinova_data_collection lerobot_recorder.launch.py
@@ -827,7 +828,7 @@ Datasets land on disk in a layout that mirrors Hugging Face's `<owner>/<name>` r
     └── kinova_pick_v1@v2.1/             # v2.1 conversion, push to same repo's v2.1 branch
 ```
 
-Make sure `dataset_root = "/home/students/work/filippo/datasets"` is set in `config/kinova_pi05.toml`, and each session TOML uses `dataset_name = "FilippoGorini/<name>"` (note the `FilippoGorini/` prefix). The recorder writes to `<dataset_root>/<dataset_name>/` automatically.
+Make sure `dataset_root = "/home/students/work/filippo/datasets"` is set in `vela_robots/config/kinova_gen3_6dof/recorder.toml`, and each session TOML uses `dataset_name = "FilippoGorini/<name>"` (note the `FilippoGorini/` prefix). The recorder writes to `<dataset_root>/<dataset_name>/` automatically.
 
 ### One-time setup: Hugging Face tokens
 

@@ -1,0 +1,34 @@
+# Kinova Gen3 6-DoF + Robotiq 2F-85: robot facts shared by every VELA node.
+# Node tuning (PID gains, RTC, rates) stays in each package's own yaml.
+# Loaded after the node yaml by every VELA launch file (robot:=kinova_gen3_6dof, the default).
+# arm_joints + gripper_joint must match observation.state in recorder.toml (same order).
+/**:
+  ros__parameters:
+    arm_joints: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+    gripper_joint: robotiq_85_left_knuckle_joint
+    gripper_open_position: 0.0
+    gripper_closed_position: 0.8
+    gripper_close_threshold: 0.55      # deploy hysteresis on the model's gripper column
+    gripper_open_threshold: 0.30
+    gripper_max_effort: 50.0
+    gripper_action: /robotiq_gripper_controller/gripper_cmd
+    joint_states_topic: /joint_states  # read by joint name, so its scrambled order is fine
+    base_frame: base_link
+    camera_keys:        [base_rgb, wrist_rgb]          # = openpi KinovaInputs keys
+    real_camera_topics: [/realsense/d435/color/image_raw, /camera/color/image_raw]
+    sim_camera_topics:  [/isaac_external_camera/color/image_raw, /isaac_wrist_camera/color/image_raw]
+    arm_action: /joint_trajectory_controller/follow_joint_trajectory
+    arm_trajectory_topic: /joint_trajectory_controller/joint_trajectory
+
+twist_pose_tracking_node:
+  ros__parameters:
+    output_mode: kortex_tool_twist     # firmware TOOL-frame Twist + lever-arm correction
+    ee_frame: end_effector_link        # frame the kinova firmware expects twists to be expressed in
+    control_frame: fingertips_frame    # frame the PID regulates (between the fingertips, defined in the urdf)
+    twist_command_topic: /twist_controller/commands
+
+quest2ros2_controller:                 # Quest2ROS2 node, named by quest_bringup.launch.py
+  ros__parameters:
+    end_effector_link_name: fingertips_frame
+    gripper_mode: binary
+    exclusive_gripper_motion: true     # Kortex high-level API: no gripper motion during twist

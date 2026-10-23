@@ -1,4 +1,4 @@
-# Same as kinova_pi05.toml plus a second external D435 (observation.images.external_2).
+# Same as recorder.toml plus a second external D435 (observation.images.external_2).
 # Separate file because adding a feature changes the dataset schema: use a NEW
 # dataset_name with this config, it can't append to 2-camera datasets.
 # Bring up the cameras with:

@@ -17,6 +17,7 @@
   <exec_depend>python3-transforms3d</exec_depend>
   <exec_depend>ros_tcp_endpoint</exec_depend>
   <exec_depend>q2r2_bringup</exec_depend>
+  <exec_depend>vela_robots</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

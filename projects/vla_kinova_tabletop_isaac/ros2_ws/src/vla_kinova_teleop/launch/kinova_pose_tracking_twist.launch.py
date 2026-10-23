@@ -39,6 +39,10 @@ def launch_setup(context, *args, **kwargs):
     twist_pid_yaml = os.path.join(
         get_package_share_directory(my_package), "config", "twist_pose_tracking.yaml"
     )
+    # frames / twist topic / output_mode for the tracker come from the Kinova robot profile
+    robot_yaml = os.path.join(
+        get_package_share_directory("vela_robots"), "config", "kinova_gen3_6dof", "robot.yaml"
+    )
 
     # Reuse the bringup launch file to bring up the kinova controllers (twist controller starts inactive)
     controllers_launch = IncludeLaunchDescription(
@@ -79,7 +83,7 @@ def launch_setup(context, *args, **kwargs):
             executable="twist_pose_tracking_node.py",
             name="twist_pose_tracking_node",
             output="screen",
-            parameters=[twist_pid_yaml],
+            parameters=[twist_pid_yaml, robot_yaml],
         )],
     )
 

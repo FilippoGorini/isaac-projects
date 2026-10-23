@@ -32,6 +32,15 @@ _OVERRIDABLE = [
 ]
 
 
+def _robot_yaml(context):
+    # launch_ros only warns about a missing params file, so fail loudly on a bad robot:=
+    robot = LaunchConfiguration("robot").perform(context)
+    path = os.path.join(get_package_share_directory("vela_robots"), "config", robot, "robot.yaml")
+    if not os.path.isfile(path):
+        raise RuntimeError(f"robot:={robot} has no profile ({path})")
+    return path
+
+
 def launch_setup(context, *args, **kwargs):
     config = os.path.join(get_package_share_directory(PKG), "config", CONFIG)
     overrides = {}
@@ -41,7 +50,7 @@ def launch_setup(context, *args, **kwargs):
             overrides[name] = cast(val)
     overrides["use_sim_time"] = _BOOL(LaunchConfiguration("use_sim").perform(context))
     return [Node(package=PKG, executable=EXECUTABLE, name=EXECUTABLE,
-                 output="screen", parameters=[config, overrides])]
+                 output="screen", parameters=[config, _robot_yaml(context), overrides])]
 
 
 def generate_launch_description():
@@ -64,6 +73,8 @@ def generate_launch_description():
         arg("debug_log_dir", "Directory for the append-only JSONL trace ('' => off)"),
         arg("js_log_hz", "Measured-state trace rate (0 => every sample)"),
         arg("rate_report_sec", "Period of the live [rate] inference readouts"),
+        DeclareLaunchArgument("robot", default_value="kinova_gen3_6dof",
+                              description="Robot profile: vela_robots/config/<robot>/robot.yaml"),
         DeclareLaunchArgument("use_sim", default_value="true",
                               description="true => sim camera topics + sim clock; false => real robot"),
         OpaqueFunction(function=launch_setup),

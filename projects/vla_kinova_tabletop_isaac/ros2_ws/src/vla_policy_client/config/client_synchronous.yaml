@@ -12,22 +12,5 @@ policy_client_synchronous:
     resize_images: true
     image_resolution: 224   
 
-    # Gripper hysteresis (model output is near-binary 0 open / ~0.8 closed)
-    gripper_close_threshold: 0.55
-    gripper_open_threshold: 0.30
-    gripper_closed_position: 0.8
-    gripper_open_position: 0.0
-    gripper_max_effort: 50.0
-
-    # Camera topics. Both pairs are listed; use_sim picks which one is used.
-    # Sim = Isaac Sim publishers, real = RealSense D435 (external) + Kinova wrist.
-    camera_keys:        ["base_rgb", "wrist_rgb"]     # obs key sent to the server for each topic
-    sim_camera_topics:  ["/isaac_external_camera/color/image_raw", "/isaac_wrist_camera/color/image_raw"]
-    real_camera_topics: ["/realsense/d435/color/image_raw", "/camera/color/image_raw"]
-
-    # Not split sim/real: /joint_states (joint_state_broadcaster output, what the
-    # dataset was recorded from; read by joint name so its scrambled order is fine)
-    # and the controllers, which are spawned identically in both modes.
-    joint_states_topic: "/joint_states"
-    arm_action: "/joint_trajectory_controller/follow_joint_trajectory"
-    gripper_action: "/robotiq_gripper_controller/gripper_cmd"
+    # Robot facts (joints, gripper values, cameras, controller topics) come from
+    # vela_robots/config/<robot>/robot.yaml, loaded after this file by the launch files.
