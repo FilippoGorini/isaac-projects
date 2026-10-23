@@ -24,6 +24,7 @@ def launch_setup(context, *args, **kwargs):
     right_arm = Node(
         package="q2r2_bringup",
         executable="right_arm_controller",
+        name="quest2ros2_controller",
         emulate_tty=True,
         output="screen",
     )
