@@ -64,8 +64,8 @@ class PolicyClientAsynchronousRtcPromptedNode(PolicyClientAsynchronousRtcNode):
         else:
             # If stopping, drop the active plan -> C++ streamer holds the last knot -> arm goes idle
             # When resuming first_chunk goes True again: keep the whole chunk and no stale RTC prefix or blend
-            with self._plan_lock:
-                self._plan = None
+            # A chunk already in flight is discarded when it lands (otherwise it would run after the stop)
+            self._reset_plan()
             self.get_logger().info("Prompt cleared -> inference paused, arm holding pose.")
         self._log_event({"type": "prompt", "t": self._now(), "prompt": prompt})
 
@@ -88,6 +88,10 @@ def main(args=None):
         executor.spin()
     except KeyboardInterrupt:
         pass
+    except Exception:
+        # Ctrl-C can surface as RCLError ("context is not valid") from the executor
+        if rclpy.ok():
+            raise
     finally:
         node.destroy_node()
         if rclpy.ok():

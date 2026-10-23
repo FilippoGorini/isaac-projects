@@ -193,7 +193,7 @@ class PolicyClientSynchronousNode(Node):
 
         # --- control loop thread ---
         self._running = True
-        self._loop_thread = threading.Thread(target=self._control_loop, daemon=True)
+        self._loop_thread = threading.Thread(target=self._run_control_loop, daemon=True)
         self._loop_thread.start()
         self.get_logger().info("Synchronous policy client started.")
 
@@ -320,6 +320,15 @@ class PolicyClientSynchronousNode(Node):
     # Control loop (one blocking cycle per chunk)
     # ------------------------------------------------------------------
 
+    def _run_control_loop(self) -> None:
+        try:
+            self._control_loop()
+        except Exception:
+            # Ctrl-C shuts the context down while the loop may be mid-chunk (gripper / action
+            # calls then raise RCLError); only real errors get the thread traceback.
+            if self._running and rclpy.ok():
+                raise
+
     def _control_loop(self) -> None:
         while self._running and rclpy.ok():
             obs = self._build_obs()
@@ -387,6 +396,10 @@ class PolicyClientSynchronousNode(Node):
 
     def destroy_node(self):
         self._running = False
+        self._arm_done.set()  # unblock a pending trajectory wait
+        # Let the loop thread exit before the handles go away (a daemon thread still using
+        # them during interpreter teardown can abort it)
+        self._loop_thread.join(timeout=3.0)
         super().destroy_node()
 
 
@@ -399,6 +412,10 @@ def main(args=None):
         executor.spin()
     except KeyboardInterrupt:
         pass
+    except Exception:
+        # Ctrl-C can surface as RCLError ("context is not valid") from the executor
+        if rclpy.ok():
+            raise
     finally:
         node.destroy_node()
         if rclpy.ok():
