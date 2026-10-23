@@ -250,16 +250,15 @@ The xacro files are layered: `gen3.xacro` is the entry point referenced by the l
 
 ## `vla_kinova_bringup`
 
-Brings up `ros2_control`, the controllers, and optionally MoveIt 2. Depends on `vla_kinova_description` for the URDF. Also ships the `home_robot.py` script (auto-run after JTC spawn in sim, optional on real robot) and the abandoned MoveIt-Servo `pose_tracking_node` (not used anymore, the teleop now uses the Kortex twist controller via `vla_kinova_teleop`).
+Brings up `ros2_control`, the controllers, and optionally MoveIt 2. Depends on `vla_kinova_description` for the URDF. Also ships the `home_robot.py` script (auto-run after JTC spawn in sim, optional on real robot). The old MoveIt-Servo teleop path was removed; the teleop uses the Kortex twist controller via `vla_kinova_teleop`.
 
 ### Package Files
 
 - **`config/ros2_controllers.yaml`**: Controller setup for `joint_trajectory_controller`, `robotiq_gripper_controller`, `joint_state_broadcaster`, plus the real-robot-only `twist_controller`, `gripper_velocity_controller`, `gripper_position_controller`, and `fault_controller`.
 - **`config/moveit_controllers.yaml`**: MoveIt 2 controller config.
 - **`config/moveit.rviz`**, **`config/servo.rviz`**: RViz presets for MoveIt motion planning and for Servo/Twist Teleop.
-- **`config/joint_limits.yaml`**, **`config/servo.yaml`**, **`config/pose_tracking_settings.yaml`**: MoveIt Servo parameters.
+- **`config/joint_limits.yaml`**: Joint limits for MoveIt planning.
 - **`scripts/home_robot.py`**: Sends a single `JointTrajectory` to the home pose.
-- **`src/pose_tracking_node.cpp`**: MoveIt-Servo PoseTracking wrapper (abandoned, kept as reference).
 
 ### Launch Files
 
@@ -282,7 +281,7 @@ The three bringup launchers share this set of arguments:
 | `unwrap_joint_states` | `false` | (`kinova_controllers.launch.py` only.) Kortex-driver param. `false` = stock single-turn `[-π, π]` `/joint_states` (what MoveIt / the closed-loop JTC expect); `true` = continuous, multi-turn `/joint_states` so a joint driven past `±π` stays smooth instead of wrapping around. Set `true` for teleop, data collection, and VLA. |
 | `open_loop_control` | `false` | (`kinova_controllers.launch.py` only.) `false` = JTC closed loop (MoveIt / regular bring-up); `true` = open loop for VLA to avoid the JTC buzz/hum issue. |
 
-The MoveIt, MoveIt-Servo and Twist Pose Tracking launchers additionally accept `launch_rviz` (default `true`). They include the bringup without forwarding `unwrap_joint_states` / `open_loop_control`, so those paths always use the defaults.
+The MoveIt and Twist Pose Tracking launchers additionally accept `launch_rviz` (default `true`). They include the bringup without forwarding `unwrap_joint_states` / `open_loop_control`, so those paths always use the defaults.
 
 ---
 
@@ -321,16 +320,6 @@ To also run the homing script when connecting to the real robot:
 ```bash
 ros2 launch vla_kinova_bringup kinova_controllers_moveit.launch.py use_sim:=false robot_ip:=192.168.50.12 auto_home:=true
 ```
-
----
-
-*Legacy MoveIt Servo path (abandoned for now due to jerky movement and singularity handling issues):*
-
-```bash
-ros2 launch vla_kinova_bringup kinova_controllers_moveit_servo.launch.py
-```
-
-Brings up MoveIt Servo and the C++ `pose_tracking_node`. **Not used anymore due to singularity and vibration issues**
 
 ---
 
@@ -423,7 +412,7 @@ In either mode the Quest controller also publishes a latched `JointState` on `/g
 
 - **`scripts/twist_pose_tracking_node.py`**: The teleop tracking node.
 - **`config/twist_pose_tracking.yaml`**: PID gains, saturation limits, stale-target handling.
-- **`scripts/gripper_sine_test.py`**, **`scripts/servo_sine_test.py`**: helper diagnostic scripts.
+- **`scripts/gripper_sine_test.py`**: helper diagnostic script.
 
 ### Launch Files
 

@@ -14,7 +14,6 @@ install(DIRECTORY config launch
 install(PROGRAMS
   scripts/twist_pose_tracking_node.py
   scripts/gripper_sine_test.py
-  scripts/servo_sine_test.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
