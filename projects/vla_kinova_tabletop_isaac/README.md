@@ -349,7 +349,10 @@ The ZED 2 is supported as an **optional alternative external camera** (`launch_z
 |----------|---------|-------------|
 | `launch_wrist` | `true` | Bring up the Kinova wrist camera (RGB only, raw, depth disabled). |
 | `launch_realsense` | `true` | Bring up the Intel RealSense D435 (RGB only; recorded as `observation.images.external`). |
-| `realsense_color_profile` | `640x480x30` | RealSense color profile `WIDTHxHEIGHTxFPS`. Valid combos depend on the USB link (`rs-enumerate-devices -c`). |
+| `realsense_serial` | `243522072381` | Serial of the first D435. Empty = first device found (only valid without `launch_realsense_2`). |
+| `launch_realsense_2` | `false` | Bring up a second D435 on `/realsense/d435_2/color/image_raw` (recorded as `observation.images.external_2` with `kinova_pi05_2ext.toml`). |
+| `realsense_2_serial` | `244222074111` | Serial of the second D435. Serials are per-device, so the mapping holds whatever USB port each camera is plugged into (`rs-enumerate-devices -s`). |
+| `realsense_color_profile` | `640x480x30` | RealSense color profile `WIDTHxHEIGHTxFPS`, shared by both D435s. Valid combos depend on the USB link (`rs-enumerate-devices -c`). |
 | `launch_zed` | `false` | Bring up the ZED 2 instead of / alongside the RealSense (needs the ZED SDK). |
 | `zed_camera_model` | `zed2` | ZED model passed to `zed_wrapper`. |
 | `kinova_ip` | `192.168.50.12` | IPv4 address of the Kinova arm; forwarded to the wrist camera as `device`. |
@@ -364,6 +367,12 @@ The ZED-specific arguments above are bundled into a single `param_overrides` str
 
 ```bash
 ros2 launch vla_kinova_sensors cameras.launch.py
+```
+
+*Wrist + both D435s (keep each D435 on a USB 3 port, the node logs `Device USB type: 3.2`):*
+
+```bash
+ros2 launch vla_kinova_sensors cameras.launch.py launch_realsense_2:=true
 ```
 
 *Wrist only / external only:*
@@ -743,7 +752,9 @@ The lerobot_ros recorder itself (the `dataset_recorder` node) lives in `ros2_ws/
 ### Package Files
 
 - **`config/kinova_pi05.toml`**: Recorder configuration. Sets `fps=30`, `robot_type=kinova_gen3_6dof_2f85`, `dataset_root`, and topic subscriptions. Two `/joint_states` subscriptions (one tagged `observation`, one tagged `action` for the arm joints), plus `/gripper_command/state` as the gripper dimension of the action, plus the RealSense D435 RGB feed (640x480) and the Kinova wrist RGB feed (320x240) as image topics. The recorded image dimensions match the published topics exactly, so lerobot_ros records them verbatim (no resize, no JPEG round-trip).
+- **`config/kinova_pi05_2ext.toml`**: Same as `kinova_pi05.toml` plus the second D435 as `observation.images.external_2`. Different dataset schema, so use it with a new `dataset_name`.
 - **`sessions/example.toml`**: Example recording session: `dataset_name`, plus an ordered list of `{prompt, episodes}` tasks. 
+- **`scripts/camera_rate_monitor.py`**: Live per-camera rate / gap monitor. Listens to `camera_info` (same stamps as the images), so it adds no image traffic and is safe to run during teleop; subscribing to the raw image topics, including with `ros2 topic hz`, lags the arm. Run with `python3`.
 - **`launch/lerobot_recorder.launch.py`**: Wraps `ros2 run lerobot_ros dataset_recorder` so you don't have to expand the config path each time; also sets `HF_HUB_OFFLINE=1` so reopening an existing dataset doesn't try to fetch it from Hugging Face.
 - **`vla_kinova_data_collection/record_session.py`**: Script to automate data-collection given a TOML plan for the recording session. Connects to the recorder's services (`/new_dataset`, `/start_episode`, `/end_episode`, `/store_episodes`, `/finalize_dataset`), walks through the slots in a session TOML, and handles keep/discard/skip/quit from the keyboard.
 

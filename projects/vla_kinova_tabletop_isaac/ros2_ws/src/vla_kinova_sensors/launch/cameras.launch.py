@@ -6,6 +6,33 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Opaq
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
+
+
+def realsense_node(name, serial, color_profile):
+    # Run the node directly instead of including rs_launch.py: that wrapper
+    # forwards every launch-arg in the shared context to the node, which
+    # spams 'parameter not supported' warnings for kinova's / our args
+    # As for the wrist, we don't enable the compressed/theora image transports
+    return Node(
+        package="realsense2_camera",
+        executable="realsense2_camera_node",
+        namespace="realsense",
+        name=name,
+        output="screen",
+        parameters=[{
+            "camera_name": name,
+            # "" = first device found; pin it when more than one D435 is plugged in.
+            # value_type=str or launch yaml-parses numeric serials into ints
+            "serial_no": ParameterValue(serial, value_type=str),
+            "enable_depth": False,
+            "enable_infra1": False,
+            "enable_infra2": False,
+            "pointcloud.enable": False,
+            "rgb_camera.color_profile": color_profile,
+            f"{name}.color.image_raw.enable_pub_plugins": ["image_transport/raw"],
+        }],
+    )
 
 
 def launch_setup(context, *args, **kwargs):
@@ -14,7 +41,12 @@ def launch_setup(context, *args, **kwargs):
     launch_realsense = (
         LaunchConfiguration("launch_realsense").perform(context).lower() == "true"
     )
+    launch_realsense_2 = (
+        LaunchConfiguration("launch_realsense_2").perform(context).lower() == "true"
+    )
     realsense_color_profile = LaunchConfiguration("realsense_color_profile").perform(context)
+    realsense_serial = LaunchConfiguration("realsense_serial").perform(context)
+    realsense_2_serial = LaunchConfiguration("realsense_2_serial").perform(context)
     zed_camera_model = LaunchConfiguration("zed_camera_model").perform(context)
     kinova_ip = LaunchConfiguration("kinova_ip").perform(context)
     disable_autofocus = LaunchConfiguration("disable_autofocus").perform(context)
@@ -61,27 +93,19 @@ def launch_setup(context, *args, **kwargs):
             }.items(),
         ))
 
+    if launch_realsense_2 and not (realsense_serial and realsense_2_serial):
+        # Without both serials the two nodes race for the same first device
+        raise RuntimeError(
+            "launch_realsense_2:=true needs both realsense_serial and realsense_2_serial "
+            "(list them with `rs-enumerate-devices -s`)"
+        )
+
     if launch_realsense:
-        # Run the node directly instead of including rs_launch.py: that wrapper
-        # forwards every launch-arg in the shared context to the node, which
-        # spams 'parameter not supported' warnings for kinova's / our args
-        # As for the wrist, we don't enable the compressed/theora image transports
-        actions.append(Node(
-            package="realsense2_camera",
-            executable="realsense2_camera_node",
-            namespace="realsense",
-            name="d435",
-            output="screen",
-            parameters=[{
-                "camera_name": "d435",
-                "enable_depth": False,
-                "enable_infra1": False,
-                "enable_infra2": False,
-                "pointcloud.enable": False,
-                "rgb_camera.color_profile": realsense_color_profile,
-                "d435.color.image_raw.enable_pub_plugins": ["image_transport/raw"],
-            }],
-        ))
+        actions.append(realsense_node("d435", realsense_serial, realsense_color_profile))
+
+    if launch_realsense_2:
+        # Second external camera, same profile as the first
+        actions.append(realsense_node("d435_2", realsense_2_serial, realsense_color_profile))
 
     return actions
 
@@ -104,9 +128,24 @@ def generate_launch_description():
             description="Bring up the Intel RealSense D435 (RGB only; recorded as observation.images.external)",
         ),
         DeclareLaunchArgument(
+            "realsense_serial",
+            default_value="243522072381",
+            description="Serial of the first D435 (empty = first device found, only valid without launch_realsense_2)",
+        ),
+        DeclareLaunchArgument(
+            "launch_realsense_2",
+            default_value="false",
+            description="Bring up a second D435 (RGB only; recorded as observation.images.external_2 with kinova_pi05_2ext.toml)",
+        ),
+        DeclareLaunchArgument(
+            "realsense_2_serial",
+            default_value="244222074111",
+            description="Serial of the second D435",
+        ),
+        DeclareLaunchArgument(
             "realsense_color_profile",
             default_value="640x480x30",
-            description="RealSense color profile WIDTHxHEIGHTxFPS (valid combos depend on USB link; `rs-enumerate-devices -c`)",
+            description="RealSense color profile WIDTHxHEIGHTxFPS, shared by both D435s (valid combos depend on USB link; `rs-enumerate-devices -c`)",
         ),
         DeclareLaunchArgument(
             "zed_camera_model",

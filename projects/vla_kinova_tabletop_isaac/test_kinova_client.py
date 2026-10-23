@@ -14,7 +14,7 @@ Observation (matches policy_client_synchronous_node._build_obs after resize):
 
 Pass --rtc-delay d (>0) to ALSO attach the RTC committed prefix (action_prefix
 (d,7) + delay=d), exactly like policy_client_asynchronous_rtc after its first
-cycle. This exercises the RTC pin path (Pi0Faster) instead of plain inference, so
+cycle. This exercises the RTC pin path (Pi0RTC) instead of plain inference, so
 the timing matches the real node, and it doubles as a pre-flight check that the
 served checkpoint is actually RTC-capable. Prefix bytes are negligible (~d*28 B)
 next to the ~294 KB of images, so it does not skew transport time -- it only

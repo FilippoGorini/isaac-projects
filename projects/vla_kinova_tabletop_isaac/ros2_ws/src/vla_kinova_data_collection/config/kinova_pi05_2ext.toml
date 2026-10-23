@@ -1,0 +1,122 @@
+# Same as kinova_pi05.toml plus a second external D435 (observation.images.external_2).
+# Separate file because adding a feature changes the dataset schema: use a NEW
+# dataset_name with this config, it can't append to 2-camera datasets.
+# Bring up the cameras with:
+#   ros2 launch vla_kinova_sensors cameras.launch.py launch_realsense_2:=true
+# (D435 serials default in cameras.launch.py: external=243522072381, external_2=244222074111)
+#
+# lerobot_ros recording config for the Kinova Gen3 + Robotiq 2F-85 setup.
+#
+# The recorder builds a LeRobot v3.0 dataset with columns keyed by topic tag:
+#   - tag = "observation" (default) -> observation.state (joints concatenated)
+#   - tag = "action"                -> action            (joints concatenated)
+#   - tag = "meta"                  -> meta.<key>
+#   - ImageTopic                    -> observation.images.<key>
+#
+# Layout (both columns are 7-D, joint order matches):
+#   observation.state = [j1..j6 from /joint_states, robotiq knuckle from /joint_states]
+#   action            = [j1..j6 from /joint_states, robotiq knuckle from /gripper_command/state]
+#
+# The arm dims of `action` mirror `observation.state` exactly at each index t:
+# we record both columns from /joint_states with no temporal offset, so for the
+# arm joints action[t] == state[t]. The gripper dim of `action` is the latched
+# binary command (0.0 open / 0.8 closed) the teleop sends to the
+# robotiq_gripper_controller action server, not the lagging joint position, so
+# the VLA learns to emit a clean discrete signal that the client thresholds
+# back into a GripperCommand goal at inference.
+
+fps = 30
+dataset_root = "/home/filippo/datasets"
+# dataset_root = "/home/students/work/filippo/datasets"
+robot_type = "kinova_gen3_6dof_2f85" 
+
+visualize = false
+# rerun_remote = "rerun+http://127.0.0.1:9876/proxy"  # uncomment to stream to a Rerun viewer
+
+[topics]
+
+# ---- proprioception ----
+
+[topics.joint_state_obs]
+topic_name = "/joint_states"
+msg_type = "JointState"
+qos = { history = "keep_last", depth = 10, reliability = "reliable", durability = "volatile" }
+# default tag = "observation" -> observation.state column
+joints = [
+    "joint_1",
+    "joint_2",
+    "joint_3",
+    "joint_4",
+    "joint_5",
+    "joint_6",
+    "robotiq_85_left_knuckle_joint",
+]
+position = true
+velocity = false
+effort = false
+
+# ---- action: arm joints from /joint_states + gripper command from teleop ----
+
+[topics.joint_state_act]
+topic_name = "/joint_states"
+msg_type = "JointState"
+qos = { history = "keep_last", depth = 10, reliability = "reliable", durability = "volatile" }
+tag = "action"
+joints = [
+    "joint_1",
+    "joint_2",
+    "joint_3",
+    "joint_4",
+    "joint_5",
+    "joint_6",
+]
+position = true
+velocity = false
+effort = false
+
+# Gripper action dim. The teleop publishes the most recently commanded position
+# (0.0 / gripper_closed_position) as a latched JointState here; transient_local
+# QoS so the recorder sees the last value on connect even if no toggle has
+# happened yet.
+[topics.gripper_act]
+topic_name = "/gripper_command/state"
+msg_type = "JointState"
+qos = { history = "keep_last", depth = 1, reliability = "reliable", durability = "transient_local" }
+tag = "action"
+joints = [
+    "robotiq_85_left_knuckle_joint",
+]
+position = true
+velocity = false
+effort = false
+
+# ---- cameras (both recorded raw, the dimensions below match the published ones so that lerobot_ros doesn't resize/scale them) ----
+
+# External camera: realsense d435, RGB only at 640x480 (max resolution at 30 fps with USB 2.1, and also allows for fast encoding)
+[topics."/realsense/d435/color/image_raw"]
+msg_type = "Image"
+qos = { reliability = "reliable", durability = "volatile", depth = 10, history = "keep_last" }
+height = 480
+width = 640
+channels = 3
+key = "external"
+
+# Second external camera: same D435 settings as the first
+[topics."/realsense/d435_2/color/image_raw"]
+msg_type = "Image"
+qos = { reliability = "reliable", durability = "volatile", depth = 10, history = "keep_last" }
+height = 480
+width = 640
+channels = 3
+key = "external_2"
+
+# Kinova wrist (Kortex color) — raw rgb8 at 320x240, sensor resolution set via
+# the Kinova web app (kinova_vision streams it through; no software resize).
+# Kinova wrist camera, currently publishes at 320x240@30fps
+[topics."/camera/color/image_raw"]
+msg_type = "Image"
+qos = { reliability = "reliable", durability = "volatile", depth = 10, history = "keep_last" }
+height = 240
+width = 320
+channels = 3
+key = "wrist"
