@@ -14,6 +14,7 @@
     gripper_action: /robotiq_gripper_controller/gripper_cmd
     joint_states_topic: /joint_states  # read by joint name, so its scrambled order is fine
     base_frame: base_link
+    control_frame: fingertips_frame    # teleop control point (between the fingertips, defined in the urdf)
     camera_keys:        [base_rgb, wrist_rgb]          # = openpi KinovaInputs keys
     real_camera_topics: [/realsense/d435/color/image_raw, /camera/color/image_raw]
     sim_camera_topics:  [/isaac_external_camera/color/image_raw, /isaac_wrist_camera/color/image_raw]
@@ -22,10 +23,13 @@
 
 twist_pose_tracking_node:
   ros__parameters:
-    output_mode: kortex_tool_twist     # firmware TOOL-frame Twist + lever-arm correction
+    twist_command_topic: /teleop_twist # TwistStamped in base_frame (in our case this is read by the kortex twist adapter)
+
+kortex_twist_adapter:                  # kinova_bringup: TwistStamped -> firmware TOOL-frame Twist
+  ros__parameters:
+    twist_topic: /teleop_twist
     ee_frame: end_effector_link        # frame the kinova firmware expects twists to be expressed in
-    control_frame: fingertips_frame    # frame the PID regulates (between the fingertips, defined in the urdf)
-    twist_command_topic: /twist_controller/commands
+    kortex_twist_topic: /twist_controller/commands
 
 quest2ros2_controller:                 # Quest2ROS2 node, named by quest_bringup.launch.py
   ros__parameters:

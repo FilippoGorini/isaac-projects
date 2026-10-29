@@ -10,6 +10,7 @@ install(DIRECTORY config launch
 install(PROGRAMS
   scripts/home_robot.py
   scripts/gripper_sine_test.py
+  scripts/kortex_twist_adapter.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

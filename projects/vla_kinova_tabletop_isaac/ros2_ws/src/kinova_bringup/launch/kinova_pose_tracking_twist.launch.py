@@ -1,6 +1,7 @@
 """
 This launch file brings up controllers, swaps from joint_trajectory_controller
-to picknik_twist_controller, then starts the twist-based pose tracking node.
+to picknik_twist_controller, then starts the twist-based pose tracking node and the
+kortex_twist_adapter that turns its TwistStamped into the firmware's tool-frame Twist.
 This launch file can be used with real robot only, no IsaacSim (for now at least).
 """
 import os
@@ -22,7 +23,6 @@ from launch_ros.actions import Node
 
 
 def launch_setup(context, *args, **kwargs):
-    my_package = "vela_teleop"
     bringup_pkg = "kinova_bringup"
     robot_ip = LaunchConfiguration("robot_ip").perform(context)
     launch_rviz = LaunchConfiguration("launch_rviz").perform(context)
@@ -36,10 +36,7 @@ def launch_setup(context, *args, **kwargs):
         value="<CycloneDDS><Domain><Tracing><Verbosity>severe</Verbosity></Tracing></Domain></CycloneDDS>",
     )
 
-    twist_pid_yaml = os.path.join(
-        get_package_share_directory(my_package), "config", "twist_pose_tracking.yaml"
-    )
-    # frames / twist topic / output_mode for the tracker come from the Kinova robot profile
+    # frames / twist topics for the adapter come from the Kinova robot profile
     robot_yaml = os.path.join(
         get_package_share_directory("vela_robots"), "config", "kinova_gen3_6dof", "robot.yaml"
     )
@@ -75,16 +72,25 @@ def launch_setup(context, *args, **kwargs):
         )],
     )
 
-    # Start pose tracking node after the controllers have been switched
+    # Start pose tracking node and the adapter after the controllers have been switched
     tracking_node = TimerAction(
         period=6.0,            
-        actions=[Node(
-            package=my_package,
-            executable="twist_pose_tracking_node.py",
-            name="twist_pose_tracking_node",
-            output="screen",
-            parameters=[twist_pid_yaml, robot_yaml],
-        )],
+        actions=[
+            Node(
+                package=bringup_pkg,
+                executable="kortex_twist_adapter.py",
+                name="kortex_twist_adapter",
+                output="screen",
+                parameters=[robot_yaml],
+            ),
+            # generic tracker launch plus the kinova profile
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(os.path.join(
+                    get_package_share_directory("vela_teleop"), "launch", "pose_tracking.launch.py",
+                )),
+                launch_arguments={"robot": "kinova_gen3_6dof"}.items(),
+            ),
+        ],
     )
 
     # Reuse the rviz config from bringup (originally written for MoveIt Servo)

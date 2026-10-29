@@ -2,9 +2,9 @@
 # PID + saturation config for twist_pose_tracking_node.
 #
 # The node computes a 6D pose error in base_link, runs PID on each axis,
-# saturates the resulting twist, then rotates it into the tool frame
-# (end_effector_link) before publishing. The picknik_twist_controller then
-# forwards it to kortex_driver, which interprets it in CARTESIAN_REFERENCE_FRAME_TOOL.
+# saturates the resulting twist and publishes it as TwistStamped in base_link.
+# On the Kinova, kinova_bringup's kortex_twist_adapter rotates it into the tool
+# frame for the picknik_twist_controller / kortex_driver.
 
 #################################
 
@@ -21,10 +21,10 @@ twist_pose_tracking_node:
     target_grace_period_s: 0.035        # absorbs Quest2ROS2 inter-arrival jitter
     target_decel_window_s: 0.085        # time window over which the twist is scaled down to 0 linearly after grace period has elapsed
 
-    # base_frame, ee_frame, control_frame, twist_command_topic, output_mode: vela_robots/config/<robot>/robot.yaml
+    # base_frame, control_frame, twist_command_topic: vela_robots/config/<robot>/robot.yaml
     target_topic: /target_frame         # Topic for the target pose to track (expressed in base frame)
 
-    # Saturation applied to norm of linear and angular velocities, applied in base frame before rotation onto the end effector frame
+    # Saturation applied to norm of linear and angular velocities, in base frame
     max_linear_velocity: 0.45           # [m/s]
     max_angular_velocity: 1.50          # [rad/s]
 

@@ -3,7 +3,7 @@
 <package format="3">
   <name>vela_teleop</name>
   <version>0.0.0</version>
-  <description>Twist-based teleoperation for the Kinova Gen3 (Quest 3 EE pose tracking via the Kortex twist controller).</description>
+  <description>Quest 3 teleoperation: Quest bringup and a twist-based pose tracker (TwistStamped output).</description>
   <maintainer email="filippogorini7@gmail.com">filippo</maintainer>
   <license>TODO: License declaration</license>
 

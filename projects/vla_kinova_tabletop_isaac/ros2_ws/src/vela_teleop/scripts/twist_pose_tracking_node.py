@@ -1,28 +1,21 @@
 #!/usr/bin/env python3
 
 """
-Twist-based pose tracking node for the real Kinova Gen3 6/7 DoF.
+Twist-based pose tracking node.
 Subscribes to a target PoseStamped on /target_frame, looks up the current pose of
-the control frame from TF, runs a per-axis PID on the 6D error in base_link,
-saturates the twist, then rotates it into the tool frame (end_effector_link) and
-publishes geometry_msgs/Twist on the picknik_twist_controller command topic.
-kortex_driver interprets the twist in CARTESIAN_REFERENCE_FRAME_TOOL, so the
-rotation into the EE frame is mandatory.
+the control frame from TF, runs a per-axis PID on the 6D error in base_frame,
+saturates the twist and publishes it as geometry_msgs/TwistStamped
+(frame_id = base_frame): the velocity the control frame should move with.
 
 The control frame (control_frame param) is the frame the PID regulates against the
-target. By default it is end_effector_link. It can instead be set to fingertips_frame
-(a frame between the gripper fingers, defined in the URDF as a pure +z translation
-of end_effector_link) so that orientation commands pivot about the fingertips,
-which is more intuitive to teleoperate. Because the firmware always actuates
-end_effector_link, when the control frame is offset from it the commanded linear
-velocity is corrected for the lever arm: the angular velocity is unchanged but
-v_ee = v_control - w x t, where t is the control frame origin expressed in EE axes
-(looked up once from TF).
+target, e.g. fingertips_frame on the Kinova (a frame between the gripper fingers) so
+that orientation commands pivot about the fingertips, which is more intuitive to
+teleoperate.
 
-All of the above is output_mode kortex_tool_twist (default). output_mode twist_stamped
-instead publishes the saturated base-frame twist as geometry_msgs/TwistStamped
-(frame_id = base_frame), with no tool-frame rotation and no lever-arm correction, for
-MoveIt Servo or Cartesian velocity controllers that move control_frame themselves.
+The twist goes to whatever moves the robot: MoveIt Servo, a Cartesian velocity
+controller, or a robot adapter. On the Kinova, kinova_bringup's kortex_twist_adapter
+rotates it into the firmware tool frame, corrects for the control-frame lever arm and
+feeds the Kortex twist controller.
 """
 
 
@@ -30,7 +23,7 @@ import signal
 import numpy as np
 import rclpy
 import transforms3d.quaternions as t3dq
-from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
@@ -70,17 +63,11 @@ class TwistPoseTrackingNode(Node):
         # Static parameters
         self.loop_rate_hz = self._declare("loop_rate_hz", 100.0)
         self.base_frame = self._declare("base_frame", "base_link")
-        # ee_frame is the firmware tool frame that kortex_driver actuates
-        self.ee_frame = self._declare("ee_frame", "end_effector_link")
-        # control_frame is the frame the PID regulates for example we can set it to ginfertips_frame ...
-        # ... to control the frame between the fingertips, which is more intuitive/comfortable. Defaults to the firmware tool frame
+        # control_frame is the frame the PID regulates, for example fingertips_frame ...
+        # ... to control the frame between the fingertips, which is more intuitive/comfortable
         self.control_frame = self._declare("control_frame", "end_effector_link")
         target_topic = self._declare("target_topic", "/target_frame")
-        twist_command_topic = self._declare("twist_command_topic", "/twist_controller/commands")
-        self.output_mode = self._declare("output_mode", "kortex_tool_twist")
-        if self.output_mode not in ("kortex_tool_twist", "twist_stamped"):
-            raise SystemExit(f"output_mode must be kortex_tool_twist or twist_stamped, "
-                             f"got '{self.output_mode}'")
+        twist_command_topic = self._declare("twist_command_topic", "/teleop_twist")
 
         # Dynamic parameters
         for name, default in _DYNAMIC_PARAMS.items():
@@ -92,16 +79,12 @@ class TwistPoseTrackingNode(Node):
         self.target_sub = self.create_subscription(
             PoseStamped, target_topic, self._target_callback, qos_profile_sensor_data
         )
-        twist_type = TwistStamped if self.output_mode == "twist_stamped" else Twist
-        self.twist_pub = self.create_publisher(twist_type, twist_command_topic, 1)
+        self.twist_pub = self.create_publisher(TwistStamped, twist_command_topic, 1)
 
         # State
         self.latest_target = None
         self.latest_target_stamp = None
 
-        # control_offset is used when we want to control a frame different from the end_effector_link (which is the frame in which the firmware expects twists to be expressed in)
-        # It is read from tf when available
-        self.control_offset = None
         self.integral_lin = np.zeros(3)
         self.integral_ang = np.zeros(3)
         self.prev_error_lin = None
@@ -114,7 +97,7 @@ class TwistPoseTrackingNode(Node):
         self.get_logger().info(
             f"twist_pose_tracking_node ready @ {self.loop_rate_hz:.1f} Hz. "
             f"Subscribing: {target_topic} | Publishing: {twist_command_topic} "
-            f"({self.output_mode})"
+            f"(TwistStamped in '{self.base_frame}', control frame '{self.control_frame}')"
         )
 
     def _declare(self, name, default):
@@ -137,33 +120,6 @@ class TwistPoseTrackingNode(Node):
         self.latest_target = msg
         self.latest_target_stamp = self.get_clock().now()
 
-    def _control_offset(self):
-        """Lever arm t = control_frame origin in ee_frame axes, or None if the
-        control frame is the firmware tool frame (no correction needed). The
-        transform is static, so it is looked up once and cached."""
-        if self.control_frame == self.ee_frame:
-            return None
-        if self.control_offset is None:
-            try:
-                tf = self.tf_buffer.lookup_transform(self.ee_frame, self.control_frame, Time())
-            except (LookupException, ExtrapolationException, ConnectivityException) as e:
-                self.get_logger().warn(
-                    f"control-frame offset lookup failed ({self.ee_frame} -> {self.control_frame}): {e}; "
-                    f"commanding twist without lever-arm correction",
-                    throttle_duration_sec=5.0,
-                )
-                return None
-            self.control_offset = np.array([
-                tf.transform.translation.x,
-                tf.transform.translation.y,
-                tf.transform.translation.z,
-            ])
-            self.get_logger().info(
-                f"Controlling frame '{self.control_frame}' with lever arm "
-                f"t={self.control_offset.tolist()} m in '{self.ee_frame}' axes."
-            )
-        return self.control_offset
-
     def _reset_integrators(self):
         self.integral_lin[:] = 0.0
         self.integral_ang[:] = 0.0
@@ -180,10 +136,7 @@ class TwistPoseTrackingNode(Node):
         return msg
 
     def _publish_zero_twist(self):
-        if self.output_mode == "twist_stamped":
-            self.twist_pub.publish(self._stamped_twist(np.zeros(3), np.zeros(3)))
-        else:
-            self.twist_pub.publish(Twist())
+        self.twist_pub.publish(self._stamped_twist(np.zeros(3), np.zeros(3)))
 
     def _tick(self):
         now = self.get_clock().now()
@@ -274,30 +227,7 @@ class TwistPoseTrackingNode(Node):
         v_base = _saturate(v_base, self._p("max_linear_velocity"))
         w_base = _saturate(w_base, self._p("max_angular_velocity"))
 
-        if self.output_mode == "twist_stamped":
-            self.twist_pub.publish(self._stamped_twist(v_base, w_base))
-            return
-
-        # Rotate base_frame twist into end effector one
-        # R_base_to_tool = R_ee_from_base = (R_base_from_ee)^T
-        # q_current is the control_frame orientation, which equals the EE orientation
-        # because fingertips_frame is a pure translation of end_effector_link.
-        R_base_to_tool = t3dq.quat2mat(q_current).T
-        v_tool = R_base_to_tool @ v_base
-        w_tool = R_base_to_tool @ w_base
-
-        # The PID twist above regulates the control frame, but kortex_driver
-        # actuates the EE origin. In EE axes the control origin sits at +t,
-        # so v_ee = v_control + w x (p_ee - p_control) = v_tool - w_tool x t.
-        offset = self._control_offset()
-        if offset is not None:
-            v_tool = v_tool - np.cross(w_tool, offset)
-
-        # Prepare and publish message
-        msg = Twist()
-        msg.linear.x, msg.linear.y, msg.linear.z = float(v_tool[0]), float(v_tool[1]), float(v_tool[2])
-        msg.angular.x, msg.angular.y, msg.angular.z = float(w_tool[0]), float(w_tool[1]), float(w_tool[2])
-        self.twist_pub.publish(msg)
+        self.twist_pub.publish(self._stamped_twist(v_base, w_base))
 
 
 def _saturate(v, max_mag):
