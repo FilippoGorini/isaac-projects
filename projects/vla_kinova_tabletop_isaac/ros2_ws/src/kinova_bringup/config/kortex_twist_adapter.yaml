@@ -1,0 +1,7 @@
+# kortex_twist_adapter: tracker TwistStamped -> firmware TOOL-frame Twist.
+# control_frame comes from the robot profile (vela_robots/config/kinova_gen3_6dof/robot.yaml).
+kortex_twist_adapter:
+  ros__parameters:
+    twist_topic: /teleop_twist           # = the profile's twist_pose_tracking_node.twist_command_topic
+    ee_frame: end_effector_link          # frame the kinova firmware expects twists to be expressed in
+    kortex_twist_topic: /twist_controller/commands

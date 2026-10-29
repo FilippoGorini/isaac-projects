@@ -36,9 +36,12 @@ def launch_setup(context, *args, **kwargs):
         value="<CycloneDDS><Domain><Tracing><Verbosity>severe</Verbosity></Tracing></Domain></CycloneDDS>",
     )
 
-    # frames / twist topics for the adapter come from the Kinova robot profile
+    # adapter: control_frame from the Kinova robot profile, its own topics/ee_frame from kinova_bringup
     robot_yaml = os.path.join(
         get_package_share_directory("vela_robots"), "config", "kinova_gen3_6dof", "robot.yaml"
+    )
+    adapter_yaml = os.path.join(
+        get_package_share_directory(bringup_pkg), "config", "kortex_twist_adapter.yaml"
     )
 
     # Reuse the bringup launch file to bring up the kinova controllers (twist controller starts inactive)
@@ -81,7 +84,7 @@ def launch_setup(context, *args, **kwargs):
                 executable="kortex_twist_adapter.py",
                 name="kortex_twist_adapter",
                 output="screen",
-                parameters=[robot_yaml],
+                parameters=[robot_yaml, adapter_yaml],
             ),
             # generic tracker launch plus the kinova profile
             IncludeLaunchDescription(
