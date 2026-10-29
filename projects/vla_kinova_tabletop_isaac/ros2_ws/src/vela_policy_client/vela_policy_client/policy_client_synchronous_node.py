@@ -331,6 +331,10 @@ class PolicyClientSynchronousNode(Node):
 
     def _control_loop(self) -> None:
         while self._running and rclpy.ok():
+            if self.get_clock().now().nanoseconds == 0:     # sim time but no /clock yet
+                self.get_logger().warn("Waiting for /clock ...", throttle_duration_sec=2.0)
+                time.sleep(0.1)
+                continue
             obs = self._build_obs()
             if obs is None:
                 self.get_logger().warn(

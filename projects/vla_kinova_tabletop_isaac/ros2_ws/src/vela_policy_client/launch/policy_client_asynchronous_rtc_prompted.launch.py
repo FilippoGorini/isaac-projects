@@ -14,8 +14,9 @@ so they can't drift apart. Every other arg defaults to "" => yaml value.
 """
 
 import os
+import yaml
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -58,6 +59,11 @@ def _robot_yaml(context):
     return path
 
 
+def _jtc_topic(context):
+    with open(_robot_yaml(context)) as f:
+        return yaml.safe_load(f)["/**"]["ros__parameters"]["arm_trajectory_topic"]
+
+
 def launch_setup(context, *args, **kwargs):
     config = os.path.join(get_package_share_directory(PKG), "config", CONFIG)
     overrides = {}
@@ -66,14 +72,14 @@ def launch_setup(context, *args, **kwargs):
         if val != "":
             overrides[name] = cast(val)
     overrides["use_sim_time"] = _BOOL(LaunchConfiguration("use_sim").perform(context))
-    return [Node(package=PKG, executable=EXECUTABLE, name=EXECUTABLE,
-                 output="screen", parameters=[config, _robot_yaml(context), overrides])]
-
-
-def generate_launch_description():
-    def arg(name, desc):
-        return DeclareLaunchArgument(name, default_value="",
-                                     description=f"{desc} (empty => value from {CONFIG})")
+    use_streamer = LaunchConfiguration("use_streamer").perform(context)
+    streamer_on = _BOOL(use_streamer) if use_streamer else not overrides["use_sim_time"]
+    if not streamer_on:
+        overrides["plan_topic"] = _jtc_topic(context)
+    client = Node(package=PKG, executable=EXECUTABLE, name=EXECUTABLE,
+                  output="screen", parameters=[config, _robot_yaml(context), overrides])
+    if not streamer_on:
+        return [LogInfo(msg=f"streamer off, plan goes straight to {overrides['plan_topic']}"), client]
 
     streamer_launch = os.path.join(
         get_package_share_directory("vela_jtc_streamer"), "launch",
@@ -89,6 +95,13 @@ def generate_launch_description():
             "robot": LaunchConfiguration("robot"),
         }.items(),
     )
+    return [client, streamer]
+
+
+def generate_launch_description():
+    def arg(name, desc):
+        return DeclareLaunchArgument(name, default_value="",
+                                     description=f"{desc} (empty => value from {CONFIG})")
 
     return LaunchDescription([
         arg("policy_host", "Policy server host"),
@@ -116,6 +129,9 @@ def generate_launch_description():
                               description="Robot profile: vela_robots/config/<robot>/robot.yaml"),
         DeclareLaunchArgument("use_sim", default_value="true",
                               description="true => sim clock + sim cameras; false => real robot"),
+        DeclareLaunchArgument("use_streamer", default_value="",
+                              description="true / false; empty => off in sim (Isaac's coarse clock starves "
+                                          "the 300 Hz stream), on for the real robot. Off: plan goes "
+                                          "straight to the profile's arm_trajectory_topic"),
         OpaqueFunction(function=launch_setup),
-        streamer,
     ])

@@ -6,7 +6,8 @@ is built from the observation only (D = len(joints) + len(gripper)), so it needs
 
   hold  repeat the current state every chunk -> the arm must not move (safest real-robot test)
   sine  state latched at the connection's first obs (again when an RTC client restarts its
-        plan) + amp*sin on one action column. The phase is wall time since that obs, so
+        plan) + amp*sin on one action column. The phase is wall time since that obs (the ROS
+        /clock with `--sim-time`, needed with Isaac Sim running slower than real time), so
         consecutive chunks agree. `--joint -1` puts the sine on the gripper column instead
         (amp ~0.8 crosses the hysteresis band -> gripper gate events)
 
@@ -31,15 +32,17 @@ logger = logging.getLogger("mock_policy_server")
 
 
 class MockPolicy:
-    def __init__(self, args):
+    def __init__(self, args, clock):
         self._args = args
+        self._clock = clock
         self._center = None     # sine: state at the first obs
         self._t_start = None
         self._had_prefix = False
 
     def infer(self, obs: dict) -> dict:
         a = self._args
-        t_obs = time.monotonic()
+        t_wall = time.monotonic()
+        t_obs = self._clock()
         state = np.concatenate([obs["joints"], obs["gripper"]]).astype(np.float32)
         has_prefix = "action_prefix" in obs
         if a.mode == "hold":
@@ -51,8 +54,6 @@ class MockPolicy:
                 self._center, self._t_start = state, t_obs
                 logger.info(f"sine center (D={len(state)}): {np.array2string(state, precision=3)}")
             # action i is for t_obs + i/hz
-            # ponytail: phase runs on server wall time, so under sim time with RTF < 1 consecutive
-            # chunks are slightly offset (small seams); send the client's clock in the obs if it matters
             t = t_obs - self._t_start + np.arange(a.horizon) / a.hz
             actions = np.tile(self._center, (a.horizon, 1))
             actions[:, a.joint] += a.amp * np.sin(2.0 * np.pi * t / a.period)
@@ -62,8 +63,21 @@ class MockPolicy:
             d = int(obs.get("delay", len(prefix)))
             actions[:d] = prefix[:d]
         if a.latency_ms > 0:
-            time.sleep(max(0.0, a.latency_ms / 1000.0 - (time.monotonic() - t_obs)))
+            time.sleep(max(0.0, a.latency_ms / 1000.0 - (time.monotonic() - t_wall)))
         return {"actions": actions}
+
+
+def _ros_clock():
+    """Sim-time clock (ROS /clock), spun in a background thread."""
+    import threading
+    import rclpy
+    from rclpy.parameter import Parameter
+    from rclpy.signals import SignalHandlerOptions
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)   # Ctrl-C / SIGTERM stay ours
+    node = rclpy.create_node("mock_policy_server_clock",
+                             parameter_overrides=[Parameter("use_sim_time", Parameter.Type.BOOL, True)])
+    threading.Thread(target=rclpy.spin, args=(node,), daemon=True).start()
+    return lambda: node.get_clock().now().nanoseconds * 1e-9
 
 
 def main():
@@ -78,8 +92,11 @@ def main():
     p.add_argument("--joint", type=int, default=0,
                    help="action column the sine is applied to (-1 = gripper)")
     p.add_argument("--latency-ms", type=float, default=0.0, help="emulated inference time")
+    p.add_argument("--sim-time", action="store_true",
+                   help="sine phase on the ROS /clock instead of wall time (use with Isaac Sim)")
     args = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="[%(name)s] %(message)s")
+    clock = _ros_clock() if args.sim_time else time.monotonic
 
     conns = set()   # open connections, closed on Ctrl-C (handler threads aren't daemons)
 
@@ -95,7 +112,7 @@ def main():
         logger.info(f"Connection from {peer} opened")
         packer = msgpack_numpy.Packer()
         ws.send(packer.pack({"policy": "mock", "mode": args.mode, "action_horizon": args.horizon}))
-        policy = MockPolicy(args)
+        policy = MockPolicy(args, clock)
         n = 0
         while True:
             try:

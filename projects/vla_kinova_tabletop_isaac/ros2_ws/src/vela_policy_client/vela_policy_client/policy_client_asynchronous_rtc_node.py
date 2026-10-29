@@ -422,6 +422,10 @@ class PolicyClientAsynchronousRtcNode(Node):
             return
 
         if self._t0 is None:                        # anchor the grid to the first observation
+            if self._now() <= 0.0:                  # sim time but no /clock yet
+                self.get_logger().warn("Waiting for /clock ...", throttle_duration_sec=2.0)
+                time.sleep(0.05)
+                return
             self._t0 = self._now()
             self._n_launch = self._get_next_step(self._now())
         # We launched ON grid step n_launch, so the observation IS that step -- exact, no

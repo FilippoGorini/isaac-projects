@@ -9,22 +9,68 @@ defaults to "" => each sub-launch falls back to its own yaml.
 """
 
 import os
+import yaml
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from ament_index_python.packages import get_package_share_directory
 
 LC = LaunchConfiguration
+_BOOL = lambda v: v.lower() in ("true", "1", "yes")
 
 
-def generate_launch_description():
+def _jtc_topic(context):
+    path = os.path.join(get_package_share_directory("vela_robots"), "config",
+                        LC("robot").perform(context), "robot.yaml")
+    with open(path) as f:
+        return yaml.safe_load(f)["/**"]["ros__parameters"]["arm_trajectory_topic"]
+
+
+def launch_setup(context, *args, **kwargs):
     client_launch = os.path.join(
         get_package_share_directory("vela_policy_client"), "launch",
         "policy_client_asynchronous_rtc.launch.py")
     streamer_launch = os.path.join(
         get_package_share_directory("vela_jtc_streamer"), "launch",
         "jtc_stream_node.launch.py")
+    use_streamer = LC("use_streamer").perform(context)
+    streamer_on = _BOOL(use_streamer) if use_streamer else not _BOOL(LC("use_sim").perform(context))
+    plan_topic = LC("plan_topic") if streamer_on else _jtc_topic(context)
+
+    client = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(client_launch),
+        launch_arguments={
+            "rtc_delay_steps": LC("rtc_delay_steps"),
+            "rtc_blend_steps": LC("rtc_blend_steps"),
+            "inference_hz": LC("inference_hz"),
+            "prompt": LC("prompt"),
+            "policy_host": LC("policy_host"),
+            "policy_port": LC("policy_port"),
+            "debug_log_dir": LC("debug_log_dir"),
+            "plan_topic": plan_topic,
+            "control_hz": LC("control_hz"),
+            "use_sim": LC("use_sim"),
+            "robot": LC("robot"),
+        }.items(),
+    )
+    if not streamer_on:
+        return [LogInfo(msg=f"streamer off, plan goes straight to {plan_topic}"), client]
+    streamer = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(streamer_launch),
+        launch_arguments={
+            "tick_hz": LC("tick_hz"),
+            "jtc_horizon": LC("jtc_horizon"),
+            "control_hz": LC("control_hz"),
+            "plan_topic": LC("plan_topic"),
+            "use_sim": LC("use_sim"),
+            "robot": LC("robot"),
+        }.items(),
+    )
+    return [client, streamer]
+
+
+def generate_launch_description():
 
     # Forwarded per-node args (empty => that sub-launch uses its own yaml default).
     fwd = [
@@ -50,33 +96,9 @@ def generate_launch_description():
                               description="true => sim clock + sim cameras; false => real robot"),
         DeclareLaunchArgument("robot", default_value="kinova_gen3_6dof",
                               description="Robot profile: vela_robots/config/<robot>/robot.yaml"),
+        DeclareLaunchArgument("use_streamer", default_value="",
+                              description="true / false; empty => off in sim (Isaac's coarse clock starves "
+                                          "the 300 Hz stream), on for the real robot. Off: plan goes "
+                                          "straight to the profile's arm_trajectory_topic"),
     ]
-
-    client = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(client_launch),
-        launch_arguments={
-            "rtc_delay_steps": LC("rtc_delay_steps"),
-            "rtc_blend_steps": LC("rtc_blend_steps"),
-            "inference_hz": LC("inference_hz"),
-            "prompt": LC("prompt"),
-            "policy_host": LC("policy_host"),
-            "policy_port": LC("policy_port"),
-            "debug_log_dir": LC("debug_log_dir"),
-            "plan_topic": LC("plan_topic"),
-            "control_hz": LC("control_hz"),
-            "use_sim": LC("use_sim"),
-            "robot": LC("robot"),
-        }.items(),
-    )
-    streamer = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(streamer_launch),
-        launch_arguments={
-            "tick_hz": LC("tick_hz"),
-            "jtc_horizon": LC("jtc_horizon"),
-            "control_hz": LC("control_hz"),
-            "plan_topic": LC("plan_topic"),
-            "use_sim": LC("use_sim"),
-            "robot": LC("robot"),
-        }.items(),
-    )
-    return LaunchDescription(declared + [client, streamer])
+    return LaunchDescription(declared + [OpaqueFunction(function=launch_setup)])
