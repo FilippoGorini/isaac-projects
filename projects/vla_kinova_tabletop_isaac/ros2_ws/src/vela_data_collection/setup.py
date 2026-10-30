@@ -21,7 +21,7 @@ setup(
     maintainer='filippo',
     maintainer_email='filippogorini7@gmail.com',
     description='Recording pipeline for Kinova Gen3 + Robotiq 2F-85 LeRobot datasets via lerobot_ros.',
-    license='TODO',
+    license='Apache-2.0',
     extras_require={
         'test': [
             'pytest',

@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>Bringup launches, controller configs, and MoveIt 2 integration for the Kinova Gen3 6-DoF + Robotiq 2F-85.</description>
   <maintainer email="filippogorini7@gmail.com">filippo</maintainer>
-  <license>TODO: License declaration</license>
+  <license>BSD-3-Clause</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

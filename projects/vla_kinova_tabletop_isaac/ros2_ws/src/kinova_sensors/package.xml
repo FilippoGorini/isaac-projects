@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>Camera bringup for the Kinova VLA tabletop project (RealSense D435 / ZED 2 + Kinova wrist camera, RGB only).</description>
   <maintainer email="filippogorini7@gmail.com">filippo</maintainer>
-  <license>TODO: License declaration</license>
+  <license>BSD-3-Clause</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

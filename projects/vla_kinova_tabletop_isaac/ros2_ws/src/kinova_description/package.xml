@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>Project-specific Kinova Gen3 6-DoF + Robotiq 2F-85 robot description (URDF/xacro).</description>
   <maintainer email="filippogorini7@gmail.com">filippo</maintainer>
-  <license>TODO: License declaration</license>
+  <license>BSD-3-Clause</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
