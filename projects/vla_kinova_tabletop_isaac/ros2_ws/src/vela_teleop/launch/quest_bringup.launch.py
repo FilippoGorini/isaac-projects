@@ -1,7 +1,8 @@
 """
 Quest 3 bringup: starts the ROS-TCP endpoint that the Quest VR app connects to,
-plus the q2r2 right-arm controller that turns Quest controller poses into the
-/target_frame topic consumed by the twist pose-tracking node.
+plus the q2r2 arm controller (node quest2ros2_controller) that turns the poses of one
+Quest controller (hand:=right|left) into the /target_frame topic consumed by the twist
+pose-tracking node. Its robot setup comes from the robot profile.
 """
 import os
 
@@ -33,16 +34,16 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{"ROS_IP": ros_ip}, {"ROS_TCP_PORT": ros_tcp_port}],
     )
 
-    right_arm = Node(
+    arm = Node(
         package="q2r2_bringup",
-        executable="right_arm_controller",
+        executable="arm_controller",
         name="quest2ros2_controller",
         emulate_tty=True,
         output="screen",
-        parameters=[_robot_yaml(context)],
+        parameters=[_robot_yaml(context), {"hand": LaunchConfiguration("hand").perform(context)}],
     )
 
-    return [tcp_endpoint, right_arm]
+    return [tcp_endpoint, arm]
 
 
 def generate_launch_description():
@@ -56,6 +57,11 @@ def generate_launch_description():
             "ros_tcp_port",
             default_value="10000",
             description="TCP port the Quest VR app connects to",
+        ),
+        DeclareLaunchArgument(
+            "hand",
+            default_value="right",
+            description="Quest controller that drives the arm: right or left",
         ),
         DeclareLaunchArgument(
             "robot",

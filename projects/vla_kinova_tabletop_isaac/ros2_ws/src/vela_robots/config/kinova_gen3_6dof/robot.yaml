@@ -29,4 +29,5 @@ quest2ros2_controller:                 # Quest2ROS2 node, named by quest_bringup
   ros__parameters:
     end_effector_link_name: fingertips_frame
     gripper_mode: binary
+    gripper_max_speed: 0.75            # velocity mode: fraction of max gripper speed at full trigger
     exclusive_gripper_motion: true     # Kortex high-level API: no gripper motion during twist
