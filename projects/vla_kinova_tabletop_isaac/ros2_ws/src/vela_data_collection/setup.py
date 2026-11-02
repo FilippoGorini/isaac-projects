@@ -20,7 +20,7 @@ setup(
     zip_safe=True,
     maintainer='filippo',
     maintainer_email='filippogorini7@gmail.com',
-    description='Recording pipeline for Kinova Gen3 + Robotiq 2F-85 LeRobot datasets via lerobot_ros.',
+    description='Recording pipeline for LeRobot datasets via lerobot_ros: recorder launch (robot profile TOML) and session driver.',
     license='Apache-2.0',
     extras_require={
         'test': [

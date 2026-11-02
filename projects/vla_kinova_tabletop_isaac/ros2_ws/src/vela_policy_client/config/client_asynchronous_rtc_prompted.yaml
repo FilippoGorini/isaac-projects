@@ -20,7 +20,7 @@ policy_client_asynchronous_rtc_prompted:
 
     # ---- RTC (real-time chunking): ALWAYS on in this node ----
     # Sends the committed action prefix (an integer slice of the active plan) + fixed delay d with
-    # each observation so the RTC-finetuned checkpoint (pi05_kinova_finetune_rtc) pins the new
+    # each observation so the RTC-finetuned checkpoint (e.g. pi05_kinova_finetune_rtc) pins the new
     # chunk's first d steps to what the arm is already executing (seamless). On time the chunk is
     # swapped in cleanly; only a latency overrun (chunk later than d) crossfades over rtc_blend_steps.
     rtc_delay_steps: 6        # d = round(latency/dt); ~140 ms @ 30 Hz => 5. Cap = model_max_delay-1

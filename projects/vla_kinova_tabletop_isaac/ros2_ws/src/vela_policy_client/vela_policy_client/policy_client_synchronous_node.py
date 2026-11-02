@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Synchronous ROS 2 policy client for a finetuned pi0.5 VLA — Kinova Gen3 6-DoF
-+ Robotiq 2F-85.
+"""Synchronous ROS 2 policy client for a finetuned chunked VLA (e.g. pi0.5).
 
 One blocking cycle per chunk (movement happens in visible steps, by design):
 
-  1. snapshot the current joint state + both camera frames,
+  1. snapshot the current joint state + one frame per camera,
   2. send the observation over websocket and wait for the action chunk,
   3. send the whole chunk as ONE FollowJointTrajectory goal (point i stamped at
      (i+1)/control_hz s) and, concurrently, step the chunk's per-timestep gripper
@@ -16,9 +15,10 @@ chunk at 30 Hz); the arm runs the same span concurrently via the JTC and its
 awaited result gates the next inference. A MultiThreadedExecutor is required so
 the action-client callbacks fire while the control loop thread runs.
 
-Works against both the real robot and Isaac Sim: only the camera topics and
-use_sim_time differ, selected by the `use_sim` parameter (every topic is still
-individually overridable).
+Works against both the real robot and a simulator: only the camera topics and
+use_sim_time differ, selected by the `use_sim` parameter. Robot facts (joints,
+gripper, cameras, gripper action) have no defaults: they come from the robot
+profile, see robot_params.py.
 """
 
 import threading
@@ -34,6 +34,8 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image, JointState
 from trajectory_msgs.msg import JointTrajectoryPoint
 
+from vela_policy_client.robot_params import T, declare_robot_params, robot_param
+
 try:
     from openpi_client import image_tools
     from openpi_client.websocket_client_policy import WebsocketClientPolicy
@@ -43,24 +45,8 @@ except ImportError as e:
         "Run: pip install openpi-client typing-extensions"
     ) from e
 
-# Camera topic defaults, picked by the `use_sim` parameter. Real-robot topics
-# come from the RealSense D435 (external, 640x480) and the Kinova wrist camera
-# (320x240) while sim topics are published by Isaac Sim
-#
 # To save websocket bandwidth, images are padded and resized client-side to `image_resolution` (default 224) using PIL
 # Notice that PIL bilinear interpolation is not byte for byte identical to JAX linear interpolation on the server side
-#
-# Both the sim and real topic names are exposed as parameters (defaults below);
-# `use_sim` only chooses which pair the node subscribes to. The joint-state and
-# controller topics are not split because they are identical in sim and real.
-DEFAULT_SIM_CAMERA_TOPICS = [
-    "/isaac_external_camera/color/image_raw",
-    "/isaac_wrist_camera/color/image_raw",
-]
-DEFAULT_REAL_CAMERA_TOPICS = [
-    "/realsense/d435/color/image_raw",
-    "/camera/color/image_raw",
-]
 
 
 def _ros_image_to_uint8_hwc(msg: Image) -> np.ndarray:
@@ -82,39 +68,30 @@ class PolicyClientSynchronousNode(Node):
         self.declare_parameter("control_hz", 30.0)
         self.declare_parameter("use_sim", True)
 
-        # Gripper hysteresis (two-threshold, level-triggered). The model output is
-        # near-binary (0 open / ~0.8 closed); close when it rises above
-        # `close_threshold`, open when it falls below `open_threshold`, hold in
-        # between. A goal is only sent on a state change, so the controller is not
-        # spammed every frame.
-        self.declare_parameter("gripper_close_threshold", 0.55)
-        self.declare_parameter("gripper_open_threshold", 0.30)
-        self.declare_parameter("gripper_closed_position", 0.8)
-        self.declare_parameter("gripper_open_position", 0.0)
-        self.declare_parameter("gripper_max_effort", 50.0)
-
-        # Arm joints in state/action order + the gripper joint (obs = joints + gripper).
-        self.declare_parameter(
-            "arm_joints", ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"]
-        )
-        self.declare_parameter("gripper_joint", "robotiq_85_left_knuckle_joint")
-
-        # Camera topics. Both the sim and real names are exposed explicitly; the
-        # node subscribes to the pair selected by `use_sim`. The joint-state and
-        # controller topics below are NOT split: /joint_states (the
-        # joint_state_broadcaster output, what the dataset was recorded from) and
-        # the controller actions are identical in sim and real. The node indexes
-        # joint values by name, so /joint_states' scrambled ordering is irrelevant.
-        # Parallel arrays: image from topic i goes to the server as obs[camera_keys[i]].
-        self.declare_parameter("camera_keys", ["base_rgb", "wrist_rgb"])
-        self.declare_parameter("sim_camera_topics", DEFAULT_SIM_CAMERA_TOPICS)
-        self.declare_parameter("real_camera_topics", DEFAULT_REAL_CAMERA_TOPICS)
+        # Robot facts, no defaults (robot profile, see robot_params.py):
+        #   gripper hysteresis (two-threshold, level-triggered) on the model's near-binary
+        #   gripper output: close when it rises above `close_threshold`, open when it falls
+        #   below `open_threshold`, hold in between. A goal is only sent on a state change,
+        #   so the controller is not spammed every frame;
+        #   arm joints in state/action order + the gripper joint (obs = joints + gripper);
+        #   cameras as parallel arrays: the image from topic i goes to the server as
+        #   obs[camera_keys[i]]. Both the sim and real lists are parameters; `use_sim` picks one.
+        declare_robot_params(self, {
+            "gripper_close_threshold": T.DOUBLE, "gripper_open_threshold": T.DOUBLE,
+            "gripper_closed_position": T.DOUBLE, "gripper_open_position": T.DOUBLE,
+            "gripper_max_effort": T.DOUBLE,
+            "arm_joints": T.STRING_ARRAY, "gripper_joint": T.STRING,
+            "camera_keys": T.STRING_ARRAY,
+            "sim_camera_topics": T.STRING_ARRAY, "real_camera_topics": T.STRING_ARRAY,
+            "gripper_action": T.STRING,
+        })
+        # The joint-state and controller topics are NOT split: /joint_states (the
+        # joint_state_broadcaster output, what the dataset was recorded from) and the
+        # controller actions are the same in sim and real. The node indexes joint values
+        # by name, so the /joint_states ordering is irrelevant.
         self.declare_parameter("joint_states_topic", "/joint_states")
         self.declare_parameter(
             "arm_action", "/joint_trajectory_controller/follow_joint_trajectory"
-        )
-        self.declare_parameter(
-            "gripper_action", "/robotiq_gripper_controller/gripper_cmd"
         )
 
         self.declare_parameter("resize_images", True)
@@ -127,28 +104,29 @@ class PolicyClientSynchronousNode(Node):
         hz = gp("control_hz").get_parameter_value().double_value
         use_sim = gp("use_sim").get_parameter_value().bool_value
 
-        self._close_thr = gp("gripper_close_threshold").get_parameter_value().double_value
-        self._open_thr = gp("gripper_open_threshold").get_parameter_value().double_value
-        self._grip_closed_pos = gp("gripper_closed_position").get_parameter_value().double_value
-        self._grip_open_pos = gp("gripper_open_position").get_parameter_value().double_value
-        self._grip_effort = gp("gripper_max_effort").get_parameter_value().double_value
-        # +1 if the gripper closes towards larger values (Robotiq knuckle), -1 otherwise
+        rp = lambda name: robot_param(self, name)  # noqa: E731
+        self._close_thr = rp("gripper_close_threshold")
+        self._open_thr = rp("gripper_open_threshold")
+        self._grip_closed_pos = rp("gripper_closed_position")
+        self._grip_open_pos = rp("gripper_open_position")
+        self._grip_effort = rp("gripper_max_effort")
+        # +1 if the gripper closes towards larger values (e.g. a Robotiq knuckle), -1 otherwise
         self._grip_sign = 1.0 if self._grip_closed_pos >= self._grip_open_pos else -1.0
 
-        self._arm_joints = list(gp("arm_joints").get_parameter_value().string_array_value)
-        self._gripper_joint = gp("gripper_joint").get_parameter_value().string_value
+        self._arm_joints = list(rp("arm_joints"))
+        self._gripper_joint = rp("gripper_joint")
         self._n_arm = len(self._arm_joints)
 
         js_topic = gp("joint_states_topic").get_parameter_value().string_value
         arm_action = gp("arm_action").get_parameter_value().string_value
-        gripper_action = gp("gripper_action").get_parameter_value().string_value
+        gripper_action = rp("gripper_action")
 
         self._resize_images = gp("resize_images").get_parameter_value().bool_value
         self._image_res = gp("image_resolution").get_parameter_value().integer_value
 
-        camera_keys = list(gp("camera_keys").get_parameter_value().string_array_value)
+        camera_keys = list(rp("camera_keys"))
         topics_param = "sim_camera_topics" if use_sim else "real_camera_topics"
-        camera_topics = list(gp(topics_param).get_parameter_value().string_array_value)
+        camera_topics = list(rp(topics_param))
         if len(camera_topics) != len(camera_keys):
             raise SystemExit(
                 f"{topics_param} has {len(camera_topics)} topics but camera_keys "
@@ -338,7 +316,7 @@ class PolicyClientSynchronousNode(Node):
             obs = self._build_obs()
             if obs is None:
                 self.get_logger().warn(
-                    "Waiting for joint states and both camera frames ...",
+                    "Waiting for joint states and all camera frames ...",
                     throttle_duration_sec=2.0,
                 )
                 time.sleep(0.1)

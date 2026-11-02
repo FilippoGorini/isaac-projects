@@ -1,4 +1,4 @@
-// Minimal reliable-timing trajectory streamer for the Kinova JTC (passthrough, linear).
+// Minimal reliable-timing trajectory streamer for a ros2_control JTC (passthrough, linear).
 //
 // The Python VLA client publishes a 30 Hz "ideal" arm plan as a JointTrajectory on
 // `plan_topic` (header.stamp = the ROS time point 0 starts; point k stamped at
@@ -7,7 +7,9 @@
 // the JTC's own 1 kHz interpolation fills in between. Deterministic C++ timing, no GIL.
 //
 // Two knobs: tick_hz (stream rate) and jtc_horizon (latency <-> smoothness). Passthrough
-// only -- no jerk limiter and no cubic/quintic. (The jerk-limited / multi-interp research
+// only -- no jerk limiter and no cubic/quintic. Optional stage: use it when the JTC shakes
+// when fed full trajectories (e.g. the Kinova Gen3's ~10 Hz torque limit cycle); otherwise
+// point the client's plan_topic at the JTC directly. (The jerk-limited / multi-interp research
 // version lives in the vla_traj_streamer package on the devel branch.)
 
 #include <algorithm>

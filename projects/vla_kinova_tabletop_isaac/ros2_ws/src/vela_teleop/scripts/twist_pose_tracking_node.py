@@ -7,15 +7,15 @@ the control frame from TF, runs a per-axis PID on the 6D error in base_frame,
 saturates the twist and publishes it as geometry_msgs/TwistStamped
 (frame_id = base_frame): the velocity the control frame should move with.
 
-The control frame (control_frame param) is the frame the PID regulates against the
-target, e.g. fingertips_frame on the Kinova (a frame between the gripper fingers) so
-that orientation commands pivot about the fingertips, which is more intuitive to
+The control frame (control_frame param, from the robot profile, no default) is the
+frame the PID regulates against the target, e.g. a frame between the gripper fingers
+so that orientation commands pivot about the fingertips, which is more intuitive to
 teleoperate.
 
 The twist goes to whatever moves the robot: MoveIt Servo, a Cartesian velocity
-controller, or a robot adapter. On the Kinova, kinova_bringup's kortex_twist_adapter
-rotates it into the firmware tool frame, corrects for the control-frame lever arm and
-feeds the Kortex twist controller.
+controller, or a robot adapter (e.g. kinova_bringup's kortex_twist_adapter, which
+rotates it into the Kortex firmware's tool frame and corrects for the control-frame
+lever arm).
 """
 
 
@@ -24,7 +24,9 @@ import numpy as np
 import rclpy
 import transforms3d.quaternions as t3dq
 from geometry_msgs.msg import PoseStamped, TwistStamped
+from rclpy.exceptions import ParameterUninitializedException
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
 from tf2_ros import Buffer, TransformListener, LookupException, ExtrapolationException, ConnectivityException
@@ -63,9 +65,16 @@ class TwistPoseTrackingNode(Node):
         # Static parameters
         self.loop_rate_hz = self._declare("loop_rate_hz", 100.0)
         self.base_frame = self._declare("base_frame", "base_link")
-        # control_frame is the frame the PID regulates, for example fingertips_frame ...
-        # ... to control the frame between the fingertips, which is more intuitive/comfortable
-        self.control_frame = self._declare("control_frame", "end_effector_link")
+        # control_frame is the frame the PID regulates, e.g. a frame between the fingertips,
+        # which is more intuitive/comfortable. A robot fact: no default, it comes from the profile
+        self.declare_parameter("control_frame", Parameter.Type.STRING)
+        try:
+            self.control_frame = self.get_parameter("control_frame").value
+        except ParameterUninitializedException:
+            raise SystemExit(
+                "Parameter 'control_frame' is not set. It is a robot fact: set it in "
+                "vela_robots/config/<robot>/robot.yaml (pose_tracking.launch.py loads it with robot:=<name>)."
+            ) from None
         target_topic = self._declare("target_topic", "/target_frame")
         twist_command_topic = self._declare("twist_command_topic", "/teleop_twist")
 

@@ -7,8 +7,10 @@ copy of every raw frame to DDS (that made teleop lag). Measures the camera side;
 delivery drops to the recorder show up as its 'Frame gap' / 'has no data' warnings.
 Gaps = intervals > 1.5x the median.
 
-    python3 camera_rate_monitor.py                 # wrist + both externals, 5 s windows
-    python3 camera_rate_monitor.py --window 10 /realsense/d435/color/camera_info
+    python3 camera_rate_monitor.py <camera_info topic> [...] [--window 5]
+    # e.g. Kinova: wrist + both external D435s
+    python3 camera_rate_monitor.py /camera/color/camera_info \
+        /realsense/d435/color/camera_info /realsense/d435_2/color/camera_info
 """
 import argparse
 import time
@@ -17,12 +19,6 @@ import numpy as np
 import rclpy
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import CameraInfo
-
-DEFAULT_TOPICS = [
-    "/camera/color/camera_info",
-    "/realsense/d435/color/camera_info",
-    "/realsense/d435_2/color/camera_info",
-]
 
 
 def summary(ts: list) -> str:
@@ -35,7 +31,7 @@ def summary(ts: list) -> str:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("topics", nargs="*", default=DEFAULT_TOPICS)
+    p.add_argument("topics", nargs="+", help="camera_info topics, one per camera")
     p.add_argument("--window", type=float, default=5.0, help="report period [s]")
     args = p.parse_args()
 

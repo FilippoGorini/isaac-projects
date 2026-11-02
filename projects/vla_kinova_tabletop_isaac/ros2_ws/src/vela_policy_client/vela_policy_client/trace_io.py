@@ -7,27 +7,28 @@ NPZ converter, and future thesis analysis all load a run the same way:
 
     from vela_policy_client.trace_io import load_run
     run = load_run("path/to/vla_async_<ts>.jsonl")
-    run.js_pos          # (N, 6) measured arm positions [rad]
-    run.chunk_raw[0]    # (H, 6) first raw model action chunk (arm)
+    run.js_pos          # (N, n) measured arm positions [rad]
+    run.chunk_raw[0]    # (H, n) first raw model action chunk (arm)
     t, pos = run.executed_plan(joint=2)   # the 30 Hz interpolated plan actually streamed
 
 Record types (JSON field `type`), one per line:
 
   meta   once at start -- control_hz, arm_mode, blend_steps, ensemble_decay,
-         ensemble_blend_steps, inference_hz, t_start.
+         ensemble_blend_steps, inference_hz, arm_joints, t_start.
+         n below = len(arm_joints), the robot's arm joints in state/action order.
   chunk  one per inference cycle:
            t_obs      ROS time [s] the observation was captured. Raw-chunk anchor:
                       raw point i is scheduled for t_obs + i/control_hz.
            t_arrive   ROS time [s] the chunk arrived. Blended-plan anchor.
            d          stale-prefix length dropped (points eaten by inference latency).
            horizon    model chunk length H.
-           raw        (H, 6) raw model arm actions.
-           blended    (M, 6) the 30 Hz arm plan actually adopted (interp mode: stale
+           raw        (H, n) raw model arm actions.
+           blended    (M, n) the 30 Hz arm plan actually adopted (interp mode: stale
                       prefix dropped + smoothstep cross-fade into the previous plan;
                       ensemble mode: temporal-ensembled across buffered chunks).
-           grip_raw   (H,) raw model gripper action (col 6), same anchoring as `raw`.
+           grip_raw   (H,) raw model gripper action (col n), same anchoring as `raw`.
            grip_blended (M,) gripper column of the adopted plan (same anchoring as `blended`).
-  js     measured /joint_states, throttled to js_log_hz: t, arm (6), [grip], [vel (6)], [eff (6)].
+  js     measured /joint_states, throttled to js_log_hz: t, arm (n), [grip], [vel (n)], [eff (n)].
   gripper one per gate decision (the discrete OPEN/CLOSE goals the node actually dispatches):
            t, cmd ("OPEN"/"CLOSE"), position (commanded), value (model gripper value that
            tripped the gate), dispatched (bool -- was the action server reachable).
@@ -41,8 +42,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-# fallback for traces written before the client logged meta["arm_joints"]
-ARM_JOINTS = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"]
+# Traces written before the client logged meta["arm_joints"] all come from the Kinova Gen3.
+LEGACY_ARM_JOINTS = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"]
 
 
 @dataclass
@@ -55,18 +56,18 @@ class Run:
     chunk_t_arrive: np.ndarray    # (C,)
     chunk_d: np.ndarray           # (C,) int
     chunk_horizon: np.ndarray     # (C,) int
-    chunk_raw: list               # C arrays, each (H_c, 6)
-    chunk_blended: list           # C arrays, each (M_c, 6)
-    chunk_sent_prefix: list       # C entries: (d, 6) committed prefix SENT to the server, or
+    chunk_raw: list               # C arrays, each (H_c, n)
+    chunk_blended: list           # C arrays, each (M_c, n)
+    chunk_sent_prefix: list       # C entries: (d, n) committed prefix SENT to the server, or
     #                               None (first cycle / non-RTC / pre-logging traces)
     chunk_grip_raw: list          # C arrays, each (H_c,) -- raw model gripper action, or None
     chunk_grip_blended: list      # C arrays, each (M_c,) -- adopted gripper column, or None
     # measured joint states
     js_t: np.ndarray              # (N,)
-    js_pos: np.ndarray            # (N, 6)
+    js_pos: np.ndarray            # (N, n)
     js_grip: np.ndarray | None    # (N,) measured gripper position, or None (pre-logging traces)
-    js_vel: np.ndarray | None     # (N, 6) or None
-    js_eff: np.ndarray | None     # (N, 6) or None
+    js_vel: np.ndarray | None     # (N, n) or None
+    js_eff: np.ndarray | None     # (N, n) or None
     # gripper gate decisions (discrete OPEN/CLOSE goals actually dispatched)
     grip_evt_t: np.ndarray        # (G,)
     grip_evt_cmd: list            # (G,) "OPEN"/"CLOSE" strings
@@ -79,7 +80,7 @@ class Run:
 
     @property
     def arm_joints(self) -> list:
-        return list(self.meta.get("arm_joints", ARM_JOINTS))
+        return list(self.meta.get("arm_joints", LEGACY_ARM_JOINTS))
 
     @property
     def control_hz(self) -> float:
@@ -152,7 +153,7 @@ def load_run(path: str) -> Run:
     ge_t, ge_cmd, ge_pos, ge_val, ge_disp = [], [], [], [], []
     rate_t, rate_hz = [], []
     have_vel = have_eff = have_grip = False
-    n_arm = len(ARM_JOINTS)
+    n_arm = len(LEGACY_ARM_JOINTS)
 
     with open(path) as f:
         for line in f:
@@ -166,7 +167,7 @@ def load_run(path: str) -> Run:
             tp = r.get("type")
             if tp == "meta":
                 meta.update(r)
-                n_arm = len(meta.get("arm_joints", ARM_JOINTS))
+                n_arm = len(meta.get("arm_joints", LEGACY_ARM_JOINTS))
             elif tp == "chunk":
                 t_obs.append(r["t_obs"])
                 t_arr.append(r["t_arrive"])
@@ -237,8 +238,8 @@ def save_npz(run: Run, path: str) -> None:
 
         d = np.load(path, allow_pickle=True)
         meta = json.loads(str(d["meta"]))
-        js_pos = d["js_pos"]                 # (N, 6)
-        raw0 = d["chunk_raw"][0]             # (H, 6)
+        js_pos = d["js_pos"]                 # (N, n)
+        raw0 = d["chunk_raw"][0]             # (H, n)
     """
     np.savez_compressed(
         path,

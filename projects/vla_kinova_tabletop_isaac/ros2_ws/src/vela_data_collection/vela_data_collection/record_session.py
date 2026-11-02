@@ -9,7 +9,8 @@ Usage (after sourcing the workspace):
 
 The `--session` value can be:
     - a bare name (looks for `<name>.toml` in the current directory first,
-      then in the package's share/sessions/ dir).
+      then in the package's share/sessions/ dir, then in every robot profile's
+      sessions/ dir, share/vela_robots/config/<robot>/sessions/).
     - a relative or absolute path to a TOML file.
 
 The lerobot_ros recorder must already be running. When the session completes
@@ -167,6 +168,8 @@ def resolve_session(value: str) -> Optional[Path]:
       1. An absolute or relative path to a `.toml` file that exists.
       2. A bare name (with or without `.toml` suffix) found in CWD.
       3. A bare name found in the package's share/sessions/ dir.
+      4. A bare name found in a robot profile's sessions/ dir
+         (share/vela_robots/config/<robot>/sessions/).
 
     Returns the first hit, or None if nothing matches.
     """
@@ -180,13 +183,15 @@ def resolve_session(value: str) -> Optional[Path]:
     if cwd_candidate.is_file():
         return cwd_candidate.resolve()
 
-    try:
-        share_dir = Path(get_package_share_directory("vela_data_collection"))
-    except Exception:
-        return None
-    share_candidate = share_dir / "sessions" / name
-    if share_candidate.is_file():
-        return share_candidate.resolve()
+    for pkg, pattern in (("vela_data_collection", "sessions"),
+                         ("vela_robots", "config/*/sessions")):
+        try:
+            share_dir = Path(get_package_share_directory(pkg))
+        except Exception:
+            continue
+        hits = sorted(share_dir.glob(f"{pattern}/{name}"))
+        if hits:
+            return hits[0].resolve()
 
     return None
 
@@ -195,7 +200,8 @@ def parse_args(argv: list) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument(
         "--session", "-s", required=True,
-        help="Session TOML: bare name (looked up in CWD, then share/sessions/) "
+        help="Session TOML: bare name (looked up in CWD, then share/sessions/, then the robot "
+             "profiles' sessions/) "
              "or relative/absolute path to a .toml file.",
     )
     return p.parse_args(argv[1:])
@@ -294,7 +300,8 @@ def main(args=None):
     if session_path is None:
         print(f"Session file not found: {parsed.session!r}", file=sys.stderr)
         print(
-            "Looked in: cwd, then share/vela_data_collection/sessions/.",
+            "Looked in: cwd, then share/vela_data_collection/sessions/, then "
+            "share/vela_robots/config/*/sessions/.",
             file=sys.stderr,
         )
         rclpy.shutdown()

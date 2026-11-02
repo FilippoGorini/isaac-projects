@@ -296,7 +296,7 @@ def main():
     ap.add_argument("--tmin", type=float, default=None, help="Start time (s, normalized)")
     ap.add_argument("--tmax", type=float, default=None, help="End time (s, normalized)")
     ap.add_argument("--out", default=None,
-                    help="Save one figure per joint (run.png -> run_joint_1.png)")
+                    help="Save one figure per joint (run.png -> run_<joint name>.png)")
     ap.add_argument("--no-show", action="store_true", help="Do not open a window")
     ap.add_argument("--chunk-style", choices=["flat", "time", "cycle"], default="flat",
                     help="flat (default): all chunks faint orange. time: colour by arrival time "

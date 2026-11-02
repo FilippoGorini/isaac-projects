@@ -3,14 +3,16 @@
 #
 # The node computes a 6D pose error in base_link, runs PID on each axis,
 # saturates the resulting twist and publishes it as TwistStamped in base_link.
-# On the Kinova, kinova_bringup's kortex_twist_adapter rotates it into the tool
-# frame for the picknik_twist_controller / kortex_driver.
+#
+# These are default values, tuned on the Kinova Gen3 (Kortex twist controller via
+# kinova_bringup's kortex_twist_adapter). A robot overrides any of them in the
+# twist_pose_tracking_node section of its vela_robots profile, which is loaded last.
 
 #################################
 
 twist_pose_tracking_node:
   ros__parameters:
-    loop_rate_hz: 100.0                 # Pose tracking rate (kinova's twist controller on the firmware runs at 40 Hz)
+    loop_rate_hz: 100.0                 # Pose tracking rate (above the robot's twist loop, e.g. 40 Hz in the Kinova firmware)
 
     # Stale-target handling — when fresh targets stop arriving:
     #   age <= grace                    : full PID (no scaling, no flutter during normal tracking)

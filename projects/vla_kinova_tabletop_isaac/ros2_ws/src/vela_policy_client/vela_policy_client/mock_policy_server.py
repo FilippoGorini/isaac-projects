@@ -85,7 +85,7 @@ def main():
     p.add_argument("--mode", choices=["hold", "sine"], default="hold")
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=8000)
-    p.add_argument("--horizon", type=int, default=30, help="chunk length (Kinova checkpoints: 30)")
+    p.add_argument("--horizon", type=int, default=30, help="chunk length (match the served checkpoint's action horizon)")
     p.add_argument("--hz", type=float, default=30.0, help="action rate, for the sine phase")
     p.add_argument("--amp", type=float, default=0.05, help="sine amplitude (rad)")
     p.add_argument("--period", type=float, default=4.0, help="sine period (s)")

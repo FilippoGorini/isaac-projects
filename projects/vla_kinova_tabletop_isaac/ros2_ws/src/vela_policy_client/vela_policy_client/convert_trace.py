@@ -11,8 +11,8 @@ Load the result with:
   import json, numpy as np
   d = np.load("TRACE.npz", allow_pickle=True)
   meta = json.loads(str(d["meta"]))
-  js_pos = d["js_pos"]            # (N, 6) measured arm positions
-  raw0 = d["chunk_raw"][0]        # (H, 6) first raw model action chunk
+  js_pos = d["js_pos"]            # (N, n) measured arm positions
+  raw0 = d["chunk_raw"][0]        # (H, n) first raw model action chunk
 """
 
 import argparse

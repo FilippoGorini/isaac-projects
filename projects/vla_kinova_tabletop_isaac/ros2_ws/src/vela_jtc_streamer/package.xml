@@ -3,7 +3,7 @@
 <package format="3">
   <name>vela_jtc_streamer</name>
   <version>0.0.0</version>
-  <description>Minimal reliable-timing C++ streamer: oversamples the 30 Hz VLA arm plan and streams single short-horizon linear-interpolated points to the Kinova JTC (passthrough).</description>
+  <description>Optional reliable-timing C++ streamer: oversamples the 30 Hz VLA arm plan and streams single short-horizon linearly interpolated points to a ros2_control JTC.</description>
   <maintainer email="philgo313@gmail.com">filippo</maintainer>
   <license>Apache-2.0</license>
 

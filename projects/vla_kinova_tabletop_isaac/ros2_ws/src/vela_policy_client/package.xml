@@ -3,7 +3,7 @@
 <package format="3">
   <name>vela_policy_client</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>ROS 2 clients for chunked VLA policies served over the openpi websocket protocol (synchronous, asynchronous RTC, voice-prompted).</description>
   <maintainer email="filippogorini7@gmail.com">filippo</maintainer>
   <license>Apache-2.0</license>
 

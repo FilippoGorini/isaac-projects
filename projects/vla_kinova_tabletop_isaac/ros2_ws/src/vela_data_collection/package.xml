@@ -3,11 +3,10 @@
 <package format="3">
   <name>vela_data_collection</name>
   <version>0.0.0</version>
-  <description>Recording pipeline for Kinova Gen3 + Robotiq 2F-85 LeRobot datasets via lerobot_ros.</description>
+  <description>Recording pipeline for LeRobot datasets via lerobot_ros: recorder launch (robot profile TOML) and session driver.</description>
   <maintainer email="filippogorini7@gmail.com">filippo</maintainer>
   <license>Apache-2.0</license>
 
-  <exec_depend>vela_teleop</exec_depend>
   <exec_depend>lerobot_ros</exec_depend>
   <exec_depend>vela_robots</exec_depend>
 

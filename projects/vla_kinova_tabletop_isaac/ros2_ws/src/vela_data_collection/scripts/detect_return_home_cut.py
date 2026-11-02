@@ -5,16 +5,17 @@ The return-home is the stereotyped tail every episode ends with. We cut each epi
 FINAL gripper release (last closed->open command = object placed) + a settle margin; everything
 after that is the arm travelling back to home and is dropped in phase 2.
 
-Use the gripper COMMAND (action[6]), not the measured state: the command is the operator's
-discrete open/close target -- perfectly binary (0.0 open / 0.8 close), independent of object
-thickness -- so a single 0.4 midpoint is unambiguous. The measured state instead ramps and
-plateaus at a thickness-dependent value (pen ~0.8, cube ~0.3), which is why it needed awkward
-low thresholds. Detect by gripper, NOT pose distance: episode STARTS are also near home, so a
-distance-to-home trigger would clip the start.
+Use the gripper COMMAND (the last action column: state/action = arm joints + gripper), not the
+measured state: the command is the operator's discrete open/close target -- perfectly binary,
+independent of object thickness -- so the midpoint between its two values is unambiguous (the
+default threshold, e.g. 0.4 for the Kinova's 0.0 open / 0.8 closed). The measured state instead
+ramps and plateaus at a thickness-dependent value (Kinova: pen ~0.8, cube ~0.3). Detect by
+gripper, NOT pose distance: episode STARTS are also near home, so a distance-to-home trigger
+would clip the start. Grippers whose value decreases when closing: --closed-below-open.
 
-Margin: the command-open edge LEADS the physical release by ~17 frames (measured median; p90
-20), so the margin must cover that lag plus a small settle before the tail is dropped -- default
-30 frames (~1.0s). Raise it if a spot-check shows a cut landing mid-release.
+Margin: the command-open edge LEADS the physical release (Kinova: ~17 frames measured median;
+p90 20), so the margin must cover that lag plus a small settle before the tail is dropped --
+default 30 frames (~1.0s). Raise it if a spot-check shows a cut landing mid-release.
 
 Run with the lerobot-edit venv:
   datasets/lerobot-edit-venv/bin/python detect_return_home_cut.py <dataset_root> [--out cuts.csv]
@@ -27,8 +28,8 @@ import sys
 import numpy as np
 import pandas as pd
 
-GRIPPER_DIM = 6      # robotiq_85_left_knuckle_joint
-CHANNEL = "action"   # use the command, not observation.state (binary 0/0.8, thickness-independent)
+GRIPPER_DIM = -1     # the gripper is the last state/action column (arm joints + gripper)
+CHANNEL = "action"   # use the command, not observation.state (binary, thickness-independent)
 
 
 def last_release(g, open_thr, close_thr):
@@ -48,13 +49,20 @@ def last_release(g, open_thr, close_thr):
     return last
 
 
-def analyse(root, open_thr, close_thr, margin, fps, channel=CHANNEL):
+def analyse(root, open_thr, close_thr, margin, fps, channel=CHANNEL, closed_below_open=False):
     data_files = glob.glob(f"{root}/data/**/*.parquet", recursive=True)
     df = pd.concat(
         [pd.read_parquet(f, columns=["episode_index", "frame_index", channel]) for f in data_files],
         ignore_index=True,
     )
     df["g"] = np.stack(df[channel].values)[:, GRIPPER_DIM]
+    if closed_below_open:   # flip so that closing increases the value, like the thresholds expect
+        df["g"] = -df["g"]
+        open_thr, close_thr = (None if t is None else -t for t in (open_thr, close_thr))
+    # default threshold: midpoint of the binary command's two values
+    mid = (df["g"].min() + df["g"].max()) / 2
+    open_thr = mid if open_thr is None else open_thr
+    close_thr = mid if close_thr is None else close_thr
     meta = pd.concat(
         [pd.read_parquet(f, columns=["episode_index", "tasks", "length"])
          for f in glob.glob(f"{root}/meta/episodes/**/*.parquet", recursive=True)],
@@ -87,7 +95,7 @@ def analyse(root, open_thr, close_thr, margin, fps, channel=CHANNEL):
 
 
 def _selftest():
-    ot, ct = 0.4, 0.4  # the real defaults; command signal is binary 0/0.8
+    ot, ct = 0.4, 0.4  # the midpoint for a binary 0 / 0.8 command (Kinova)
     o, c = 0.0, 0.8
     # open -> grasp -> release -> travel -> grasp again -> release near end
     trace = [o] * 5 + [c] * 10 + [o] * 20 + [c] * 8 + [o] * 4
@@ -102,8 +110,12 @@ def _selftest():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("root", nargs="?", help="dataset root (contains data/ and meta/)")
-    ap.add_argument("--open-thr", type=float, default=0.4, help="command below this = open")
-    ap.add_argument("--close-thr", type=float, default=0.4, help="command above this = close (signal is binary 0/0.8)")
+    ap.add_argument("--open-thr", type=float, default=None,
+                    help="command below this = open (default: midpoint of the command's min/max)")
+    ap.add_argument("--close-thr", type=float, default=None,
+                    help="command above this = close (default: midpoint of the command's min/max)")
+    ap.add_argument("--closed-below-open", action="store_true",
+                    help="gripper value decreases when closing (e.g. parallel-jaw finger width)")
     ap.add_argument("--margin", type=int, default=30, help="frames kept after the open command; covers the ~17f command->release lag + settle (30 = 1.0s @30fps)")
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--channel", default=CHANNEL, help="gripper source: 'action' (command, default) or 'observation.state'")
@@ -116,7 +128,7 @@ def main():
     if not a.root:
         ap.error("dataset root required (or --selftest)")
 
-    r = analyse(a.root, a.open_thr, a.close_thr, a.margin, a.fps, a.channel)
+    r = analyse(a.root, a.open_thr, a.close_thr, a.margin, a.fps, a.channel, a.closed_below_open)
     tot = r.length.sum()
     print(f"episodes {len(r)}  frames {tot:,} -> {r.new_length.sum():,} "
           f"(removing {r.frames_removed.sum():,} = {100*r.frames_removed.sum()/tot:.1f}%)")

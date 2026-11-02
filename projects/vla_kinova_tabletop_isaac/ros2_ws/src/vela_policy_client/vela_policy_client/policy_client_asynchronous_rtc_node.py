@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Asynchronous RTC VLA policy client for the Kinova Gen3 -- GRID-anchored, RTC-only.
+"""Asynchronous RTC VLA policy client -- GRID-anchored, RTC-only.
 
 Everything lives on a single shared 30 Hz integer timeline. There is one origin `t0` and grid
 step `n` is the instant `t0 + n*dt`; the active plan is stored as knots + the grid index of
@@ -26,13 +26,16 @@ sample. This removes the round()/interpolate ambiguity the wall-clock variant ne
     the chunk arrives.
   * The gripper consumer reads the plan's gripper column by the same integer grid index.
 
-This client is RTC-ONLY: it always sends the committed prefix + fixed delay and needs the
-RTC-finetuned checkpoint (pi05_kinova_finetune_rtc). For standard (non-RTC) inference, or the
-ACT-style ensemble / wall-clock behaviour, use policy_client_asynchronous_walltime.
+This client is RTC-ONLY: it always sends the committed prefix + fixed delay and needs an
+RTC-finetuned checkpoint (e.g. our pi05_kinova_finetune_rtc). For standard (non-RTC) inference,
+use the synchronous client.
 
-The arm is still shaped + streamed by the C++ vela_jtc_streamer/jtc_stream_node (this
-node only publishes the 30 Hz knots on `plan_topic`); the grid just defines the knots the
-streamer interpolates.
+The node only publishes the 30 Hz knots on `plan_topic`: either the optional C++
+vela_jtc_streamer/jtc_stream_node, which oversamples them and streams to the JTC, or the JTC's
+trajectory topic directly. The grid just defines the knots.
+
+Robot facts (joints, gripper, cameras, gripper action) have no defaults: they come from the robot
+profile, see robot_params.py.
 
 Debug trace: set `debug_log_dir` for an append-only JSONL (Ctrl-C safe); schema/loader in
 vela_policy_client/trace_io.py, plot with `plot_vla_trace`. Times are logged grid-aligned
@@ -57,6 +60,8 @@ from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import Image, JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+
+from vela_policy_client.robot_params import T, declare_robot_params, robot_param
 
 try:
     from openpi_client import image_tools
@@ -86,11 +91,12 @@ class PolicyClientAsynchronousRtcNode(Node):
         self.declare_parameter("inference_hz", 1.5)    # 0.0 => free-running
         # RTC (real-time chunking) is ALWAYS on in this node: each observation carries the
         # committed action prefix + a fixed inference delay d, so the RTC-finetuned model
-        # (pi05_kinova_finetune_rtc) hard-pins the new chunk's first d steps to the plan knots the
-        # arm is executing -- a seamless continuation. Needs the RTC checkpoint.
-        # d: committed-prefix length in grid steps. ~140 ms at 30 Hz => 5. Max 7:
-        # pi05_kinova_finetune_rtc trained on randint(0, max_delay=8) = delays 0..7. Choose d in
-        # slight excess of the real latency so the next chunk is back before the prefix runs out.
+        # hard-pins the new chunk's first d steps to the plan knots the arm is executing -- a
+        # seamless continuation. Needs an RTC checkpoint.
+        # d: committed-prefix length in grid steps, e.g. ~140 ms at 30 Hz => 5. It must be below the
+        # checkpoint's trained max_delay (a model trained on randint(0, max_delay=8) knows delays
+        # 0..7). Choose d in slight excess of the real latency so the next chunk is back before the
+        # prefix runs out.
         self.declare_parameter("rtc_delay_steps", 5)
         # The served checkpoint's trained max_delay: this is just to warn in case a delay bigger than the max the checkpoint was trained on is requested
         self.declare_parameter("model_max_delay", 10)
@@ -102,31 +108,25 @@ class PolicyClientAsynchronousRtcNode(Node):
         # Gripper loop rate; default = the 30 Hz grid rate (one VLA gripper knot per tick).
         self.declare_parameter("gripper_hz", 30.0)
 
-        # Gripper hysteresis (near-binary model output: 0 open / ~0.8 closed).
-        self.declare_parameter("gripper_close_threshold", 0.55)
-        self.declare_parameter("gripper_open_threshold", 0.30)
-        self.declare_parameter("gripper_closed_position", 0.8)
-        self.declare_parameter("gripper_open_position", 0.0)
-        self.declare_parameter("gripper_max_effort", 50.0)
-
-        # Arm joints in state/action order + the gripper joint (obs = joints + gripper).
-        self.declare_parameter("arm_joints", ["joint_1", "joint_2", "joint_3",
-                                              "joint_4", "joint_5", "joint_6"])
-        self.declare_parameter("gripper_joint", "robotiq_85_left_knuckle_joint")
-
-        # Camera topics (use_sim picks the pair). /joint_states is read by joint name, so its
-        # scrambled order is irrelevant.
-        # Parallel arrays: image from topic i goes to the server as obs[camera_keys[i]].
-        self.declare_parameter("camera_keys", ["base_rgb", "wrist_rgb"])
-        self.declare_parameter("sim_camera_topics", ["/isaac_external_camera/color/image_raw",
-                                                     "/isaac_wrist_camera/color/image_raw"])
-        self.declare_parameter("real_camera_topics", ["/realsense/d435/color/image_raw",
-                                                      "/camera/color/image_raw"])
+        # Robot facts, no defaults (robot profile):
+        #   gripper hysteresis on the model's near-binary gripper output + the binary goal values;
+        #   arm joints in state/action order + the gripper joint (obs = joints + gripper);
+        #   cameras as parallel arrays: the image from topic i goes to the server as
+        #   obs[camera_keys[i]], use_sim picks the topic list.
+        declare_robot_params(self, {
+            "gripper_close_threshold": T.DOUBLE, "gripper_open_threshold": T.DOUBLE,
+            "gripper_closed_position": T.DOUBLE, "gripper_open_position": T.DOUBLE,
+            "gripper_max_effort": T.DOUBLE,
+            "arm_joints": T.STRING_ARRAY, "gripper_joint": T.STRING,
+            "camera_keys": T.STRING_ARRAY,
+            "sim_camera_topics": T.STRING_ARRAY, "real_camera_topics": T.STRING_ARRAY,
+            "gripper_action": T.STRING,
+        })
+        # /joint_states is read by joint name, so its order is irrelevant.
         self.declare_parameter("joint_states_topic", "/joint_states")
         # 30 Hz plan output: the C++ jtc_stream_node subscribes here, shapes it, and streams to
         # the JTC. This node does NOT publish to the JTC directly.
         self.declare_parameter("plan_topic", "/vla_arm_plan")
-        self.declare_parameter("gripper_action", "/robotiq_gripper_controller/gripper_cmd")
 
         self.declare_parameter("resize_images", True)
         self.declare_parameter("image_resolution", 224)
@@ -150,21 +150,22 @@ class PolicyClientAsynchronousRtcNode(Node):
 
         self._gripper_hz = max(gp("gripper_hz").get_parameter_value().double_value, 1.0)
 
-        self._close_thr = gp("gripper_close_threshold").get_parameter_value().double_value
-        self._open_thr = gp("gripper_open_threshold").get_parameter_value().double_value
-        self._grip_closed_pos = gp("gripper_closed_position").get_parameter_value().double_value
-        self._grip_open_pos = gp("gripper_open_position").get_parameter_value().double_value
-        self._grip_effort = gp("gripper_max_effort").get_parameter_value().double_value
-        # +1 if the gripper closes towards larger values (Robotiq knuckle), -1 otherwise
+        rp = lambda name: robot_param(self, name)  # noqa: E731
+        self._close_thr = rp("gripper_close_threshold")
+        self._open_thr = rp("gripper_open_threshold")
+        self._grip_closed_pos = rp("gripper_closed_position")
+        self._grip_open_pos = rp("gripper_open_position")
+        self._grip_effort = rp("gripper_max_effort")
+        # +1 if the gripper closes towards larger values (e.g. a Robotiq knuckle), -1 otherwise
         self._grip_sign = 1.0 if self._grip_closed_pos >= self._grip_open_pos else -1.0
 
-        self._arm_joints = list(gp("arm_joints").get_parameter_value().string_array_value)
-        self._gripper_joint = gp("gripper_joint").get_parameter_value().string_value
+        self._arm_joints = list(rp("arm_joints"))
+        self._gripper_joint = rp("gripper_joint")
         self._n_arm = len(self._arm_joints)
 
         js_topic = gp("joint_states_topic").get_parameter_value().string_value
         plan_topic = gp("plan_topic").get_parameter_value().string_value
-        gripper_action = gp("gripper_action").get_parameter_value().string_value
+        gripper_action = rp("gripper_action")
 
         self._resize_images = gp("resize_images").get_parameter_value().bool_value
         self._image_res = gp("image_resolution").get_parameter_value().integer_value
@@ -173,9 +174,9 @@ class PolicyClientAsynchronousRtcNode(Node):
         self._js_log_period = 1.0 / js_log_hz if js_log_hz > 0 else 0.0   # 0 => every sample
         self._rate_report_sec = gp("rate_report_sec").get_parameter_value().double_value
 
-        camera_keys = list(gp("camera_keys").get_parameter_value().string_array_value)
+        camera_keys = list(rp("camera_keys"))
         topics_param = "sim_camera_topics" if use_sim else "real_camera_topics"
-        camera_topics = list(gp(topics_param).get_parameter_value().string_array_value)
+        camera_topics = list(rp(topics_param))
         if len(camera_topics) != len(camera_keys):
             raise SystemExit(f"{topics_param} has {len(camera_topics)} topics but camera_keys "
                              f"has {len(camera_keys)}; they must be parallel arrays.")
@@ -225,7 +226,7 @@ class PolicyClientAsynchronousRtcNode(Node):
         self._t0: float | None = None
         # Grid step to launch the next inference on (obs capture is locked to this tick).
         self._n_launch: int = 0
-        # Active plan (guarded by _plan_lock): (knots (M,7), n0) -- knot k is at grid step n0+k.
+        # Active plan (guarded by _plan_lock): (knots (M, n_arm+1), n0) -- knot k is at grid step n0+k.
         self._plan_lock = threading.Lock()
         self._plan: tuple[np.ndarray, int] | None = None
         # Bumped by _reset_plan: a chunk whose inference started before a reset is discarded.
@@ -536,7 +537,7 @@ class PolicyClientAsynchronousRtcNode(Node):
             "type": "chunk", "t_obs": t_obs, "t_arrive": t_anchor,
             "d": int(d_elapsed), "horizon": int(horizon),
             "raw": actions[:, :n].tolist(), "blended": blended[:, :n].tolist(),
-            # Gripper command trajectory (col 6): lets a stuck / never-reopened gripper be
+            # Gripper command trajectory (col n_arm): lets a stuck / never-reopened gripper be
             # diagnosed straight from the trace -- did the model even command open (value below
             # gripper_open_threshold), or did it sit in the hysteresis dead zone?
             "grip_raw": actions[:, n].tolist(), "grip_blended": blended[:, n].tolist(),
@@ -576,7 +577,7 @@ class PolicyClientAsynchronousRtcNode(Node):
     # ------------------------------------------------------------------
 
     def _prefix_from_plan(self, plan, n_obs: int, d: int) -> np.ndarray:
-        """RTC committed prefix: the d plan knots (absolute, 6 arm + 1 gripper) the arm will
+        """RTC committed prefix: the d plan knots (absolute, n_arm arm + 1 gripper) the arm will
         execute during the inference delay -- grid steps [n_obs, n_obs+d). A pure integer slice
         of the active plan (clamped at its ends), so it is exactly what the arm executes; the
         model pins the returned chunk's first d steps to it. The server re-anchors/normalizes it

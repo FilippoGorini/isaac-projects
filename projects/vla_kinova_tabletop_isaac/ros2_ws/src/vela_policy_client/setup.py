@@ -19,7 +19,7 @@ setup(
     zip_safe=True,
     maintainer='filippo',
     maintainer_email='filippogorini7@gmail.com',
-    description='ROS 2 policy client for pi0/pi05 VLA on Kinova Gen3',
+    description='ROS 2 clients for chunked VLA policies served over the openpi websocket protocol (synchronous, asynchronous RTC, voice-prompted).',
     license='Apache-2.0',
     extras_require={
         'test': [
