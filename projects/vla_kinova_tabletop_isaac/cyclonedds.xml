@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- Keeps all ROS 2 traffic on loopback. Without it CycloneDDS picks one wired interface on its own,
+     which on the robot PC was the arm's Ethernet, and can multicast camera frames onto it.
+     Loopback has no multicast, so discovery goes by unicast to localhost, and the participant index
+     limit is raised from its default (~10 processes per domain) so the full stack fits. -->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain Id="any">
+    <General>
+      <Interfaces>
+        <NetworkInterface name="lo"/>
+      </Interfaces>
+      <AllowMulticast>false</AllowMulticast>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>60</MaxAutoParticipantIndex>
+      <Peers>
+        <Peer address="localhost"/>
+      </Peers>
+    </Discovery>
+  </Domain>
+</CycloneDDS>
