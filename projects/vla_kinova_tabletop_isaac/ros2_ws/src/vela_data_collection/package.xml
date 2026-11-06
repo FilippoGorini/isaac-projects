@@ -3,7 +3,7 @@
 <package format="3">
   <name>vela_data_collection</name>
   <version>0.0.0</version>
-  <description>Recording pipeline for LeRobot datasets via lerobot_ros: recorder launch (robot profile TOML) and session driver.</description>
+  <description>Recording pipeline for LeRobot datasets via lerobot_ros: recorder launch (robot profile TOML) and session driver. Also an on-demand video recorder for evaluation trials.</description>
   <maintainer email="filippogorini7@gmail.com">filippo</maintainer>
   <license>Apache-2.0</license>
 
@@ -16,6 +16,10 @@
   <exec_depend>std_srvs</exec_depend>
   <exec_depend>lerobot_interfaces</exec_depend>
   <exec_depend>python3-toml</exec_depend>
+
+  <!-- video_recorder deps -->
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>ffmpeg</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

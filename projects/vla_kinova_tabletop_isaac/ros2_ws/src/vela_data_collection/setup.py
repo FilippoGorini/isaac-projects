@@ -20,7 +20,7 @@ setup(
     zip_safe=True,
     maintainer='filippo',
     maintainer_email='filippogorini7@gmail.com',
-    description='Recording pipeline for LeRobot datasets via lerobot_ros: recorder launch (robot profile TOML) and session driver.',
+    description='Recording pipeline for LeRobot datasets via lerobot_ros: recorder launch (robot profile TOML) and session driver. Also an on-demand video recorder for evaluation trials.',
     license='Apache-2.0',
     extras_require={
         'test': [
@@ -30,6 +30,7 @@ setup(
     entry_points={
         'console_scripts': [
             'record_session = vela_data_collection.record_session:main',
+            'video_recorder = vela_data_collection.video_recorder:main',
         ],
     },
 )
