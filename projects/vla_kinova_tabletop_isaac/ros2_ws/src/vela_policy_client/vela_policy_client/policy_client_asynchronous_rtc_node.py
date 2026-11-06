@@ -124,6 +124,10 @@ class PolicyClientAsynchronousRtcNode(Node):
         })
         # /joint_states is read by joint name, so its order is irrelevant.
         self.declare_parameter("joint_states_topic", "/joint_states")
+        # With no joint states for this long [s], stop inference and the streamer until a new
+        # prompt arrives. Otherwise the model keeps running on a frozen state and the plan drifts
+        # away from the arm, which snaps towards it when the bringup comes back.
+        self.declare_parameter("joint_state_timeout", 0.5)
         # 30 Hz plan output: the C++ jtc_stream_node subscribes here, shapes it, and streams to
         # the JTC. This node does NOT publish to the JTC directly.
         self.declare_parameter("plan_topic", "/vla_arm_plan")
@@ -164,6 +168,7 @@ class PolicyClientAsynchronousRtcNode(Node):
         self._n_arm = len(self._arm_joints)
 
         js_topic = gp("joint_states_topic").get_parameter_value().string_value
+        self._joint_state_timeout = gp("joint_state_timeout").get_parameter_value().double_value
         plan_topic = gp("plan_topic").get_parameter_value().string_value
         gripper_action = rp("gripper_action")
 
@@ -217,6 +222,8 @@ class PolicyClientAsynchronousRtcNode(Node):
         self._obs_lock = threading.Lock()
         self._joint_positions: dict[str, float] = {}
         self._measured_arm = None
+        self._last_js_time: float | None = None     # monotonic time of the last arm joint states
+        self._state_lost = False                    # latched until a new prompt
         self._images: dict[str, np.ndarray | None] = {k: None for k in camera_keys}
         self._missing_status = "initializing"
 
@@ -304,6 +311,8 @@ class PolicyClientAsynchronousRtcNode(Node):
         with self._obs_lock:
             for name, pos in zip(msg.name, msg.position):
                 self._joint_positions[name] = pos
+            if set(self._arm_joints) <= set(msg.name):
+                self._last_js_time = time.monotonic()
             arm = None
             grip = self._joint_positions.get(self._gripper_joint)
             if all(j in self._joint_positions for j in self._arm_joints):
@@ -362,7 +371,25 @@ class PolicyClientAsynchronousRtcNode(Node):
         self._infer_n = 0
         self._infer_report_wall = now_wall
 
+    def _check_joint_states(self) -> None:
+        """Latch _state_lost when joint states go stale, and stop the streamer with an empty plan.
+        A JTC that comes back with no commands holds the arm's actual pose, wherever it is now."""
+        with self._obs_lock:
+            last = self._last_js_time
+        if (self._state_lost or last is None
+                or time.monotonic() - last <= self._joint_state_timeout):
+            return
+        self._state_lost = True
+        self._reset_plan()
+        self._plan_pub.publish(JointTrajectory())
+        self.get_logger().error(
+            "Joint states lost: stopped sending commands until a new prompt arrives.")
+
     def _build_obs(self) -> dict | None:
+        self._check_joint_states()
+        if self._state_lost:
+            self._missing_status = "joint states were lost; send a new prompt or restart the client"
+            return None
         with self._obs_lock:
             missing = [j for j in self._arm_joints + [self._gripper_joint]
                        if j not in self._joint_positions]

@@ -86,7 +86,12 @@ private:
   {
     const size_t n = msg->points.size();
     const size_t nj = msg->joint_names.size();
-    if (n == 0 || nj == 0) return;
+    // An empty plan means stop sending: the JTC then holds on its own, even if it restarts.
+    if (n == 0 || nj == 0) {
+      std::lock_guard<std::mutex> lk(plan_mtx_);
+      have_plan_ = false;
+      return;
+    }
     // Joints are whatever the plan names (the client's arm_joints), forwarded as-is to the JTC.
     std::vector<double> arr(n * nj);
     for (size_t k = 0; k < n; ++k) {

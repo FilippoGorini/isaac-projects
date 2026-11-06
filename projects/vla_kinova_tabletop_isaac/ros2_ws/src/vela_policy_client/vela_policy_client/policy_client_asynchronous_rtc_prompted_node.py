@@ -54,6 +54,7 @@ class PolicyClientAsynchronousRtcPromptedNode(PolicyClientAsynchronousRtcNode):
                 f"(start the speech_to_prompt node and speak).")
 
     def _cb_prompt(self, msg: String) -> None:
+        self._state_lost = False    # any prompt message restarts after lost joint states
         # The topic is latched so we only react on a change
         prompt = process_prompt(msg.data)
         if prompt == self._prompt:
