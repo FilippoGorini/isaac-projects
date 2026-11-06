@@ -21,6 +21,7 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from std_msgs.msg import String
+from trajectory_msgs.msg import JointTrajectory
 
 from vela_policy_client.policy_client_asynchronous_rtc_node import (
     PolicyClientAsynchronousRtcNode,
@@ -63,10 +64,11 @@ class PolicyClientAsynchronousRtcPromptedNode(PolicyClientAsynchronousRtcNode):
         if prompt:
             self.get_logger().info(f'New prompt: "{prompt}"')
         else:
-            # If stopping, drop the active plan -> C++ streamer holds the last knot -> arm goes idle
+            # If stopping, drop the active plan and send an empty one -> streamer stops sending, JTC keeps the arm still
             # When resuming first_chunk goes True again: keep the whole chunk and no stale RTC prefix or blend
             # A chunk already in flight is discarded when it lands (otherwise it would run after the stop)
             self._reset_plan()
+            self._plan_pub.publish(JointTrajectory())
             self.get_logger().info("Prompt cleared -> inference paused, arm holding pose.")
         self._log_event({"type": "prompt", "t": self._now(), "prompt": prompt})
 
