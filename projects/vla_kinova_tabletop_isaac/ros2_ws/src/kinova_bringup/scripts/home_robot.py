@@ -14,7 +14,15 @@ class HomeRobot(Node):
         prefix = prefix.strip('"\'')
 
         if positions is None:
-            self.positions = [0.0, -0.29473, -2.14440, 0.0, -1.25329, 1.5708]        # average starting position in the clutter dataset approximated to be centered
+            # average starting position in the clutter dataset approximated to be centered
+            # self.positions = [0.0, -0.29473, -2.14440, 0.0, -1.25329, 1.5708]   
+      
+            # average starting position in the clutter dataset approximated to be centered minus j4 encoder offset (~/ros2_kortex_ws/data/kin_calib/fit_3placements.txt)
+            self.positions = [0.0, -0.29473, -2.14440, 0.06971, -1.25329, 1.5708]
+
+            # # average starting position in the clutter dataset approximated to be centered minus all encoder offsets (~/ros2_kortex_ws/data/kin_calib/fit_3placements.txt)
+            # self.positions = [0.0, -0.30779, -2.15016, 0.06971, -1.25046, 1.5708]
+
             # self.positions = [0.0, -0.281186, -2.169146, 0.0, -1.197100, 1.5708]        # average starting position in the dataset approximated to be centered
             # self.positions = [0.0, 0.418879, -1.8675, 0.0, 0.750492, 1.5708]        # looking forward position
         else:
