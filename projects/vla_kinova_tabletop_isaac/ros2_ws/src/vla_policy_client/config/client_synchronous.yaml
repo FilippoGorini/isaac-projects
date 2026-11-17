@@ -1,0 +1,16 @@
+policy_client_synchronous:
+  ros__parameters:
+    policy_host: "localhost"
+    policy_port: 8000
+    prompt: "lift the blue cube"
+    control_hz: 30.0          # rate at which each action chunk's step is executed
+    use_sim: true             # false => real-robot camera topics + use_sim_time off
+
+    # Use the resize_images parameter to either send native resolution camera frames or pre-resize them (with padding)
+    # on the client side to make a lighter websocket payload. The server resizes anyways but behaviour is unchanged if 
+    # the incoming frames are already the correct res
+    resize_images: true
+    image_resolution: 224   
+
+    # Robot facts (joints, gripper values, cameras, controller topics) come from
+    # vla_robots/config/<robot>/robot.yaml, loaded after this file by the launch files.

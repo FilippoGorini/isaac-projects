@@ -4,7 +4,7 @@
 Kortex twist adapter: turns the teleop tracker's generic twist into what the Kinova firmware expects.
 
 Subscribes to geometry_msgs/TwistStamped (the velocity of control_frame, expressed in the header's
-frame, e.g. base_link) from vela_teleop's twist_pose_tracking_node, and publishes geometry_msgs/Twist
+frame, e.g. base_link) from vla_teleop's twist_pose_tracking_node, and publishes geometry_msgs/Twist
 on the picknik_twist_controller command topic. kortex_driver interprets that twist in
 CARTESIAN_REFERENCE_FRAME_TOOL (end_effector_link), so the twist is rotated into the tool frame.
 

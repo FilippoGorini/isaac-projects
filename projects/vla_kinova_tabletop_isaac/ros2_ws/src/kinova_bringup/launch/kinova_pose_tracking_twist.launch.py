@@ -30,7 +30,7 @@ def launch_setup(context, *args, **kwargs):
 
     # adapter: control_frame from the Kinova robot profile, its own topics/ee_frame from kinova_bringup
     robot_yaml = os.path.join(
-        get_package_share_directory("vela_robots"), "config", "kinova_gen3_6dof", "robot.yaml"
+        get_package_share_directory("vla_robots"), "config", "kinova_gen3_6dof", "robot.yaml"
     )
     adapter_yaml = os.path.join(
         get_package_share_directory(bringup_pkg), "config", "kortex_twist_adapter.yaml"
@@ -81,7 +81,7 @@ def launch_setup(context, *args, **kwargs):
             # generic tracker launch plus the kinova profile
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(os.path.join(
-                    get_package_share_directory("vela_teleop"), "launch", "pose_tracking.launch.py",
+                    get_package_share_directory("vla_teleop"), "launch", "pose_tracking.launch.py",
                 )),
                 launch_arguments={"robot": "kinova_gen3_6dof"}.items(),
             ),
