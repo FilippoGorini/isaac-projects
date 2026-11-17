@@ -2,10 +2,11 @@
 # Project environment setup script.
 #
 # Source this in every new terminal before working on the project:
-#   source setup.bash
+#   source setup.bash        # real robot: DDS on loopback (from .env)
+#   source setup.bash sim    # Isaac Sim: ROS 2 DDS defaults, so an unmodified Isaac Sim can connect
 #
 # It will:
-#   1. Load project-specific variables from .env (if present)
+#   1. Load project-specific variables from .env (if present), dropping the loopback settings with `sim`
 #   2. Source the ROS 2 environment (Humble or Jazzy, whichever is installed)
 #   3. Source the colcon workspace if it has been built
 #
@@ -23,6 +24,12 @@ if [[ -f "${_project_dir}/.env" ]]; then
   echo "[setup] Loaded ${_project_dir}/.env"
 else
   echo "[setup] No .env found — skipping project overrides."
+fi
+
+# Isaac Sim's ROS bridge defaults to Fast DDS on all interfaces and can't reach loopback-only nodes so we unset the localhost only mode when sim flag is active
+if [[ "${1:-}" == "sim" ]]; then
+  unset ROS_LOCALHOST_ONLY CYCLONEDDS_URI
+  echo "[setup] Sim mode: DDS on the default network interfaces (not for the real arm)"
 fi
 
 # ─── 2. Source ROS 2 ──────────────────────────────────────────────────────────

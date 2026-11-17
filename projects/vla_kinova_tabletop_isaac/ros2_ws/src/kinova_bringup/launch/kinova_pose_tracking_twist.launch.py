@@ -13,7 +13,6 @@ from launch.actions import (
     ExecuteProcess,
     IncludeLaunchDescription,
     OpaqueFunction,
-    SetEnvironmentVariable,
     TimerAction,
 )
 from launch.conditions import IfCondition
@@ -28,13 +27,6 @@ def launch_setup(context, *args, **kwargs):
     launch_rviz = LaunchConfiguration("launch_rviz").perform(context)
     tf_publish_rate = LaunchConfiguration("tf_publish_rate").perform(context)
     gripper_max_force = LaunchConfiguration("gripper_max_force").perform(context)
-
-    # Suppress Cyclone DDS multicast-write warnings to avoid flooding terminal
-    # The ros2 control node sometimes crashes but real errors were lost in the dds warnings
-    quiet_dds = SetEnvironmentVariable(
-        name="CYCLONEDDS_URI",
-        value="<CycloneDDS><Domain><Tracing><Verbosity>severe</Verbosity></Tracing></Domain></CycloneDDS>",
-    )
 
     # adapter: control_frame from the Kinova robot profile, its own topics/ee_frame from kinova_bringup
     robot_yaml = os.path.join(
@@ -107,7 +99,7 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(launch_rviz),
     )
 
-    return [quiet_dds, controllers_launch, switch_to_twist, tracking_node, rviz_node]
+    return [controllers_launch, switch_to_twist, tracking_node, rviz_node]
 
 
 def generate_launch_description():
