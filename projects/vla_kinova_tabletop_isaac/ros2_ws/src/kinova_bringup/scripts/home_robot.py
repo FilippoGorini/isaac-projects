@@ -1,45 +1,39 @@
 #!/usr/bin/env python3
+import os
 import sys
 import argparse
 import rclpy
+import yaml
+from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 
 
+def load_profile(robot):
+    """robot.yaml parameters of a vla_robots profile."""
+    path = os.path.join(get_package_share_directory('vla_robots'), 'config', robot, 'robot.yaml')
+    with open(path) as f:
+        return yaml.safe_load(f)['/**']['ros__parameters']
+
+
 class HomeRobot(Node):
-    def __init__(self, prefix='', positions=None):
+    def __init__(self, robot, positions=None):
         super().__init__('home_robot')
 
-        prefix = prefix.strip('"\'')
+        # Joints, home pose and JTC topic come from the robot profile
+        profile = load_profile(robot)
+        self.joint_names = profile['arm_joints']
+        self.positions = positions if positions is not None else profile['home_positions']
+        if len(self.positions) != len(self.joint_names):
+            raise SystemExit(f'{len(self.positions)} positions for {len(self.joint_names)} joints')
 
-        if positions is None:
-            # average starting position in the clutter dataset approximated to be centered
-            # self.positions = [0.0, -0.29473, -2.14440, 0.0, -1.25329, 1.5708]   
-      
-            # average starting position in the clutter dataset approximated to be centered minus j4 encoder offset (~/ros2_kortex_ws/data/kin_calib/fit_3placements.txt)
-            self.positions = [0.0, -0.29473, -2.14440, 0.06971, -1.25329, 1.5708]
-
-            # # average starting position in the clutter dataset approximated to be centered minus all encoder offsets (~/ros2_kortex_ws/data/kin_calib/fit_3placements.txt)
-            # self.positions = [0.0, -0.30779, -2.15016, 0.06971, -1.25046, 1.5708]
-
-            # self.positions = [0.0, -0.281186, -2.169146, 0.0, -1.197100, 1.5708]        # average starting position in the dataset approximated to be centered
-            # self.positions = [0.0, 0.418879, -1.8675, 0.0, 0.750492, 1.5708]        # looking forward position
-        else:
-            self.positions = positions
-
-        self.joint_names = [f'{prefix}joint_{i+1}' for i in range(len(self.positions))]
-
-        self.publisher_ = self.create_publisher(
-            JointTrajectory,
-            '/joint_trajectory_controller/joint_trajectory',
-            10
-        )
+        self.publisher_ = self.create_publisher(JointTrajectory, profile['arm_trajectory_topic'], 10)
 
         self.timer = self.create_timer(1.0, self.home)
         self.done = False
 
-        self.get_logger().info(f'Homing robot (prefix: "{prefix}") to positions: {self.positions}')
+        self.get_logger().info(f'Homing robot (profile: {robot}) to positions: {self.positions}')
 
     def home(self):
         if self.done:
@@ -63,14 +57,14 @@ class HomeRobot(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    parser = argparse.ArgumentParser(description='Home the Kinova arm to the default observation position')
-    parser.add_argument('--prefix', type=str, default='', help='Joint name prefix')
-    parser.add_argument('--positions', type=float, nargs='+', help='Target joint positions')
+    parser = argparse.ArgumentParser(description='Home the arm to the robot profile\'s home_positions')
+    parser.add_argument('--robot', type=str, default='kinova_gen3_6dof', help='vla_robots profile')
+    parser.add_argument('--positions', type=float, nargs='+', help='Target joint positions (overrides the profile)')
 
     ros_args = rclpy.utilities.remove_ros_args(sys.argv[1:])
     parsed_args = parser.parse_args(ros_args)
 
-    node = HomeRobot(prefix=parsed_args.prefix, positions=parsed_args.positions)
+    node = HomeRobot(robot=parsed_args.robot, positions=parsed_args.positions)
 
     try:
         rclpy.spin(node)

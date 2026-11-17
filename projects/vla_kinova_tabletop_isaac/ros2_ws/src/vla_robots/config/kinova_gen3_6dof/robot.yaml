@@ -20,6 +20,10 @@
     sim_camera_topics:  [/isaac_external_camera/color/image_raw, /isaac_wrist_camera/color/image_raw]
     arm_action: /joint_trajectory_controller/follow_joint_trajectory
     arm_trajectory_topic: /joint_trajectory_controller/joint_trajectory
+    # Homing pose (arm_joints order), read by kinova_bringup's home_robot.py: the average start of the clutter dataset,
+    # centered. j4 = +3.994 deg cancels its encoder offset (~/ros2_kortex_ws/data/kin_calib/fit_3placements.txt);
+    # with all fitted offsets it would be [0.0, -0.30779, -2.15016, 0.06971, -1.25046, 1.5708].
+    home_positions: [0.0, -0.29473, -2.14440, 0.06971, -1.25329, 1.5708]
 
 twist_pose_tracking_node:
   ros__parameters:
