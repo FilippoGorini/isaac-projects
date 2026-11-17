@@ -18,9 +18,11 @@ Usage:
 
 import os
 
-from ament_index_python.packages import get_package_prefix
+import toml
+import yaml
+from ament_index_python.packages import get_package_prefix, get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, OpaqueFunction, SetEnvironmentVariable
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -31,6 +33,27 @@ def _venv_python():
     ws = os.path.dirname(os.path.dirname(get_package_prefix("lerobot_ros")))
     path = os.path.join(ws, "src", "lerobot_ros", ".venv", "bin", "python")
     return path if os.path.isfile(path) else None
+
+
+def _check_joints(context):
+    # The clients read state/actions by the profile's joint order, so a recorder config that
+    # differs (missing joint, other order) would silently record an unusable dataset.
+    robot = LaunchConfiguration("robot").perform(context)
+    config = LaunchConfiguration("config").perform(context)
+    with open(os.path.join(get_package_share_directory("vla_robots"), "config", robot, "robot.yaml")) as f:
+        profile = yaml.safe_load(f)["/**"]["ros__parameters"]
+    expected = profile["arm_joints"] + [profile["gripper_joint"]]
+    # lerobot_ros concatenates the JointState topics of each tag in TOML order
+    columns = {"observation": [], "action": []}
+    for topic in toml.load(config)["topics"].values():
+        tag = topic.get("tag", "observation")
+        if topic.get("msg_type") == "JointState" and tag in columns:
+            columns[tag] += topic["joints"]
+    for tag, joints in columns.items():
+        if joints != expected:
+            raise RuntimeError(f"{config}: {tag} joints {joints} != arm_joints + gripper_joint "
+                               f"{expected} of robot:={robot}")
+    return []
 
 
 def generate_launch_description():
@@ -52,6 +75,7 @@ def generate_launch_description():
             default_value=default_config,
             description="Path to the lerobot_ros recorder TOML config.",
         ),
+        OpaqueFunction(function=_check_joints),
         SetEnvironmentVariable("HF_HUB_OFFLINE", "1"),
         Node(
             package="lerobot_ros",
